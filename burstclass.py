@@ -3,23 +3,18 @@
 # This code is a preliminary attempt to develop a burst class for MINBAR,
 # including model-observation comparisons. 
 # 
-# The first type of implementation we want to include is the "reference"
-# bursts, which have a format like this:
-# 
-#     #
-#     # Columns are:
-#     # 'Time [s]' 'dt [s]' 'flux [10^-9 erg/cm^2/s]' 'flux error [10^-9 erg/cm^2/s]' 'blackbody temperature kT [keV]' 'kT error [keV]' 'blackbody normalisation K_bb [(km/d_10kpc)^2]' 'K_bb error [(km/d_10kpc)^2]' chi-sq
-#      -1.750  0.500   1.63    0.054   1.865  0.108   13.891   4.793  0.917
-#      -1.250  0.500   2.88    1.005   1.862  0.246   22.220   4.443  1.034
-#      -0.750  0.500   4.38    1.107   1.902  0.093   30.247   2.943  1.089
-#      -0.250  0.500   6.57    0.463   1.909  0.080   46.936   6.969  0.849
-# 
-# We ultimately want to run the comparison step in mlfit, which is invoked
-# with something like this:
-# 
-#     params, uparams, ms, chisq, goodParams = lcCompare(burstFile,obsfile,plot=True)
+# Here are the classes and functions making up this module:
+#
+# class Lightcurve(object):
+# class ObservedBurst(Lightcurve):
+# class KeplerBurst(Lightcurve):
+#
+# def decode_LaTeX(string):
+# def modelFunc(p,obs,model): 
 
 import numpy as np
+from math import *
+
 import astropy.units as u
 import astropy.constants as const
 import astropy.io.ascii as ascii
@@ -29,7 +24,7 @@ import re
 from scipy.interpolate import interp1d
 from astroquery.vizier import Vizier
 
-from math import *
+from anisotropy import *
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -140,7 +135,11 @@ class Lightcurve(object):
 #        plt.plot(self.time,self.flux)
 
         assert self.timepixr == 0.0
-        plt.step(self.time,self.flux,where='post')
+        plt.step(self.time,self.flux,where='post',
+#		label=self.filename.replace('_',r'\_'))
+		label=self.filename)
+        plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
+            self.flux.value, yerr=self.flux_err.value,fmt='b.')
         plt.xlabel("Time ({0.unit:latex_inline})".format(self.time))
         plt.ylabel("Flux ({0.unit:latex_inline})".format(self.flux))
 
@@ -151,8 +150,33 @@ class Lightcurve(object):
 
 class ObservedBurst(Lightcurve):
     
-    def __init__(self, filename):
-        d=ascii.read(filename)
+    def __init__(self, filename, path=None):
+
+# For now, this is restricted to the "reference" bursts, which have a
+# format like this:
+
+#	.
+#	.
+#	.
+#
+# Columns are:
+# 'Time [s]' 'dt [s]' 'flux [10^-9 erg/cm^2/s]' 'flux error [10^-9
+# erg/cm^2/s]' 'blackbody temperature kT [keV]' 'kT error [keV]'
+# 'blackbody normalisation K_bb [(km/d_10kpc)^2]' 'K_bb error
+# [(km/d_10kpc)^2]' chi-sq
+#     -1.750  0.500   1.63    0.054   1.865  0.108   13.891   4.793  0.917
+#     -1.250  0.500   2.88    1.005   1.862  0.246   22.220   4.443  1.034
+#     -0.750  0.500   4.38    1.107   1.902  0.093   30.247   2.943  1.089
+#     -0.250  0.500   6.57    0.463   1.909  0.080   46.936   6.969  0.849
+
+        if path == None:
+            path = '.'
+        self.path = path
+        self.filename = filename
+
+        d=ascii.read(path+'/'+self.filename)
+
+# Now we define a Lightcurve instance, using the columns from the file
 
         Lightcurve.__init__(self, time=d['col1']*u.s, dt=d['col2']*u.s, 
                             flux=d['col3']*1e-9*u.erg/u.cm**2/u.s, 
@@ -182,7 +206,8 @@ class ObservedBurst(Lightcurve):
 #                self.tdel_err = float(m.group(2))*u.hr
 ##        print (tdel, tdel_err)
            
-        self.table_file = '/Users/duncan/burst/reference/doc/table2.tex'
+#        self.table_file = '/Users/duncan/burst/reference/doc/table2.tex'
+        self.table_file = 'table2.tex'
         self.table = Table.read(self.table_file)
 
 # Below we associate each epoch with a file
@@ -204,7 +229,7 @@ class ObservedBurst(Lightcurve):
             m = re.search(lcfile,self.filename)
             if m != None:
                 self.row=i
-                print (i, lcfile, filename)
+#                print (i, lcfile, filename)
 
         if hasattr(self,'row'):
 
@@ -215,10 +240,11 @@ class ObservedBurst(Lightcurve):
 
 # Decode the other table parameters
 
-        label = ['cbol','mdot','fluen','F_pk','alpha']
-        unit = [1.,1.75e-8*const.M_sun/u.yr,1e-6*u.erg/u.cm**2/u.s,
+        label = ['fper','cbol','mdot','fluen','F_pk','alpha']
+        unit = [1e-9*u.erg/u.cm**2/u.s, 1.,1.75e-8*const.M_sun/u.yr,
+                1e-6*u.erg/u.cm**2/u.s,
                 1e-9*u.erg/u.cm**2/u.s,1.]
-        for i, column in enumerate(self.table.columns[5:10]):
+        for i, column in enumerate(self.table.columns[4:10]):
 #            print (i, column, label[i], self.table[column][row], type(self.table[column][row]))
             if ((type(self.table[column][self.row]) == np.str_)):
 #    or (type(self.table[column][row]) == np.str_)):
@@ -230,14 +256,29 @@ class ObservedBurst(Lightcurve):
             else:
                 setattr(self,label[i],self.table[column][self.row]*unit[i])
                 
+# This is the key method for running the mcmc; it can be used to plot the 
+# observations with the models rescaled by the appropriate parameters, and
+# also returns a likelihood value
+
     def compare(self, mburst, param = (6.1*u.kpc,60.*u.degree,1.,+8.*u.s), 
 		plot = False, subplot = True):
 
         dist, inclination, opz, t_off = param
+        xi_b, xi_p = anisotropy(inclination)
 
-# This parameter gives the relative weight to the tdel for the likelihood
+# These parameters ultimately need to be read from the model and converted
 
-        tdelwt=2.5e3
+        M_NS = 1.4*const.M_sun
+        R_NS = 11.2*u.km
+
+# These parameters give the relative weight to the tdel and persistent
+# flux for the likelihood. Since you have many more points in the
+# lightcurve, you may want to weight these greater than one so that the 
+# MCMC code will try to match those preferentially
+
+#        tdelwt=2.5e3
+        tdelwt=1.0
+        fluxwt=1.0
         
 # Calculate the rescaled model flux with the passed parameters
 
@@ -254,7 +295,11 @@ class ObservedBurst(Lightcurve):
         
 # overplot the rescaled model burst
 #        plt.plot(mburst.time, mburst.flux(dist))
-            plt.plot(self.time+(0.5-self.timepixr)*self.dt, model,'r.')
+            plt.plot(self.time+(0.5-self.timepixr)*self.dt, model,'r-',
+# This removes the problems with the underscore, but now introduces an
+# extra backslash... argh
+#		label=mburst.filename.replace('_',r'\_'))
+		label=mburst.filename)
     
             if subplot:
 
@@ -274,17 +319,69 @@ class ObservedBurst(Lightcurve):
                 plt.xlim(0.8,1.2)
                 plt.xticks([])
     
-# This is just a preliminary version of the likelihood calculation, that
-# does not include the recurrence time (or other parameters) and may also
-# not properly incorporate the normalisation
+            else:
+
+# This bit doesn't work because it wants to parse the labels as LaTeX,
+# which works for some strings (byt not for bytes). Don't know why the
+# strings sometimes end up as byte arrays... grr.
+
+                plt.legend()
+#                print (mburst.filename)
+
+# Here we assemble an array with the likelihood components from each
+# parameter, for accounting purposes
+# By convention we calculate the observed parameter (from the model) and
+# then do the comparison
+# Should probably incorporate these calculations into the class, so you
+# can just refer to them as an attribute
+
+        lhood_cpt = np.array([])
+
+# persistent flux
+
+        fper_sig2 = 1.0/(self.fper_err.value**2)
+        fper_pred = ( const.G*M_NS*mburst.mdot /
+               (4.*pi*dist**2*xi_p*R_NS*opz*self.cbol) )
+        fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
+        lhood_cpt = np.append(lhood_cpt, -fluxwt*( 
+               (self.fper.value-fper_pred.value)**2*fper_sig2 
+               -np.log(2.*pi*fper_sig2) ) )
+
+# recurrence time
+
+        tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*opz)**2)
+        lhood_cpt = np.append(lhood_cpt, -tdelwt*( 
+               (self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
+               -np.log(2.*pi*tdel_sig2) ) )
+
+# lightcurve
 
         inv_sigma2 = 1.0/(self.flux_err.value**2)
-        tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*opz)**2)
-        return ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
+        lhood_cpt = np.append(lhood_cpt, 
+        	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
+                - np.log(2.0*pi*inv_sigma2) ) )
+
+# This is just a preliminary version of the likelihood calculation, that
+# does not include the recurrence time (or other parameters)
+# Also a possible minor error that the tdel weight doesn't apply to the
+# entire likelihood component
+
+#        return ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
+#                               - np.log(2.0*pi*inv_sigma2) ) 
+#               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
+#               -np.log(2.*pi*tdel_sig2))
+
+        lhood_p = ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
                                - np.log(2.0*pi*inv_sigma2) ) 
                -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
                -np.log(2.*pi*tdel_sig2))
+
+# Finally we return the sum of the likelihoods
         
+#        print (lhood_cpt,lhood_cpt.sum())
+        return lhood_cpt.sum()
+#        return lhood_p
+
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 # Here's an example of a simulated model class
@@ -293,10 +390,15 @@ class KeplerBurst(Lightcurve):
     
     def __init__(self, run_id, path=None):
         self.filename = 'kepler_'+run_id+'_mean.txt'
-        if path != None:
-            self.filename = path+'/'+self.filename
 
-        d=ascii.read(self.filename)
+# Don't add the path to the filename, because we want to use the latter as
+# a plot label (for example)
+
+        if path == None:
+            path = '.'
+        self.path = path
+
+        d=ascii.read(path+'/'+self.filename)
 
         Lightcurve.__init__(self, time=d['col1']*u.s,  
                             lumin=d['col2']*u.erg/u.s, lumin_err=d['col3']*u.erg/u.s)
