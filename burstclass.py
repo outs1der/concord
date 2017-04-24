@@ -11,6 +11,10 @@
 #
 # def decode_LaTeX(string):
 # def modelFunc(p,obs,model): 
+# def lnprior(theta):
+# def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
+# def lhoodClass(params,obs,model):
+# def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 
 import numpy as np
 from math import *
@@ -20,9 +24,11 @@ import astropy.constants as const
 import astropy.io.ascii as ascii
 from astropy.table import Table
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
 import re
 from scipy.interpolate import interp1d
 from astroquery.vizier import Vizier
+from chainconsumer import ChainConsumer
 
 from anisotropy import *
 
@@ -271,6 +277,8 @@ class ObservedBurst(Lightcurve):
         M_NS = 1.4*const.M_sun
         R_NS = 11.2*u.km
 
+        Q_grav = const.G*M_NS/R_NS
+
 # These parameters give the relative weight to the tdel and persistent
 # flux for the likelihood. Since you have many more points in the
 # lightcurve, you may want to weight these greater than one so that the 
@@ -337,11 +345,12 @@ class ObservedBurst(Lightcurve):
 
         lhood_cpt = np.array([])
 
-# persistent flux
+# persistent flux (see lampe16, eq. 8, noting that our mdot is averaged
+# over the neutron star surface):
 
         fper_sig2 = 1.0/(self.fper_err.value**2)
-        fper_pred = ( const.G*M_NS*mburst.mdot /
-               (4.*pi*dist**2*xi_p*R_NS*opz*self.cbol) )
+        fper_pred = ( mburst.mdot*Q_grav/
+               (4.*pi*opz*dist**2*xi_p*self.cbol) )
         fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
         lhood_cpt = np.append(lhood_cpt, -fluxwt*( 
                (self.fper.value-fper_pred.value)**2*fper_sig2 
@@ -388,8 +397,17 @@ class ObservedBurst(Lightcurve):
 
 class KeplerBurst(Lightcurve):
     
-    def __init__(self, run_id, path=None):
-        self.filename = 'kepler_'+run_id+'_mean.txt'
+    def __init__(self, filename=None, run_id=None, path=None, **kwargs):
+
+        if run_id != None:
+
+# For a KEPLER run, we use the convention for filename as follows:
+
+            self.filename = 'kepler_'+run_id+'_mean.txt'
+
+        elif filename!= None:
+
+            self.filename = filename
 
 # Don't add the path to the filename, because we want to use the latter as
 # a plot label (for example)
@@ -398,6 +416,8 @@ class KeplerBurst(Lightcurve):
             path = '.'
         self.path = path
 
+# Read in the file, and initialise the lightcurve
+
         d=ascii.read(path+'/'+self.filename)
 
         Lightcurve.__init__(self, time=d['col1']*u.s,  
@@ -405,54 +425,68 @@ class KeplerBurst(Lightcurve):
 
         self.comments = d.meta['comments']
         
-# Read information from the burst table
+        if run_id != None:
+
+# For KEPLER models, read information from the burst table
 # Lately we go directly to the online version of the table
 
-        try:
-            model_table = Vizier.get_catalogs('J/ApJ/819/46')
-            self.data = model_table[0]
+            try:
+                model_table = Vizier.get_catalogs('J/ApJ/819/46')
+                self.data = model_table[0]
         
 # Table columns are: 'model','N','Z','H','Lacc','bstLgth','e_bstLgth','pkLum','e_pkLum',
 # 'psLum','e_psLum','Fluence','e_Fluence','tau','e_tau','tDel','e_tDel','conv','e_conv',
 # 'r1090','e_r1090','r2590','e_r2590','alpha1','e_alpha1','tau1','e_tau1','alpha','e_alpha',
 # 'Flag'
 
-            self.row = np.flatnonzero(self.data['model'] == run_id.encode('ascii'))[0]
+                self.row = np.flatnonzero(self.data['model'] == run_id.encode('ascii'))[0]
 #            print (self.row, self.data['model'][self.row], self.data['e_tDel'][self.row])
-            self.tdel = self.data['tDel'][self.row]*u.hr
+                self.tdel = self.data['tDel'][self.row]*u.hr
 #            print (self.tdel.units)
-            self.tdel_err = self.data['e_tDel'][self.row]*u.hr
+                self.tdel_err = self.data['e_tDel'][self.row]*u.hr
 
 # print (model_table[0].columns)
 
-        except:
-            print ("** WARNING ** can't get Vizier table, using local file")
-            self.table_file='/Users/duncan/Documents/2015/Nat new catalog/summ.csv'
-            self.data = ascii.read(self.table_file)
+            except:
+                print ("** WARNING ** can't get Vizier table, using local file")
+                self.table_file='/Users/duncan/Documents/2015/Nat new catalog/summ.csv'
+                self.data = ascii.read(self.table_file)
 
 # Local file columns are slightly different: 'model','num','acc','z','h','lAcc','pul','cyc','
 # burstLength','uBurstLength','peakLum','uPeakLum','persLum','uPersLum','fluence','uFluence',
 # 'tau','uTau','tDel','uTDel','conv','uConv','r1090','uR1090','r2590','uR2590','singAlpha',
 # 'uSingAlpha','singDecay','uSingDecay','alpha','uAlpha','flag'
 
-            self.row = np.flatnonzero(self.data['model'] == "'xrb"+run_id+"'")[0]
+                self.row = np.flatnonzero(self.data['model'] == "'xrb"+run_id+"'")[0]
 
 # Set the legacy tdel attribute, as well as the correct units for tdel_err
 
-            self.tdel = self.data['tDel'][self.row]/3600.*u.hr
-            self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
+                self.tdel = self.data['tDel'][self.row]/3600.*u.hr
+                self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
         
-# Set all the remaiing attributes
+# Set all the remaining attributes
 
-        for attr in self.data.columns:
-            setattr(self,attr,self.data[attr][self.row])
+            for attr in self.data.columns:
+                setattr(self,attr,self.data[attr][self.row])
             
-        if (not hasattr(self,'Lacc')):
+        elif kwargs != None:
+
+# For non-KEPLER models, you can use kwargs to populate the parameters
+
+            for key in kwargs:
+#                print (key, kwargs[key])
+                if (key == 'tdel') | (key == 'tdel_err'):
+                    setattr(self,key,float(kwargs[key])*u.hr)
+                else:
+                    setattr(self,key,kwargs[key])
+
+        if ((not hasattr(self,'Lacc')) & hasattr(self,'lAcc')):
             self.Lacc = self.lAcc
             
 # Set the mdot with the correct units
 
-        self.mdot = self.Lacc*1.75e-8*const.M_sun/u.yr
+        if hasattr(self,'Lacc'):
+            self.mdot = self.Lacc*1.75e-8*const.M_sun/u.yr
 
 # The flux method is supposed to calculate the flux at a particular distance
 
@@ -461,5 +495,200 @@ class KeplerBurst(Lightcurve):
             self.dist = dist
             
         return self.lumin/(4.*pi*self.dist.to('cm')**2)
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+# Now define a new likelihood function, based on the old one, but which
+# can handle multiple pairs of observed bursts
+
+# First define the prior
+
+def lnprior(theta):
+    dist, inclination, opz, t_off = theta
+
+# We have currently flat priors for everything but the inclination, which
+# has a probability distribution proportional to cos(i)
+
+    if (dist.value > 0.0 and 0.0 < inclination.value < 90. 
+        and 1. < opz < 2):
+        return np.log(np.cos(inclination))
+    
+    return -np.inf
+    
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
+    
+# When called from emcee, the parameters array might not have units. So 
+# apply them here, in a copy of params (uparams)
+
+    ok = True
+    uparams = []
+    for i, param in enumerate(params):
+#        print (i,param,units[i])
+        if units[i] != None:
+            if hasattr(param,'unit') == False:
+                uparams.append(param*units[i])
+#                print ("Applying unit to element ",i)
+            else:
+                uparams.append(param)
+                if param.unit != units[i]:
+                    ok = False
+        else:
+            uparams.append(param)
+            if hasattr(param,'unit') == True:
+                ok = False
+#    print (params, uparams, ok)
+    assert(ok == True)
+    
+    return uparams
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def lhoodClass(params,obs,model):
+    '''
+    Calculate the likelihood related to one or more model-observation
+    comparisons The corresponding call to emcee will (necessarily) look
+    something like this:
+
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lhoodClass, args=[obs, models ])    
+    '''
+    
+    uparams = apply_units(params)
+    
+# We can pass multiple bursts, in which case we just loop over the function
+
+    alh = 0.0
+
+    if type(obs) == tuple:
+        n = len(obs)
+        if (n != len(model)):
+            print ("** ERROR ** number of observed and model bursts don't match")
+        
+        for i in range(n):
+            alh += lhoodClass(uparams,obs[i],model[i])
+#            print (i,n,alh)
+
+    else:
+        
+# Or if we have just one burst, here's what we do
+
+        alh = obs.compare(model,uparams)
+            
+    return alh + lnprior(uparams) 
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
+    '''
+    This routine will plot each observation vs. each model, for a given
+    set of parameters. If you supply an emcee sampler object, it will find
+    the highest-likelihood sample and use that
+    '''
+
+# Need to specify at least one of param, sampler
+
+    assert ((param != None) | (sampler != None))
+    
+    if param == None:
+
+# If no parameters are specified, try to get the best example
+# from the sampler object
+
+        if ibest == None:
+
+# Identify the maximum probability set of parameters
+
+            chain_shape = np.shape(sampler.lnprobability)
+            imax = np.argmax(sampler.lnprobability)
+            ibest = np.unravel_index(imax,chain_shape)
+
+# print (imax,chain_shape,ibest)
+        prob_max = sampler.lnprobability[ibest]
+        _param_best = sampler.chain[ibest[0],ibest[1],:]
+
+    else:
+        
+# Just use the supplied parameters
+
+        _param_best = param
+        
+    param_best = apply_units(_param_best)
+    print ('Got parameter set for plotting: ',param_best)
+
+# Want to have a check here in case there are other than 3 models & obs 
+# to compare
+
+    n = len(obs)
+    assert (n == 3)
+
+    b1, b2, b3 = obs
+    m1, m2, m3 = models
+    
+# See http://matplotlib.org/users/gridspec.html for documentation
+
+    fig = plt.figure()
+    gs = gridspec.GridSpec(3,2)
+
+# plot the model comparisons. Should really do a loop here, but not sure
+# exactly how
+
+    ax1 = fig.add_subplot(gs[0,0])
+    b1.compare(m1,param_best,plot=True,subplot=False)
+
+    ax2 = fig.add_subplot(gs[0,1])
+    b2.compare(m2,param_best,plot=True,subplot=False)
+
+    ax3 = fig.add_subplot(gs[1,0])
+    b3.compare(m3,param_best,plot=True,subplot=False)
+
+# Now assemlbe the tdel values for plotting. This is a bit clumsy
+
+    x = np.zeros(n)
+    xerr = np.zeros(n)
+    y = np.zeros(n)
+    yerr = np.zeros(n)
+    for i, burst in enumerate(obs):
+        x[i] = burst.tdel.value
+        xerr[i] = burst.tdel_err.value
+        y[i] = models[i].tdel.value*param_best[2]
+        yerr[i] = models[i].tdel_err.value*param_best[2]
+
+#    print (x,xerr,y,yerr)
+#    print (type(x))
+#    print (type(b1.tdel),type(m1.tdel))
+
+    ax4 = fig.add_subplot(gs[1:,-1])
+    ax4.errorbar(x,y,xerr=xerr,yerr=yerr,fmt='o')
+    ax4.plot([3,6],[3,6],'--')
+    ax4.set_xlabel('Observed $\Delta t$ (hr)')
+    ax4.set_ylabel('Predicted $(1+z)\Delta t$ (hr)')
+
+    fig.set_size_inches(10,6)
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def plot_contours(sampler,parameters=[r"$d$",r"$i$",r"$1+z$"],
+        ignore=10,plot_size=6):
+    '''
+    Simple routine to plot contours of the walkers, ignoring some initial
+    fraction of the steps (the "burn-in" phase)
+
+    Documentation is here https://samreay.github.io/ChainConsumer/index.html
+    '''
+
+    samples = sampler.chain[:, ignore:, :].reshape((-1, ndim))
+#    print (np.shape(samples))
+
+# This to produce a much more beautiful plot
+
+    c = ChainConsumer()
+    c.add_chain(samples, parameters = parameters)#,r"$\Delta t$"])
+
+
+    fig = c.plot()
+    fig.set_size_inches(6,6)
+    
+    return c
 
 # end of file burstclass.py
