@@ -27,3 +27,7 @@ A work in progress
 ### Who do I talk to? ###
 
 * Duncan.Galloway@monash.edu
+
+### Why concord? ###
+
+Because we're trying to achieve a "concordance" fit to a wide range of burst data. Plus, concord was cool
