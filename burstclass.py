@@ -267,7 +267,7 @@ class ObservedBurst(Lightcurve):
 # also returns a likelihood value
 
     def compare(self, mburst, param = (6.1*u.kpc,60.*u.degree,1.,+8.*u.s), 
-		plot = False, subplot = True):
+		breakdown = False, plot = False, subplot = True):
 
         dist, inclination, opz, t_off = param
         xi_b, xi_p = anisotropy(inclination)
@@ -299,16 +299,27 @@ class ObservedBurst(Lightcurve):
 # Plot the observed burst
 
         if plot:
+
+# Now do a more complex plot with a subplot
+
+            fig = plt.figure()
+            gs = gridspec.GridSpec(4, 3)
+            ax1 = fig.add_subplot(gs[0:3,:])
+
             self.plot()
         
 # overplot the rescaled model burst
-#        plt.plot(mburst.time, mburst.flux(dist))
-            plt.plot(self.time+(0.5-self.timepixr)*self.dt, model,'r-',
-# This removes the problems with the underscore, but now introduces an
-# extra backslash... argh
-#		label=mburst.filename.replace('_',r'\_'))
+
+##        plt.plot(mburst.time, mburst.flux(dist))
+#            plt.plot(self.time+(0.5-self.timepixr)*self.dt, model,'r-',
+## This removes the problems with the underscore, but now introduces an
+## extra backslash... argh
+##		label=mburst.filename.replace('_',r'\_'))
+#		label=mburst.filename)
+
+            ax1.plot(self.time+(0.5-self.timepixr)*self.dt, model,'r-',
 		label=mburst.filename)
-    
+
             if subplot:
 
 # Show the recurrence time comparison in the subplot; see 
@@ -336,6 +347,16 @@ class ObservedBurst(Lightcurve):
                 plt.legend()
 #                print (mburst.filename)
 
+# Residual panel
+
+            ax2 = fig.add_subplot(gs[3,:])
+#            ax2.plot(self.time+(0.5-self.timepixr)*self.dt, model-self.flux)
+            plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value, 
+		self.flux.value-model.value,
+		yerr=self.flux_err.value,fmt='b.')
+            ax2.axhline(0.0, linestyle='--', color='k')
+            gs.update(hspace=0.0)
+    
 # Here we assemble an array with the likelihood components from each
 # parameter, for accounting purposes
 # By convention we calculate the observed parameter (from the model) and
@@ -369,6 +390,9 @@ class ObservedBurst(Lightcurve):
         lhood_cpt = np.append(lhood_cpt, 
         	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
                 - np.log(2.0*pi*inv_sigma2) ) )
+# troubleshooting the likelihood comparison
+#        print ( (model.value-self.flux.value)**2*inv_sigma2 
+#                - np.log(2.0*pi*inv_sigma2) )
 
 # This is just a preliminary version of the likelihood calculation, that
 # does not include the recurrence time (or other parameters)
@@ -384,6 +408,9 @@ class ObservedBurst(Lightcurve):
                                - np.log(2.0*pi*inv_sigma2) ) 
                -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
                -np.log(2.*pi*tdel_sig2))
+
+        if breakdown:
+            print ("Likelihood component breakdown (fper, tdel, lightcurve): ",lhood_cpt)
 
 # Finally we return the sum of the likelihoods
         
@@ -676,6 +703,8 @@ def plot_contours(sampler,parameters=[r"$d$",r"$i$",r"$1+z$"],
 
     Documentation is here https://samreay.github.io/ChainConsumer/index.html
     '''
+
+    nwalkers, nsteps, ndim = np.shape(sampler.chain)
 
     samples = sampler.chain[:, ignore:, :].reshape((-1, ndim))
 #    print (np.shape(samples))
