@@ -81,14 +81,6 @@ def modelFunc(p,obs,model):
 
     xi_b, xi_p = anisotropy(inclination)
     
-# Additional parameter here gives the radius conversion between the assumed
-# (Newtonian) value of 10 km and the GR equivalent for a neutron star of 
-# mass 1.4 M_sun, to achieve the same surface gravity.
-# If your model-defined surface gravity changes, or the radius (or mass)
-# of the NS, this quantity will also have to change
-
-    xi = 1.12
-    
 # First interpolate the model values onto the observed grid
 # This step defines the interpolation function, using a shifted and rescaled
 # model time to account for time dilation in the NS surface frame
@@ -105,7 +97,7 @@ def modelFunc(p,obs,model):
 #   L_b = 4\pi d^2 \xi_b F_b
 
 #    return p[1]*fInterp(p[2]*(obs.time-p[3]))*model.lumin.unit/(4.*pi*p[0].to('cm')**2)
-    return ( (xi/opz)**2 * fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*model.lumin.unit
+    return ( (model.xi/opz)**2 * fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*model.lumin.unit
             / (4.*pi*dist.to('cm')**2) / xi_b )
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
@@ -266,18 +258,28 @@ class ObservedBurst(Lightcurve):
 # observations with the models rescaled by the appropriate parameters, and
 # also returns a likelihood value
 
-    def compare(self, mburst, param = (6.1*u.kpc,60.*u.degree,1.,+8.*u.s), 
-		breakdown = False, plot = False, subplot = True):
+    def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s], 
+		breakdown = False, plot = False, subplot = True,
+                debug = False):
 
         dist, inclination, opz, t_off = param
         xi_b, xi_p = anisotropy(inclination)
 
-# These parameters ultimately need to be read from the model and converted
+# Here we calculate the equivalent mass and radius given the redshift and
+# radius. Since we allow the redshift to vary, but the model is calculated
+# at a fixed surface gravity, we need to adjust one (or both) of M_NS and
+# R_NS to obtain a self-consistent set of parameters. 
+# Because many equations of state have roughly constant radius over a
+# range of masses, we choose to keep R_NS constant and to vary M_NS
 
-        M_NS = 1.4*const.M_sun
-        R_NS = 11.2*u.km
-
-        Q_grav = const.G*M_NS/R_NS
+#        _t = (mburst.g.to(u.cm/u.s**2)*mburst.R_NS.to(u.cm)
+#		/const.c.to(u.cm/u.s)**2)
+#        M_NS = (mburst.g*mburst.R_NS**2/const.G * (-_t + sqrt(_t+1)))
+        M_NS = mburst.g*mburst.R_NS**2/(const.G*opz)
+        M_NS = M_NS.to(u.kg)
+        if debug:
+            print ('Inferred mass = {:.4f} M_sun'.format(M_NS/const.M_sun))
+        Q_grav = const.G*M_NS/mburst.R_NS
 
 # These parameters give the relative weight to the tdel and persistent
 # flux for the likelihood. Since you have many more points in the
@@ -301,6 +303,7 @@ class ObservedBurst(Lightcurve):
         if plot:
 
 # Now do a more complex plot with a subplot
+# See http://matplotlib.org/users/gridspec.html for documentation
 
             fig = plt.figure()
             gs = gridspec.GridSpec(4, 3)
@@ -375,24 +378,35 @@ class ObservedBurst(Lightcurve):
         fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
         lhood_cpt = np.append(lhood_cpt, -fluxwt*( 
                (self.fper.value-fper_pred.value)**2*fper_sig2 
-               -np.log(2.*pi*fper_sig2) ) )
+               +np.log(2.*pi/fper_sig2) ) )
 
 # recurrence time
 
         tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*opz)**2)
         lhood_cpt = np.append(lhood_cpt, -tdelwt*( 
                (self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
-               -np.log(2.*pi*tdel_sig2) ) )
+               +np.log(2.*pi/tdel_sig2) ) )
 
 # lightcurve
 
         inv_sigma2 = 1.0/(self.flux_err.value**2)
         lhood_cpt = np.append(lhood_cpt, 
         	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
-                - np.log(2.0*pi*inv_sigma2) ) )
+                +np.log(2.0*pi/inv_sigma2) ) )
 # troubleshooting the likelihood comparison
 #        print ( (model.value-self.flux.value)**2*inv_sigma2 
 #                - np.log(2.0*pi*inv_sigma2) )
+
+# Printing the values to test
+
+        if debug:
+            cl=0.0
+            for i in range(len(self.time)):
+                _lhood = -0.5*((model[i].value-self.flux[i].value)**2*inv_sigma2[i]
+                    +np.log(2.0*pi/inv_sigma2[i]))
+                cl += _lhood
+                print ('{:6.2f} {:.4g} {:.4g} {:.4g} {:8.3f} {:8.3f}'.format(self.time[i],self.flux[i].value,self.flux_err[i].value,
+                    model[i].value,_lhood,cl))
 
 # This is just a preliminary version of the likelihood calculation, that
 # does not include the recurrence time (or other parameters)
@@ -423,7 +437,18 @@ class ObservedBurst(Lightcurve):
 # Here's an example of a simulated model class
 
 class KeplerBurst(Lightcurve):
-    
+    '''
+    Example simulated burst class. Apart from the lightcurve (which is
+    defined with time, lumin, and lumin_err columns), the additional
+    (minimal) attributes requred are:
+    filename - source file name
+    tdel, tdel_err - recurrence time and error (hr)
+    Lacc - accretion luminosity (in units of Mdot_Edd)
+    xi - radius factor between assumed (Newtonian) value and the GR equivalent
+    R_NS - model-assumed radius of the neutron star (GR)
+    g - surface gravity assumed for the run
+    '''
+
     def __init__(self, filename=None, run_id=None, path=None, **kwargs):
 
         if run_id != None:
@@ -446,11 +471,17 @@ class KeplerBurst(Lightcurve):
 # Read in the file, and initialise the lightcurve
 
         d=ascii.read(path+'/'+self.filename)
+#        print (d.columns,d.meta)
 
-        Lightcurve.__init__(self, time=d['col1']*u.s,  
+        if ('time' in d.columns):
+            Lightcurve.__init__(self, time=d['time']*u.s,  
+                            lumin=d['luminosity']*u.erg/u.s, lumin_err=d['u_luminosity']*u.erg/u.s)
+        else:
+            Lightcurve.__init__(self, time=d['col1']*u.s,  
                             lumin=d['col2']*u.erg/u.s, lumin_err=d['col3']*u.erg/u.s)
 
-        self.comments = d.meta['comments']
+        if ('comments' in d.meta):
+            self.comments = d.meta['comments']
         
         if run_id != None:
 
@@ -490,6 +521,22 @@ class KeplerBurst(Lightcurve):
 
                 self.tdel = self.data['tDel'][self.row]/3600.*u.hr
                 self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
+
+# Additional parameter here gives the radius conversion between the assumed
+# (Newtonian) value of 10 km and the GR equivalent for a neutron star of 
+# mass 1.4 M_sun, to achieve the same surface gravity.
+# If your model-defined surface gravity changes, or the radius (or mass)
+# of the NS, this quantity will also have to change
+
+            self.xi = 1.12
+
+# Define the neutron star mass, radius, and surface gravity
+
+            self.M_NS = 1.4*const.M_sun
+            self.R_Newt = 10.*u.km
+            self.R_NS = self.R_Newt*self.xi
+            self.opz = 1./sqrt(1.-2.*const.G*self.M_NS/(const.c**2*self.R_NS))
+            self.g = const.G*self.M_NS/(self.R_NS**2/self.opz)
         
 # Set all the remaining attributes
 
@@ -551,15 +598,26 @@ def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
 
     ok = True
     uparams = []
+    n_units = len(units)
     for i, param in enumerate(params):
 #        print (i,param,units[i])
-        if units[i] != None:
+
+# Define iunit here so we apply the last unit in the list, to the 4th (and
+# all subsequent) element of params
+# This is to cover the variable number of offset values for the burst
+# start, which depends upon the number of bursts matching simultaneously
+
+        iunit = min(i,n_units-1)
+
+        if units[iunit] != None:
             if hasattr(param,'unit') == False:
-                uparams.append(param*units[i])
+#                uparams.append(param*units[i])
+                uparams.append(param*units[iunit])
 #                print ("Applying unit to element ",i)
             else:
                 uparams.append(param)
-                if param.unit != units[i]:
+#                if param.unit != units[i]:
+                if param.unit != units[iunit]:
                     ok = False
         else:
             uparams.append(param)
@@ -593,7 +651,14 @@ def lhoodClass(params,obs,model):
             print ("** ERROR ** number of observed and model bursts don't match")
         
         for i in range(n):
-            alh += lhoodClass(uparams,obs[i],model[i])
+
+# Need to create a reduced parameter array here, keeping only the offset
+# value appropriate for this burst
+
+            _params = uparams[0:3]
+            _params.append(uparams[3+i])
+#            alh += lhoodClass(uparams,obs[i],model[i])
+            alh += lhoodClass(_params,obs[i],model[i])
 #            print (i,n,alh)
 
     else:
@@ -602,7 +667,7 @@ def lhoodClass(params,obs,model):
 
         alh = obs.compare(model,uparams)
             
-    return alh + lnprior(uparams) 
+    return alh + lnprior(uparams[0:4]) 
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -652,22 +717,28 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
     b1, b2, b3 = obs
     m1, m2, m3 = models
     
-# See http://matplotlib.org/users/gridspec.html for documentation
+# Can't use the gridspec anymore, as this is used for the individual plots
 
-    fig = plt.figure()
-    gs = gridspec.GridSpec(3,2)
+#    fig = plt.figure()
+#    gs = gridspec.GridSpec(3,2)
 
 # plot the model comparisons. Should really do a loop here, but not sure
 # exactly how
 
-    ax1 = fig.add_subplot(gs[0,0])
-    b1.compare(m1,param_best,plot=True,subplot=False)
+    _param_best = param_best[0:4]
+#    ax1 = fig.add_subplot(gs[0,0])
+    b1.compare(m1,_param_best,plot=True,subplot=False)
+#    fig.set_size_inches(8,3)
 
-    ax2 = fig.add_subplot(gs[0,1])
-    b2.compare(m2,param_best,plot=True,subplot=False)
+    _param_best = param_best[0:3]
+    _param_best.append(param_best[4])
+#    ax2 = fig.add_subplot(gs[0,1])
+    b2.compare(m2,_param_best,plot=True,subplot=False)
 
-    ax3 = fig.add_subplot(gs[1,0])
-    b3.compare(m3,param_best,plot=True,subplot=False)
+    _param_best = param_best[0:3]
+    _param_best.append(param_best[5])
+#    ax3 = fig.add_subplot(gs[1,0])
+    b3.compare(m3,_param_best,plot=True,subplot=False)
 
 # Now assemlbe the tdel values for plotting. This is a bit clumsy
 
@@ -685,13 +756,14 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 #    print (type(x))
 #    print (type(b1.tdel),type(m1.tdel))
 
-    ax4 = fig.add_subplot(gs[1:,-1])
-    ax4.errorbar(x,y,xerr=xerr,yerr=yerr,fmt='o')
-    ax4.plot([3,6],[3,6],'--')
-    ax4.set_xlabel('Observed $\Delta t$ (hr)')
-    ax4.set_ylabel('Predicted $(1+z)\Delta t$ (hr)')
+#    ax4 = fig.add_subplot(gs[1:,-1])
+    fig = plt.figure()
+    plt.errorbar(x,y,xerr=xerr,yerr=yerr,fmt='o')
+    plt.plot([3,6],[3,6],'--')
+    plt.xlabel('Observed $\Delta t$ (hr)')
+    plt.ylabel('Predicted $(1+z)\Delta t$ (hr)')
 
-    fig.set_size_inches(10,6)
+#    fig.set_size_inches(10,6)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
