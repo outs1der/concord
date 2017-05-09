@@ -489,6 +489,7 @@ class KeplerBurst(Lightcurve):
 # Lately we go directly to the online version of the table
 
             try:
+                Vizier.columns = ['all']
                 model_table = Vizier.get_catalogs('J/ApJ/819/46')
                 self.data = model_table[0]
         
