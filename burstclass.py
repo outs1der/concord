@@ -43,8 +43,11 @@ def decode_LaTeX(string):
     assert (type(string) == str) or (type(string) == np.str_)
     
 # Look for the start of a LaTeX numerical expression
+# We no longer explicitly look for the $ sign, as this pattern can match a
+# general numeric string. We also include the mantissa as optional
 
-    val_match = re.search('\$ *([0-9]+\.[0-9]+)',string)
+#    val_match = re.search('\$ *([0-9]+\.[0-9]+)',string)
+    val_match = re.search('([0-9]+(\.[0-9]+)?)',string)
     
 # If not found, presumably you just have a numerical expression as string
 
@@ -147,8 +150,25 @@ class Lightcurve(object):
 # with models
 
 class ObservedBurst(Lightcurve):
+    '''
+    Observed burst class. Apart from the lightcurve (which is
+    defined with time, flux, and flux_err columns), the additional
+    attributes set are:
+    filename - source file name
+    tdel, tdel_err - recurrence time and error (hr)
+    comments - ASCII file header text
+    table_file - LaTeX file of table 2 from Galloway et al. (2017)
+    table - contents of table 2 
+    row - entry in the table corresponding to this burst
+    fper, fper_err - persistent flux level
+    cbol - bolometric correction
+    mdot - accretion rate
+    fluen - burst fluence
+    F_pk - burst peak flux
+    alpha - alpha value
+    '''
     
-    def __init__(self, filename, path=None):
+    def __init__(self, filename, path=None, **kwargs):
 
 # For now, this is restricted to the "reference" bursts, which have a
 # format like this:
@@ -191,8 +211,7 @@ class ObservedBurst(Lightcurve):
 # In principle we can parse a bunch of additional information from the headers
 
         self.comments = d.meta['comments']
-        self.filename = filename
-        
+
 # Here the recurrence time; looking for a string like
 #   Average recurrence time is 3.350 +/- 0.04 hr
 # (not present in all the files; only the 1826-24 ones)
@@ -235,25 +254,61 @@ class ObservedBurst(Lightcurve):
             self.tdel = tdel*u.hr
             if tdel_err != None:
                 self.tdel_err = tdel_err*u.hr
+            else:
+
+# If no tdel error is supplied by the file (e.g. for the later bursts from 
+# SAX J1808.4-3658), we set a nominal value corresponding to 1 s (typical
+# RXTE time resolution) here
+
+                self.tdel_err = 1./3600.*u.hr
 
 # Decode the other table parameters
 
-        label = ['fper','cbol','mdot','fluen','F_pk','alpha']
-        unit = [1e-9*u.erg/u.cm**2/u.s, 1.,1.75e-8*const.M_sun/u.yr,
-                1e-6*u.erg/u.cm**2/u.s,
-                1e-9*u.erg/u.cm**2/u.s,1.]
-        for i, column in enumerate(self.table.columns[4:10]):
+            label = ['fper','cbol','mdot','fluen','F_pk','alpha']
+            unit = [1e-9*u.erg/u.cm**2/u.s, 1.,1.75e-8*const.M_sun/u.yr,
+                    1e-6*u.erg/u.cm**2/u.s,
+                    1e-9*u.erg/u.cm**2/u.s,1.]
+            for i, column in enumerate(self.table.columns[4:10]):
 #            print (i, column, label[i], self.table[column][row], type(self.table[column][row]))
-            if ((type(self.table[column][self.row]) == np.str_)):
+                if ((type(self.table[column][self.row]) == np.str_)):
 #    or (type(self.table[column][row]) == np.str_)):
-                val, val_err = decode_LaTeX(self.table[column][self.row])
-                setattr(self,label[i],val*unit[i])
-                if val_err != None:
+
+# Here we convert the table entry to a value. We have a couple of options
+# here: raw value, range (separated by "--"), or LaTeX expression
+
+                    range_match = re.search('([0-9]+\.[0-9]+)--([0-9]+\.[0-9]+)',
+			    self.table[column][self.row])
+                    if range_match:
+
+                        lo = float(range_match.group(1))
+                        hi = float(range_match.group(2))
+                        val = 0.5*(lo+hi)
+                        val_err = 0.5*abs(hi-lo)
+
+                    else:
+                        val, val_err = decode_LaTeX(self.table[column][self.row])
+
+# Now set the appropriate attribute
+
+                    setattr(self,label[i],val*unit[i])
+                    if val_err != None:
 #                    print (column, label[i]+'_err',val_err)
-                    setattr(self,label[i]+'_err',val_err*unit[i])
-            else:
-                setattr(self,label[i],self.table[column][self.row]*unit[i])
+                        setattr(self,label[i]+'_err',val_err*unit[i])
+                else:
+                    setattr(self,label[i],self.table[column][self.row]*unit[i])
                 
+# End block for adding attributes from the file. Below you can use the
+# additional arguments on init to set or override attributes
+
+        if kwargs != None:
+
+            for key in kwargs:
+#                print (key, kwargs[key])
+                if (key == 'tdel') | (key == 'tdel_err'):
+                    setattr(self,key,float(kwargs[key])*u.hr)
+                else:
+                    setattr(self,key,kwargs[key])
+
 # This is the key method for running the mcmc; it can be used to plot the 
 # observations with the models rescaled by the appropriate parameters, and
 # also returns a likelihood value
