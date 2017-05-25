@@ -81,3 +81,29 @@ def anisotropy(inclination,model='he16',test=False):
 
         print ("** ERROR ** model ",model," not yet implemented!")
         return None, None
+
+def inclination(chi,model='he16',burst=True):
+    '''This function returns the inclination given a burst or persistent 
+       anisotropy factor. It is the inverse of anisotropy():
+       
+    burst=True indicates that the given chi is the burst anisotropy factor
+    burst=False indicates that it is the persistent anisotropy factor
+    
+    results are returned in units of degrees'''
+
+    if model == 'fuji88':
+        if burst:
+            return np.arccos(1.0/chi - 0.5) * 180./np.pi * u.degree / u.rad
+        else:
+            return np.arccos(0.5/chi) * 180./np.pi * u.degree / u.rad
+    elif model == 'he16':
+        a=ascii.read('anisotropy_he16.txt')
+        if burst:
+            q = 1./(a['col2']+a['col3'])
+            incl_he16 = interp1d(q,a['col1'])
+        else:
+            incl_he16 = interp1d(1./a['col4'],a['col1'])
+        return incl_he16(chi) * u.degree
+    else:
+        print ("** ERROR ** model ",model," not yet implemented!")
+        return None
