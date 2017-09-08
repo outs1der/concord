@@ -1,8 +1,8 @@
 # Burst class for MINBAR
-# 
+#
 # This code is a preliminary attempt to develop a burst class for MINBAR,
-# including model-observation comparisons. 
-# 
+# including model-observation comparisons.
+#
 # Here are the classes and functions making up this module:
 #
 # class Lightcurve(object):
@@ -10,7 +10,7 @@
 # class KeplerBurst(Lightcurve):
 #
 # def decode_LaTeX(string):
-# def modelFunc(p,obs,model): 
+# def modelFunc(p,obs,model):
 # def lnprior(theta):
 # def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
 # def lhoodClass(params,obs,model):
@@ -39,27 +39,27 @@ def decode_LaTeX(string):
     This function converts a LaTeX numerical value (with error) to one
     or more floating point values
     '''
-    
+
     assert (type(string) == str) or (type(string) == np.str_)
-    
+
 # Look for the start of a LaTeX numerical expression
 # We no longer explicitly look for the $ sign, as this pattern can match a
 # general numeric string. We also include the mantissa as optional
 
 #    val_match = re.search('\$ *([0-9]+\.[0-9]+)',string)
     val_match = re.search('([0-9]+(\.[0-9]+)?)',string)
-    
+
 # If not found, presumably you just have a numerical expression as string
 
     if val_match == None:
 #        print (val_match)
         return float(string), None
-    
+
 # Otherwise, convert the first part to a float, and look for the error
 
     val = float(val_match.group(1))
     err_match = re.search('pm *([0-9]+\.[0-9]+)',string)
-    
+
     if err_match == None:
         return val, None
     else:
@@ -67,23 +67,23 @@ def decode_LaTeX(string):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def modelFunc(p,obs,model): 
-    ''' 
+def modelFunc(p,obs,model):
+    '''
     This function performs the stretching and rescaling of the (model
     predicted) burst lightcurve based on the input parameter set
-    The calculations are based on those in Appendix B of Lampe et al. 
+    The calculations are based on those in Appendix B of Lampe et al.
     2016 (ApJ 819:46)
     Parameter array is (for now) a tuple with the appropriate units:
     ( distance, inclination, redshift, time offset )
     '''
-    
+
     dist, inclination, opz, t_off = p
-    
+
 # Use the anisotropy function to calculate the anisotropy factors given
 # the inclination
 
     xi_b, xi_p = anisotropy(inclination)
-    
+
 # First interpolate the model values onto the observed grid
 # This step defines the interpolation function, using a shifted and rescaled
 # model time to account for time dilation in the NS surface frame
@@ -92,11 +92,11 @@ def modelFunc(p,obs,model):
     fInterp = interp1d(opz*(model.time-t_off),model.lumin,bounds_error=False,
                       fill_value = min(model.lumin))
 
-# Then we return the predicted model flux, interpolated onto the observed 
+# Then we return the predicted model flux, interpolated onto the observed
 # burst time bins. We shift the observed times to the middle of the bin, using
 # the timepixr attribute.
-# We also account for the distance, and the anisotropy parameter, using the 
-# convention of Fujimoto et al. 1988, i.e. 
+# We also account for the distance, and the anisotropy parameter, using the
+# convention of Fujimoto et al. 1988, i.e.
 #   L_b = 4\pi d^2 \xi_b F_b
 
 #    return p[1]*fInterp(p[2]*(obs.time-p[3]))*model.lumin.unit/(4.*pi*p[0].to('cm')**2)
@@ -110,7 +110,7 @@ def modelFunc(p,obs,model):
 
 class Lightcurve(object):
     """Test class for a burst lightcurve"""
-    
+
     def __init__(self, *args, **kwargs):
         """initialise the object by assigning named entities from the kwargs"""
 
@@ -158,7 +158,7 @@ class ObservedBurst(Lightcurve):
     tdel, tdel_err - recurrence time and error (hr)
     comments - ASCII file header text
     table_file - LaTeX file of table 2 from Galloway et al. (2017)
-    table - contents of table 2 
+    table - contents of table 2
     row - entry in the table corresponding to this burst
     fper, fper_err - persistent flux level
     cbol - bolometric correction
@@ -167,7 +167,7 @@ class ObservedBurst(Lightcurve):
     F_pk - burst peak flux
     alpha - alpha value
     '''
-    
+
     def __init__(self, filename, path=None, **kwargs):
 
 # For now, this is restricted to the "reference" bursts, which have a
@@ -196,8 +196,8 @@ class ObservedBurst(Lightcurve):
 
 # Now we define a Lightcurve instance, using the columns from the file
 
-        Lightcurve.__init__(self, time=d['col1']*u.s, dt=d['col2']*u.s, 
-                            flux=d['col3']*1e-9*u.erg/u.cm**2/u.s, 
+        Lightcurve.__init__(self, time=d['col1']*u.s, dt=d['col2']*u.s,
+                            flux=d['col3']*1e-9*u.erg/u.cm**2/u.s,
                             flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
 
 # additional (presently redundant) quantities, held over from the older version
@@ -222,9 +222,9 @@ class ObservedBurst(Lightcurve):
 #                self.tdel = float(m.group(1))*u.hr
 #                self.tdel_err = float(m.group(2))*u.hr
 ##        print (tdel, tdel_err)
-           
+
 #        self.table_file = '/Users/duncan/burst/reference/doc/table2.tex'
-        self.table_file = 'table2.tex'
+        self.table_file = '/home/zacpetej/projects/codes/concord/table2.tex'
         self.table = Table.read(self.table_file)
 
 # Below we associate each epoch with a file
@@ -256,7 +256,7 @@ class ObservedBurst(Lightcurve):
                 self.tdel_err = tdel_err*u.hr
             else:
 
-# If no tdel error is supplied by the file (e.g. for the later bursts from 
+# If no tdel error is supplied by the file (e.g. for the later bursts from
 # SAX J1808.4-3658), we set a nominal value corresponding to 1 s (typical
 # RXTE time resolution) here
 
@@ -296,7 +296,7 @@ class ObservedBurst(Lightcurve):
                         setattr(self,label[i]+'_err',val_err*unit[i])
                 else:
                     setattr(self,label[i],self.table[column][self.row]*unit[i])
-                
+
 # End block for adding attributes from the file. Below you can use the
 # additional arguments on init to set or override attributes
 
@@ -309,11 +309,11 @@ class ObservedBurst(Lightcurve):
                 else:
                     setattr(self,key,kwargs[key])
 
-# This is the key method for running the mcmc; it can be used to plot the 
+# This is the key method for running the mcmc; it can be used to plot the
 # observations with the models rescaled by the appropriate parameters, and
 # also returns a likelihood value
 
-    def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s], 
+    def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s],
 		breakdown = False, plot = False, subplot = True,
                 debug = False):
 
@@ -323,7 +323,7 @@ class ObservedBurst(Lightcurve):
 # Here we calculate the equivalent mass and radius given the redshift and
 # radius. Since we allow the redshift to vary, but the model is calculated
 # at a fixed surface gravity, we need to adjust one (or both) of M_NS and
-# R_NS to obtain a self-consistent set of parameters. 
+# R_NS to obtain a self-consistent set of parameters.
 # Because many equations of state have roughly constant radius over a
 # range of masses, we choose to keep R_NS constant and to vary M_NS
 
@@ -338,13 +338,13 @@ class ObservedBurst(Lightcurve):
 
 # These parameters give the relative weight to the tdel and persistent
 # flux for the likelihood. Since you have many more points in the
-# lightcurve, you may want to weight these greater than one so that the 
+# lightcurve, you may want to weight these greater than one so that the
 # MCMC code will try to match those preferentially
 
 #        tdelwt=2.5e3
         tdelwt=1.0
         fluxwt=1.0
-        
+
 # Calculate the rescaled model flux with the passed parameters
 
         model = modelFunc(param,self,mburst)
@@ -365,7 +365,7 @@ class ObservedBurst(Lightcurve):
             ax1 = fig.add_subplot(gs[0:3,:])
 
             self.plot()
-        
+
 # overplot the rescaled model burst
 
 ##        plt.plot(mburst.time, mburst.flux(dist))
@@ -380,22 +380,22 @@ class ObservedBurst(Lightcurve):
 
             if subplot:
 
-# Show the recurrence time comparison in the subplot; see 
+# Show the recurrence time comparison in the subplot; see
 # http://matplotlib.org/examples/pylab_examples/axes_demo.html for
 # illustrative example
 
                 a = plt.axes([.55, .5, .3, .3], facecolor='y')
 #                print (self.tdel,self.tdel_err)
-                a.errorbar([0.95], self.tdel.value, 
+                a.errorbar([0.95], self.tdel.value,
                        yerr=self.tdel_err.value, fmt='o')
-                a.errorbar([1.05], mburst.tdel.value*opz, 
+                a.errorbar([1.05], mburst.tdel.value*opz,
                        yerr=mburst.tdel_err.value*opz, fmt='ro')
                 plt.ylabel('$\Delta t$ (hr)')
 
 #            plt.plot(self.time,model,'.')
                 plt.xlim(0.8,1.2)
                 plt.xticks([])
-    
+
             else:
 
 # This bit doesn't work because it wants to parse the labels as LaTeX,
@@ -409,12 +409,12 @@ class ObservedBurst(Lightcurve):
 
             ax2 = fig.add_subplot(gs[3,:])
 #            ax2.plot(self.time+(0.5-self.timepixr)*self.dt, model-self.flux)
-            plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value, 
+            plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
 		self.flux.value-model.value,
 		yerr=self.flux_err.value,fmt='b.')
             ax2.axhline(0.0, linestyle='--', color='k')
             gs.update(hspace=0.0)
-    
+
 # Here we assemble an array with the likelihood components from each
 # parameter, for accounting purposes
 # By convention we calculate the observed parameter (from the model) and
@@ -431,25 +431,25 @@ class ObservedBurst(Lightcurve):
         fper_pred = ( mburst.mdot*Q_grav/
                (4.*pi*opz*dist**2*xi_p*self.cbol) )
         fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
-        lhood_cpt = np.append(lhood_cpt, -fluxwt*( 
-               (self.fper.value-fper_pred.value)**2*fper_sig2 
+        lhood_cpt = np.append(lhood_cpt, -fluxwt*(
+               (self.fper.value-fper_pred.value)**2*fper_sig2
                +np.log(2.*pi/fper_sig2) ) )
 
 # recurrence time
 
         tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*opz)**2)
-        lhood_cpt = np.append(lhood_cpt, -tdelwt*( 
-               (self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
+        lhood_cpt = np.append(lhood_cpt, -tdelwt*(
+               (self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2
                +np.log(2.*pi/tdel_sig2) ) )
 
 # lightcurve
 
         inv_sigma2 = 1.0/(self.flux_err.value**2)
-        lhood_cpt = np.append(lhood_cpt, 
-        	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
+        lhood_cpt = np.append(lhood_cpt,
+        	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2
                 +np.log(2.0*pi/inv_sigma2) ) )
 # troubleshooting the likelihood comparison
-#        print ( (model.value-self.flux.value)**2*inv_sigma2 
+#        print ( (model.value-self.flux.value)**2*inv_sigma2
 #                - np.log(2.0*pi*inv_sigma2) )
 
 # Printing the values to test
@@ -468,21 +468,21 @@ class ObservedBurst(Lightcurve):
 # Also a possible minor error that the tdel weight doesn't apply to the
 # entire likelihood component
 
-#        return ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
-#                               - np.log(2.0*pi*inv_sigma2) ) 
-#               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
+#        return ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2
+#                               - np.log(2.0*pi*inv_sigma2) )
+#               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2
 #               -np.log(2.*pi*tdel_sig2))
 
-        lhood_p = ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
-                               - np.log(2.0*pi*inv_sigma2) ) 
-               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
+        lhood_p = ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2
+                               - np.log(2.0*pi*inv_sigma2) )
+               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2
                -np.log(2.*pi*tdel_sig2))
 
         if breakdown:
             print ("Likelihood component breakdown (fper, tdel, lightcurve): ",lhood_cpt)
 
 # Finally we return the sum of the likelihoods
-        
+
 #        print (lhood_cpt,lhood_cpt.sum())
         return lhood_cpt.sum()
 #        return lhood_p
@@ -529,15 +529,15 @@ class KeplerBurst(Lightcurve):
 #        print (d.columns,d.meta)
 
         if ('time' in d.columns):
-            Lightcurve.__init__(self, time=d['time']*u.s,  
+            Lightcurve.__init__(self, time=d['time']*u.s,
                             lumin=d['luminosity']*u.erg/u.s, lumin_err=d['u_luminosity']*u.erg/u.s)
         else:
-            Lightcurve.__init__(self, time=d['col1']*u.s,  
+            Lightcurve.__init__(self, time=d['col1']*u.s,
                             lumin=d['col2']*u.erg/u.s, lumin_err=d['col3']*u.erg/u.s)
 
         if ('comments' in d.meta):
             self.comments = d.meta['comments']
-        
+
         if run_id != None:
 
 # For KEPLER models, read information from the burst table
@@ -547,7 +547,7 @@ class KeplerBurst(Lightcurve):
                 Vizier.columns = ['all']
                 model_table = Vizier.get_catalogs('J/ApJ/819/46')
                 self.data = model_table[0]
-        
+
 # Table columns are: 'model','N','Z','H','Lacc','bstLgth','e_bstLgth','pkLum','e_pkLum',
 # 'psLum','e_psLum','Fluence','e_Fluence','tau','e_tau','tDel','e_tDel','conv','e_conv',
 # 'r1090','e_r1090','r2590','e_r2590','alpha1','e_alpha1','tau1','e_tau1','alpha','e_alpha',
@@ -579,7 +579,7 @@ class KeplerBurst(Lightcurve):
                 self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
 
 # Additional parameter here gives the radius conversion between the assumed
-# (Newtonian) value of 10 km and the GR equivalent for a neutron star of 
+# (Newtonian) value of 10 km and the GR equivalent for a neutron star of
 # mass 1.4 M_sun, to achieve the same surface gravity.
 # If your model-defined surface gravity changes, or the radius (or mass)
 # of the NS, this quantity will also have to change
@@ -593,12 +593,12 @@ class KeplerBurst(Lightcurve):
             self.R_NS = self.R_Newt*self.xi
             self.opz = 1./sqrt(1.-2.*const.G*self.M_NS/(const.c**2*self.R_NS))
             self.g = const.G*self.M_NS/(self.R_NS**2/self.opz)
-        
+
 # Set all the remaining attributes
 
             for attr in self.data.columns:
                 setattr(self,attr,self.data[attr][self.row])
-            
+
         elif kwargs != None:
 
 # For non-KEPLER models, you can use kwargs to populate the parameters
@@ -612,7 +612,7 @@ class KeplerBurst(Lightcurve):
 
         if ((not hasattr(self,'Lacc')) & hasattr(self,'lAcc')):
             self.Lacc = self.lAcc
-            
+
 # Set the mdot with the correct units
 
         if hasattr(self,'Lacc'):
@@ -623,7 +623,7 @@ class KeplerBurst(Lightcurve):
     def flux(self,dist):
         if not hasattr(self,'dist'):
             self.dist = dist
-            
+
         return self.lumin/(4.*pi*self.dist.to('cm')**2)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
@@ -639,17 +639,17 @@ def lnprior(theta):
 # We have currently flat priors for everything but the inclination, which
 # has a probability distribution proportional to cos(i)
 
-    if (dist.value > 0.0 and 0.0 < inclination.value < 90. 
+    if (dist.value > 0.0 and 0.0 < inclination.value < 90.
         and 1. < opz < 2):
         return np.log(np.cos(inclination))
-    
+
     return -np.inf
-    
+
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
-    
-# When called from emcee, the parameters array might not have units. So 
+
+# When called from emcee, the parameters array might not have units. So
 # apply them here, in a copy of params (uparams)
 
     ok = True
@@ -681,7 +681,7 @@ def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
                 ok = False
 #    print (params, uparams, ok)
     assert(ok == True)
-    
+
     return uparams
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
@@ -692,11 +692,11 @@ def lhoodClass(params,obs,model):
     comparisons The corresponding call to emcee will (necessarily) look
     something like this:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, lhoodClass, args=[obs, models ])    
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lhoodClass, args=[obs, models ])
     '''
-    
+
     uparams = apply_units(params)
-    
+
 # We can pass multiple bursts, in which case we just loop over the function
 
     alh = 0.0
@@ -705,7 +705,7 @@ def lhoodClass(params,obs,model):
         n = len(obs)
         if (n != len(model)):
             print ("** ERROR ** number of observed and model bursts don't match")
-        
+
         for i in range(n):
 
 # Need to create a reduced parameter array here, keeping only the offset
@@ -718,12 +718,12 @@ def lhoodClass(params,obs,model):
 #            print (i,n,alh)
 
     else:
-        
+
 # Or if we have just one burst, here's what we do
 
         alh = obs.compare(model,uparams)
-            
-    return alh + lnprior(uparams[0:4]) 
+
+    return alh + lnprior(uparams[0:4])
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -737,7 +737,7 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 # Need to specify at least one of param, sampler
 
     assert ((param != None) | (sampler != None))
-    
+
     if param == None:
 
 # If no parameters are specified, try to get the best example
@@ -756,15 +756,15 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
         _param_best = sampler.chain[ibest[0],ibest[1],:]
 
     else:
-        
+
 # Just use the supplied parameters
 
         _param_best = param
-        
+
     param_best = apply_units(_param_best)
     print ('Got parameter set for plotting: ',param_best)
 
-# Want to have a check here in case there are other than 3 models & obs 
+# Want to have a check here in case there are other than 3 models & obs
 # to compare
 
     n = len(obs)
@@ -772,7 +772,7 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 
     b1, b2, b3 = obs
     m1, m2, m3 = models
-    
+
 # Can't use the gridspec anymore, as this is used for the individual plots
 
 #    fig = plt.figure()
@@ -845,7 +845,7 @@ def plot_contours(sampler,parameters=[r"$d$",r"$i$",r"$1+z$"],
 
     fig = c.plot()
     fig.set_size_inches(6,6)
-    
+
     return c
 
 # end of file burstclass.py
