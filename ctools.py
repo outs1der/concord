@@ -2,28 +2,24 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import kepdump
-import lcdata
 import sys, os
 import emcee
 import astropy.units as u
 import astropy.constants as const
+from math import sqrt
+from chainconsumer import ChainConsumer
 
 # homebrew
 import burstclass
-from misc import try_mkdir
-from params import *
-from printing import *
 
 #============================================
 # Author: Zac Johnston (2017)
 # zac.johnston@monash.edu
-#
 # Tools in progress for using X-ray burst matcher Concord
 #============================================
 # TODO: - function to run mcmc
 #       - save sampler for future analysis
-#       -  generalised function to plot best fit contours/lightcurves
+#       - generalised function to plot best fit contours/lightcurves
 #============================================
 
 
@@ -33,8 +29,14 @@ def load_obs(source='gs1826',
     """
     Loads observed burst data
     """
-    source_path = os.path.join(obs_path, source)
+    #========================================================
+    # Parameters
+    #--------------------------------------------------------
+    # source   = str : astrophysical source being matched (gs1826, 4u1820)
+    # obs_path = str : path to directory containing observational data
+    #========================================================
     obs = []
+    source_path = os.path.join(obs_path, source)
     obs_files = {'gs1826':['gs1826-24_3.530h.dat',
                             'gs1826-24_4.177h.dat',
                             'gs1826-24_5.14h.dat'],
@@ -44,6 +46,8 @@ def load_obs(source='gs1826',
     for ob_file in obs_files[source]:
         b = burstclass.ObservedBurst(ob_file, path=source_path)
         obs.append(b)
+
+    obs = tuple(obs)
 
     return obs
 
@@ -98,8 +102,8 @@ def load_models(runs,
         lAcc = ptable['accrate'][idx] * ptable['xi'][idx]    # includes xi_p multiplier
         opz = 1./sqrt(1.-2.*const.G*M_NS/(const.c**2*R_NS))
         g = const.G*M_NS/(R_NS**2/opz)
-        tdel = mtable['tDel'][idx]
-        tdel_err = mtable['uTDel'][idx]
+        tdel = mtable['tDel'][idx]/3600
+        tdel_err = mtable['uTDel'][idx]/3600
 
         m = burstclass.KeplerBurst(filename = mean_str,
                         path = mean_path,
@@ -114,4 +118,44 @@ def load_models(runs,
 
         models.append(m)
 
+    models = tuple(models)
+
     return models
+
+
+
+def setup_sampler(obs,
+                    models,
+                    params = [6.09,60.,1.28],
+                    tshift = -6.5,
+                    nwalkers = 100,
+                    threads = 4):
+    """
+
+    """
+
+    for i in range(len(obs)):
+        params.append(tshift)
+
+    ndim = len(params)
+    pos = [params*(1+1e-3*np.random.randn(ndim)) for i in range(nwalkers)]
+
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, burstclass.lhoodClass,
+                                    args=(obs,models), threads=threads)
+
+    return sampler, pos
+
+
+def run_sampler(sampler,
+                    pos,
+                    nsteps,
+                    restart=False):
+    """
+
+    """
+    if restart:
+        sampler.reset()
+
+    pos_new, lnprob, rstate = sampler.run_mcmc(pos,nsteps)
+
+    return pos_new, lnprob, rstate

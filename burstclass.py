@@ -318,6 +318,11 @@ class ObservedBurst(Lightcurve):
                 debug = False):
 
         dist, inclination, opz, t_off = param
+
+        if inclination > 90.*u.degree or inclination < 0.*u.degree:
+            return 0.
+
+
         xi_b, xi_p = anisotropy(inclination)
 
 # Here we calculate the equivalent mass and radius given the redshift and
@@ -768,13 +773,12 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 # to compare
 
     n = len(obs)
-    # assert (n == 3)
+    assert (n == 3)
 
-    # b1, b2, b3 = obs
-    # m1, m2, m3 = models
-
-    b1 = obs[0]
-    m1 = models[0]
+    b1, b2, b3 = obs
+    m1, m2, m3 = models
+    # b1 = obs[0]
+    # m1 = models[0]
 
 # Can't use the gridspec anymore, as this is used for the individual plots
 
@@ -789,15 +793,15 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
     b1.compare(m1,_param_best,plot=True,subplot=False)
 #    fig.set_size_inches(8,3)
 
-#     _param_best = param_best[0:3]
-#     _param_best.append(param_best[4])
+    _param_best = param_best[0:3]
+    _param_best.append(param_best[4])
 # #    ax2 = fig.add_subplot(gs[0,1])
-#     b2.compare(m2,_param_best,plot=True,subplot=False)
-#
-#     _param_best = param_best[0:3]
-#     _param_best.append(param_best[5])
+    b2.compare(m2,_param_best,plot=True,subplot=False)
+
+    _param_best = param_best[0:3]
+    _param_best.append(param_best[5])
 # #    ax3 = fig.add_subplot(gs[1,0])
-#     b3.compare(m3,_param_best,plot=True,subplot=False)
+    b3.compare(m3,_param_best,plot=True,subplot=False)
 
 # Now assemlbe the tdel values for plotting. This is a bit clumsy
 
@@ -837,7 +841,8 @@ def plot_contours(sampler,parameters=[r"$d$",r"$i$",r"$1+z$"],
 
     nwalkers, nsteps, ndim = np.shape(sampler.chain)
 
-    samples = sampler.chain[:, ignore:, :].reshape((-1, ndim))
+    #samples = sampler.chain[:, ignore:, :].reshape((-1, ndim))
+    samples = np.load('temp/chain_200.npy').reshape((-1,ndim))
 #    print (np.shape(samples))
 
 # This to produce a much more beautiful plot
