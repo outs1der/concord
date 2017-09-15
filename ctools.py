@@ -126,24 +126,42 @@ def load_models(runs,
 
 def setup_sampler(obs,
                     models,
-                    params = [6.09,60.,1.28],
-                    tshift = -6.5,
-                    nwalkers = 100,
-                    threads = 4):
+                    pos = None,
+                    threads = 4,
+                    **kwargs):
     """
-
+    Initialises and returns EnsembleSampler object
     """
+    if pos == None:
+        pos = setup_positions(obs=obs, **kwargs)
 
-    for i in range(len(obs)):
-        params.append(tshift)
-
-    ndim = len(params)
-    pos = [params*(1+1e-3*np.random.randn(ndim)) for i in range(nwalkers)]
+    nwalkers = len(pos)
+    ndim = len(pos[0])
 
     sampler = emcee.EnsembleSampler(nwalkers, ndim, burstclass.lhoodClass,
                                     args=(obs,models), threads=threads)
 
-    return sampler, pos
+    return sampler
+
+
+
+def setup_positions(obs,
+                        nwalkers = 200,
+                        params0 = [6.09, 60., 1.28],
+                        tshift = -6.5,
+                        mag = 1e-3):
+    """
+    Sets up and returns posititons of walkers
+    """
+    params = list(params0)   # prevent persistence between calls
+    for i in range(len(obs)):
+        params.append(tshift)
+
+    ndim = len(params)
+    pos = [params * (1 + mag * np.random.randn(ndim)) for i in range(nwalkers)]
+
+    return pos
+
 
 
 def run_sampler(sampler,
@@ -159,3 +177,47 @@ def run_sampler(sampler,
     pos_new, lnprob, rstate = sampler.run_mcmc(pos,nsteps)
 
     return pos_new, lnprob, rstate
+
+
+
+def animate_contours(run,
+                        step,
+                        dt=5,
+                        fps=30,
+                        ffmpeg=True,
+                        path = '/home/zacpetej/projects/codes/concord/'):
+    """
+    Saves frames of contour evolution, to make an animation
+    """
+    parameters=[r"$d$",r"$i$",r"$1+z$"]
+    chain_str = 'chain_{r}'.format(r=run)
+    chain_file = os.path.join(path, 'temp', '{chain}_{st}.npy'.format(chain=chain_str, st=step))
+    chain = np.load(chain_file)
+    nwalkers, nsteps, ndim = np.shape(chain)
+
+    mtarget = os.path.join(path, 'animation')
+    ftarget = os.path.join(mtarget, 'frames')
+
+    c = ChainConsumer()
+
+    for i in range(dt, nsteps, dt):
+        print('frame  ', i)
+        subchain = chain[:, :i, :].reshape((-1,ndim))
+        c.add_chain(subchain, parameters=parameters)
+
+        fig = c.plotter.plot()
+        fig.set_size_inches(6,6)
+        cnt = round(i/dt)
+
+        filename = '{chain}_{n:04d}.png'.format(chain=chain_str, n=cnt)
+        filepath = os.path.join(ftarget, filename)
+        fig.savefig(filepath)
+
+        plt.close(fig)
+        c.remove_chain()
+
+    if ffmpeg:
+        print('Creating movie')
+        framefile = os.path.join(ftarget, '{chain}_%04d.png'.format(chain=chain_str))
+        savefile = os.path.join(mtarget, '{chain}.mp4'.format(chain=chain_str))
+        subprocess.run(['ffmpeg', '-r', str(fps), '-i', framefile, savefile])
