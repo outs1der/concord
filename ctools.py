@@ -180,6 +180,60 @@ def run_sampler(sampler,
 
 
 
+def save_contours(runs,
+                batches,
+                step,
+                source='gs1826',
+                path='/home/zacpetej/projects/kepler_grids/'):
+    """
+    Save contour plots from multiple concord runs
+    """
+    #========================================================
+    # Parameters
+    #--------------------------------------------------------
+    # run
+    # batches    = [int] :
+    # step       = int   : emcee step to load (used in file label)
+    # source
+    # path = str   : path to directory containing chain files
+    #========================================================
+    ndim = 6
+    parameters=[r"$d$",r"$i$",r"$1+z$"]
+    c = ChainConsumer()
+
+    chain_dir = os.path.join(path, source, 'concord')
+    save_dir = os.path.join(path, source, 'contours')
+
+    print('Source: ', source)
+    print('Loading from : ', chain_dir)
+    print('Saving to    : ', save_dir)
+    print('Batch set: ', batches)
+    print('Runs: ')
+    print(runs)
+
+    for run in runs:
+        print('Run ', run)
+        batch_str = '{src}_{b1}-{b2}-{b3}_R{r}_S{s}'.format(src=source, b1=batches[0], b2=batches[1], b3=batches[2], r=run, s=step)
+        chain_str = 'chain_{batch_str}.npy'.format(batch_str=batch_str)
+        save_str = 'contour_{batch_str}.png'.format(batch_str=batch_str)
+
+        chain_file = os.path.join(chain_dir, chain_str)
+        save_file = os.path.join(save_dir, save_str)
+
+        chain = np.load(chain_file)
+        chain = chain.reshape((-1, ndim))
+
+        c.add_chain(chain, parameters=parameters)
+
+        fig = c.plotter.plot()
+        fig.set_size_inches(6,6)
+        fig.savefig(save_file)
+
+        plt.close(fig)
+        c.remove_chain()
+
+    print('Done!')
+
 def animate_contours(run,
                         step,
                         dt=5,
