@@ -17,15 +17,35 @@ import burstclass
 # zac.johnston@monash.edu
 # Tools in progress for using X-ray burst matcher Concord
 #============================================
-# TODO: - function to run mcmc
-#       - save sampler for future analysis
-#       - generalised function to plot best fit contours/lightcurves
+# TODO:
+#    - generalised function to plot best fit contours/lightcurves
+#    - write simple pipeline/recipe for setting up grids --> analyser --> concord
+#
+# --- Functions ---
+# def setup_all():
+#     """
+#     Sets up observed/modelled burst objects and initiallises sampler
+#     """
+#
+# def plot_walkers():
+#     """
+#     plots walkers of mcmc chain
+#     """
 #============================================
 
 
+#===================================================
+# GLOBAL PATHS
+#---------------------------------------------------
+# If you wish to use a different path for a specific function call,
+# include it as the parameter 'path' when calling the function
+#---------------------------------------------------
+GRIDS_PATH = '/home/zacpetej/projects/kepler_grids/'
+CONCORD_PATH = '/home/zacpetej/projects/codes/concord/'
+#===================================================
 
 def load_obs(source='gs1826',
-                obs_path = '/home/zacpetej/projects/kepler_grids/obs_data/'):
+                **kwargs):
     """
     Loads observed burst data
     """
@@ -36,7 +56,9 @@ def load_obs(source='gs1826',
     # obs_path = str : path to directory containing observational data
     #========================================================
     obs = []
+    obs_path = kwargs.get('path', GRIDS_PATH+'obs_data/')
     source_path = os.path.join(obs_path, source)
+
     obs_files = {'gs1826':['gs1826-24_3.530h.dat',
                             'gs1826-24_4.177h.dat',
                             'gs1826-24_5.14h.dat'],
@@ -59,8 +81,7 @@ def load_models(runs,
                   basename = 'xrb',
                   params_prefix = 'params',
                   summ_prefix = 'summ',
-                  mean_path = '/home/zacpetej/projects/kepler_grids/gs1826/mean_lightcurves',
-                  source_path = '/home/zacpetej/projects/kepler_grids/gs1826/'):
+                  **kwargs):
     """
     Loads a set of models (parameters and lightcurves)
     """
@@ -71,6 +92,7 @@ def load_models(runs,
     # batches = [] : batches that the models in runs[] belong to (one-to-one correspondence)
     #========================================================
     models = []
+    path = kwargs.get('path', GRIDS_PATH)
 
     for i, run in enumerate(runs):
         batch = batches[i]
@@ -80,9 +102,10 @@ def load_models(runs,
         param_str = '{prefix}_{batch_str}.txt'.format(prefix=params_prefix, batch_str=batch_str)
         summ_str = '{prefix}_{batch_str}.txt'.format(prefix=summ_prefix, batch_str=batch_str)
 
+        source_path = os.path.join(path, source)
         param_file = os.path.join(source_path, param_str)
-        mean_file = os.path.join(mean_path, mean_str)   # currently not used
         summ_file = os.path.join(source_path, summ_str)
+        mean_path = os.path.join(source_path, 'mean_lightcurves')
 
         #----------------------------------
         # TODO: - account for different Eddington composition
@@ -169,7 +192,7 @@ def run_sampler(sampler,
                     nsteps,
                     restart=False):
     """
-
+    Runs emcee chain for nsteps
     """
     if restart:
         sampler.reset()
@@ -180,23 +203,127 @@ def run_sampler(sampler,
 
 
 
-def save_contours(runs,
+def write_batch(run,
+                batches,
+                qos = 'medium',
+                auto_qos = True,
+                **kwargs):
+    """
+    ========================================================
+    Writes batch script for job-submission on Monarch
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+     auto_qos  = bool   : split jobs between node types (overrides qos)
+    ========================================================
+    """
+
+#TODO: ---Needs finishing--
+    path = kwargs.get('path', os.path.join(GRIDS_PATH, 'logs'))
+    print('Writing slurm sbatch script')
+    span = '{n0}-{n1}'.format(n0=n0, n1=n1)
+    slurmfile = path+'{prep}{gbase}{grid}_{span}.sh'.format(prep=prepend, gbase=grid_basename, grid=grid_num, span=span)
+
+    with open(slurmfile, 'w') as f:
+        f.write("""#!/bin/bash
+
+#SBATCH --job-name={jobname}
+#SBATCH --output=arrayJob_%A_%a.out
+#SBATCH --error=arrayJob_%A_%a.err
+#SBATCH --array={n0}-{n1}
+#SBATCH --time={time}
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task={threads}
+{qos_str}
+#SBATCH --mem-per-cpu=2000
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=zac.johnston@monash.edu
+
+######################
+# Begin work section #
+######################
+
+N=$SLURM_ARRAY_TASK_ID
+module load python/3.5.1-gcc
+cd /home/zacpetej/id43/python/concord/
+python3 run_concord {source} {batches} $N no_restart""".format(jobname=jobname,
+                n0=n0, n1=n1, source=source, batches=batches, threads=threds, qos_str=qos_str, time=time))
+
+
+
+def batch_string(batches,
+                    delim='-'):
+    """
+    ========================================================
+    constructs a string of generic number of batch IDs
+    ========================================================
+    batches  = [int]
+    delim    = str     : delimiter to place between IDs
+    ========================================================
+    """
+    b_string = ''
+
+    for b in batches[:-1]:
+        b_string += str(b)
+        b_string += delim
+
+    b_string += str(batches[-1])
+
+    return b_string
+
+
+
+def load_chain(run,
                 batches,
                 step,
                 source='gs1826',
-                path='/home/zacpetej/projects/kepler_grids/'):
+                **kwargs):
     """
+    ========================================================
+    Load chain file from completed emcee run
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+    run
+    batches
+    step
+    source
+    ========================================================
+    """
+    path = kwargs.get('path', GRIDS_PATH)
+    b_str = batch_string(batches)
+
+    chain_path = os.path.join(path, source, 'concord')
+    chain_str = 'chain_{src}_{bstr}_R{run}_S{stp}.npy'.format(src=source, bstr = b_str,
+                                        run=run, stp=step)
+    chain_file = os.path.join(chain_path, chain_str)
+    chain = np.load(chain_file)
+
+    return chain
+
+
+
+def save_contours(runs,
+                batches,
+                step,
+                ignore=100,
+                source='gs1826',
+                **kwargs):
+    """
+    ========================================================
     Save contour plots from multiple concord runs
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+    run
+    batches    = [int] :
+    step       = int   : emcee step to load (used in file label)
+    ignore     = int   : number of initial chain steps to ignore (burn-in phase)
+    source
+    path       = str   : path to kepler_grids directory
+    ========================================================
     """
-    #========================================================
-    # Parameters
-    #--------------------------------------------------------
-    # run
-    # batches    = [int] :
-    # step       = int   : emcee step to load (used in file label)
-    # source
-    # path = str   : path to directory containing chain files
-    #========================================================
+    path = kwargs.get('path', GRIDS_PATH)
     ndim = 6
     parameters=[r"$d$",r"$i$",r"$1+z$"]
     c = ChainConsumer()
@@ -207,9 +334,8 @@ def save_contours(runs,
     print('Source: ', source)
     print('Loading from : ', chain_dir)
     print('Saving to    : ', save_dir)
-    print('Batch set: ', batches)
-    print('Runs: ')
-    print(runs)
+    print('Batches: ', batches)
+    print('Runs: ', runs)
 
     for run in runs:
         print('Run ', run)
@@ -220,7 +346,7 @@ def save_contours(runs,
         chain_file = os.path.join(chain_dir, chain_str)
         save_file = os.path.join(save_dir, save_str)
 
-        chain = np.load(chain_file)
+        chain = np.load(chain_file)[:, ignore:, :]
         chain = chain.reshape((-1, ndim))
 
         c.add_chain(chain, parameters=parameters)
@@ -234,15 +360,19 @@ def save_contours(runs,
 
     print('Done!')
 
+
+
 def animate_contours(run,
                         step,
                         dt=5,
                         fps=30,
                         ffmpeg=True,
-                        path = '/home/zacpetej/projects/codes/concord/'):
+                        **kwargs):
     """
     Saves frames of contour evolution, to make an animation
     """
+    path = kwargs.get('path', CONCORD_PATH)
+
     parameters=[r"$d$",r"$i$",r"$1+z$"]
     chain_str = 'chain_{r}'.format(r=run)
     chain_file = os.path.join(path, 'temp', '{chain}_{st}.npy'.format(chain=chain_str, st=step))
