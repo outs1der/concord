@@ -5,3 +5,4 @@ __pycache__
 animation/
 temp/
 plots/
+.ipynb_checkpoints/

@@ -331,7 +331,7 @@ def save_summaries(n_runs,
                         **kwargs):
     """
     ========================================================
-    Compiles summary stats for all runs in a batch and saves as a table
+    Extracts summary mcmc stats for a batch and saves as a table
     ========================================================
     Parameters
     --------------------------------------------------------
@@ -366,6 +366,8 @@ def save_summaries(n_runs,
 
 
     # ===== get summaries from each set =====
+    unconstrained_flag = False
+
     for run in range(1, n_runs+1):
         models = load_models(runs=[run], batches=batches, source=source, **kwargs)
         summary = get_summary(run=run, batches=batches, source=source, step=step,
@@ -380,8 +382,17 @@ def save_summaries(n_runs,
 
             means.append(summary[p][0])
 
+            # ===== Test for unconstrained parameter =====
+            if summary[p][0] == None:       # an unconstrained param won't have any bounds
+                unconstrained_flag = True
+
         # ===== get likelihood value =====
-        lhood = burstclass.lhoodClass(params=means, obs=obs, model=models)
+        if unconstrained_flag:
+            lhood = np.nan
+            unconstrained_flag = False
+        else:
+            lhood = burstclass.lhoodClass(params=means, obs=obs, model=models)
+
         results['lhood'][run-1] = lhood
 
 
