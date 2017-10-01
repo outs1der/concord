@@ -31,6 +31,7 @@ import burstclass
 #     """
 #     plots walkers of mcmc chain
 #     """
+#
 #============================================
 
 
@@ -47,14 +48,14 @@ CONCORD_PATH = '/home/zacpetej/projects/codes/concord/'
 def load_obs(source='gs1826',
                 **kwargs):
     """
+    ========================================================
     Loads observed burst data
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+    source   = str : astrophysical source being matched (gs1826, 4u1820)
+    ========================================================
     """
-    #========================================================
-    # Parameters
-    #--------------------------------------------------------
-    # source   = str : astrophysical source being matched (gs1826, 4u1820)
-    # obs_path = str : path to directory containing observational data
-    #========================================================
     obs = []
     obs_path = kwargs.get('path', GRIDS_PATH+'obs_data/')
     source_path = os.path.join(obs_path, source)
@@ -83,16 +84,22 @@ def load_models(runs,
                   summ_prefix = 'summ',
                   **kwargs):
     """
+    ========================================================
     Loads a set of models (parameters and lightcurves)
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+    runs    = [] : list of models to use (assumed to be identical if only one given)
+    batches = [] : batches that the models in runs[] belong to (one-to-one correspondence)
+    ========================================================
     """
-    #========================================================
-    # Parameters
-    #--------------------------------------------------------
-    # runs    = [] : list of models to use
-    # batches = [] : batches that the models in runs[] belong to (one-to-one correspondence)
-    #========================================================
     models = []
     path = kwargs.get('path', GRIDS_PATH)
+
+    #
+    if len(runs) == 1:
+        nb = len(batches)
+        runs = np.full(nb, runs[0])
 
     for i, run in enumerate(runs):
         batch = batches[i]
@@ -214,7 +221,7 @@ def write_batch(run,
     ========================================================
     Parameters
     --------------------------------------------------------
-     auto_qos  = bool   : split jobs between node types (overrides qos)
+    auto_qos  = bool   : split jobs between node types (overrides qos)
     ========================================================
     """
 
@@ -251,28 +258,6 @@ python3 run_concord {source} {batches} $N no_restart""".format(jobname=jobname,
 
 
 
-def batch_string(batches,
-                    delim='-'):
-    """
-    ========================================================
-    constructs a string of generic number of batch IDs
-    ========================================================
-    batches  = [int]
-    delim    = str     : delimiter to place between IDs
-    ========================================================
-    """
-    b_string = ''
-
-    for b in batches[:-1]:
-        b_string += str(b)
-        b_string += delim
-
-    b_string += str(batches[-1])
-
-    return b_string
-
-
-
 def load_chain(run,
                 batches,
                 step,
@@ -294,19 +279,176 @@ def load_chain(run,
     b_str = batch_string(batches)
 
     chain_path = os.path.join(path, source, 'concord')
-    chain_str = 'chain_{src}_{bstr}_R{run}_S{stp}.npy'.format(src=source, bstr = b_str,
+    chain_str = 'chain_{src}_{bstr}_R{run}_S{stp}.npy'.format(src=source, bstr=b_str,
                                         run=run, stp=step)
     chain_file = os.path.join(chain_path, chain_str)
+
+    print('Loading chain: ', chain_file)
     chain = np.load(chain_file)
 
     return chain
 
 
 
+def get_summary(run,
+                batches,
+                step,
+                ignore=250,
+                source='gs1826',
+                param_names=["d", "i", "1+z"],
+                **kwargs):
+    """
+    ========================================================
+    Get summary stats (mean + std) from a given mcmc chain
+    ========================================================
+    """
+    path = kwargs.get('path', GRIDS_PATH)
+
+    chain = load_chain(run=run, batches=batches, step=step, source=source, path=path)
+    chain = chain[:, ignore:, :]  # cut out "burn-in" steps
+
+    # ===== Construct time parameter strings =====
+    ndim = np.shape(chain)[2]
+    n_time = ndim - len(param_names)
+    t_params = construct_t_params(n_time)
+    param_names = param_names + t_params
+
+    # ===== Get summary values =====
+    cs = ChainConsumer()
+    cs.add_chain(chain.reshape(-1, ndim), parameters=param_names)
+    summary = cs.analysis.get_summary()
+
+    return summary
+
+
+
+def save_summaries(n_runs,
+                        batches,
+                        step,
+                        ignore=250,
+                        source='gs1826',
+                        param_names=['d', 'i', '1+z'],
+                        **kwargs):
+    """
+    ========================================================
+    Compiles summary stats for all runs in a batch and saves as a table
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+    n_runs  = int   : number of runs in each batch
+    --------------------------------------------------------
+    Notes:
+            - Assumes each batch contains models numbered from 1 to [n_runs]
+    ========================================================
+    """
+    path = kwargs.get('path', GRIDS_PATH)
+    obs = load_obs(source=source, **kwargs)
+
+    n_obs = len(obs)
+    t_params = construct_t_params(n_obs)
+    param_names = param_names + t_params
+
+
+    # ===== Setup dict to store summary values =====
+    results = {}
+    results['run'] = np.arange(1, n_runs+1)
+    results['lhood'] = np.zeros(n_runs)       # likelihood values
+    sigma_bounds_names = []
+
+    for p in param_names:
+        p_low = p + '_low'                     # 1-sigma lower/upper boundaries
+        p_high = p + '_high'                   #
+        sigma_bounds_names += [p_low, p_high]
+
+        results[p] = np.zeros(n_runs)
+        results[p_low] = np.zeros(n_runs)
+        results[p_high] = np.zeros(n_runs)
+
+
+    # ===== get summaries from each set =====
+    for run in range(1, n_runs+1):
+        models = load_models(runs=[run], batches=batches, source=source, **kwargs)
+        summary = get_summary(run=run, batches=batches, source=source, step=step,
+                                ignore=ignore, param_names=param_names, **kwargs)
+
+        # ===== get mean +/- 1-sigma for each param =====
+        means = []
+        for p in param_names:
+            results[p][run-1] = summary[p][1]
+            results[p + '_low'][run-1] = summary[p][0]
+            results[p + '_high'][run-1] = summary[p][2]
+
+            means.append(summary[p][0])
+
+        # ===== get likelihood value =====
+        lhood = burstclass.lhoodClass(params=means, obs=obs, model=models)
+        results['lhood'][run-1] = lhood
+
+
+    # ========== format and save table ==========
+    # --- number formatting stuff ---
+    flt0 = '{:.0f}'.format
+    flt4 = '{:.4f}'.format
+    FORMATTERS = {'lhood':flt0}
+    for p in param_names[:3]:
+        FORMATTERS[p] = flt4
+        FORMATTERS[p + '_low'] = flt4
+        FORMATTERS[p + '_high'] = flt4
+
+    out_table = pd.DataFrame(results)
+    col_order = ['run', 'lhood'] + param_names + sigma_bounds_names
+    out_table = out_table[col_order]    # fix column order
+
+    batch_str = full_string(run=run, batches=batches, step=step, source=source)
+    file_str = 'mcmc_' + batch_str + '.txt'
+    file_path = os.path.join(path, source, 'mcmc', file_str)
+
+    table_str = out_table.to_string(index=False, justify='left', col_space=8, formatters=FORMATTERS)
+
+    with open(file_path, 'w') as f:
+        f.write(table_str)
+
+    return out_table
+
+
+
+def construct_t_params(n):
+    """
+    ========================================================
+    Creates list of time-param labels (t1, t2, t3...)
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+    n = int  : number of time parameters
+    ========================================================
+    """
+    t_params = []
+
+    for i in range(n):
+        tname = 't' + str(i+1)
+        t_params.append(tname)
+
+    return t_params
+
+
+
+# TODO
+# def get_likelihood(params,
+#                     obs,
+#                     models):
+#     """
+#     ========================================================
+#     Gets likelihood of given set of parameters
+#     ========================================================
+#     Parameters
+#     --------------------------------------------------------
+#     """
+
+
 def save_contours(runs,
                 batches,
                 step,
-                ignore=100,
+                ignore=250,
                 source='gs1826',
                 **kwargs):
     """
@@ -339,7 +481,7 @@ def save_contours(runs,
 
     for run in runs:
         print('Run ', run)
-        batch_str = '{src}_{b1}-{b2}-{b3}_R{r}_S{s}'.format(src=source, b1=batches[0], b2=batches[1], b3=batches[2], r=run, s=step)
+        batch_str = full_string(run=run, batches=batches, source=source, step=step)
         chain_str = 'chain_{batch_str}.npy'.format(batch_str=batch_str)
         save_str = 'contour_{batch_str}.png'.format(batch_str=batch_str)
 
@@ -405,3 +547,42 @@ def animate_contours(run,
         framefile = os.path.join(ftarget, '{chain}_%04d.png'.format(chain=chain_str))
         savefile = os.path.join(mtarget, '{chain}.mp4'.format(chain=chain_str))
         subprocess.run(['ffmpeg', '-r', str(fps), '-i', framefile, savefile])
+
+
+
+def full_string(run,
+                        batches,
+                        step,
+                        source='gs1826'):
+    """
+    ========================================================
+    constructs a standardised string for a batch model
+    ========================================================
+    """
+    b_string = batch_string(batches)
+    string = '{src}_{bstr}_R{run}_S{stp}'.format(src=source, bstr=b_string,
+                                                    run=run, stp=step)
+
+    return string
+
+
+
+def batch_string(batches,
+                    delim='-'):
+    """
+    ========================================================
+    constructs a string of generic number of batch IDs
+    ========================================================
+    batches  = [int]
+    delim    = str     : delimiter to place between IDs
+    ========================================================
+    """
+    b_string = ''
+
+    for b in batches[:-1]:
+        b_string += str(b)
+        b_string += delim
+
+    b_string += str(batches[-1])
+
+    return b_string

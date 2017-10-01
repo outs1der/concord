@@ -2,3 +2,6 @@ syntax: glob
 .DS_Store
 *.swp
 __pycache__
+animation/
+temp/
+plots/
