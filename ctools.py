@@ -11,7 +11,6 @@ from chainconsumer import ChainConsumer
 
 # homebrew
 import burstclass
-from misc import try_mkdir
 
 #============================================
 # Author: Zac Johnston (2017)
@@ -672,3 +671,21 @@ def batch_daisychain(batches,
     batch_daisy += str(batches[-1])
 
     return batch_daisy
+
+
+def try_mkdir(path, skip=False):
+    try:
+        print('Creating directory  {}'.format(path))
+        subprocess.run(['mkdir', path], check=True)
+    except:
+        if skip:
+            print('Directory already exists - skipping')
+        else:
+            print('Directory exists')
+            cont = input('Overwrite? (DESTROY) [y/n]: ')
+
+            if cont == 'y' or cont == 'Y':
+                subprocess.run(['rm', '-r', path])
+                subprocess.run(['mkdir', path])
+            elif cont =='n' or cont == 'N':
+                sys.exit()
