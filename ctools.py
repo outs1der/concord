@@ -11,6 +11,7 @@ from chainconsumer import ChainConsumer
 
 # homebrew
 import burstclass
+from misc import try_mkdir
 
 #============================================
 # Author: Zac Johnston (2017)
@@ -32,6 +33,10 @@ import burstclass
 #     plots walkers of mcmc chain
 #     """
 #
+# def best_fits():
+#     """
+#     extracts best fits from given batch, prints params
+#     """
 #============================================
 
 
@@ -110,10 +115,9 @@ def load_models(runs,
         summ_str = '{prefix}_{batch_str}.txt'.format(prefix=summ_prefix, batch_str=batch_str)
 
         source_path = os.path.join(path, source)
-        param_file = os.path.join(source_path, param_str)
-        summ_file = os.path.join(source_path, summ_str)
+        param_file = os.path.join(source_path, 'params', param_str)
+        summ_file = os.path.join(source_path, 'summary', summ_str)
         mean_path = os.path.join(source_path, 'mean_lightcurves')
-
         #----------------------------------
         # TODO: - account for different Eddington composition
         #----------------------------------
@@ -170,7 +174,6 @@ def setup_sampler(obs,
 
     sampler = emcee.EnsembleSampler(nwalkers, ndim, burstclass.lhoodClass,
                                     args=(obs,models), threads=threads)
-
     return sampler
 
 
@@ -210,54 +213,6 @@ def run_sampler(sampler,
 
 
 
-def write_batch(run,
-                batches,
-                qos = 'medium',
-                auto_qos = True,
-                **kwargs):
-    """
-    ========================================================
-    Writes batch script for job-submission on Monarch
-    ========================================================
-    Parameters
-    --------------------------------------------------------
-    auto_qos  = bool   : split jobs between node types (overrides qos)
-    ========================================================
-    """
-
-#TODO: ---Needs finishing--
-    path = kwargs.get('path', os.path.join(GRIDS_PATH, 'logs'))
-    print('Writing slurm sbatch script')
-    span = '{n0}-{n1}'.format(n0=n0, n1=n1)
-    slurmfile = path+'{prep}{gbase}{grid}_{span}.sh'.format(prep=prepend, gbase=grid_basename, grid=grid_num, span=span)
-
-    with open(slurmfile, 'w') as f:
-        f.write("""#!/bin/bash
-
-#SBATCH --job-name={jobname}
-#SBATCH --output=arrayJob_%A_%a.out
-#SBATCH --error=arrayJob_%A_%a.err
-#SBATCH --array={n0}-{n1}
-#SBATCH --time={time}
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task={threads}
-{qos_str}
-#SBATCH --mem-per-cpu=2000
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=zac.johnston@monash.edu
-
-######################
-# Begin work section #
-######################
-
-N=$SLURM_ARRAY_TASK_ID
-module load python/3.5.1-gcc
-cd /home/zacpetej/id43/python/concord/
-python3 run_concord {source} {batches} $N no_restart""".format(jobname=jobname,
-                n0=n0, n1=n1, source=source, batches=batches, threads=threds, qos_str=qos_str, time=time))
-
-
-
 def load_chain(run,
                 batches,
                 step,
@@ -276,7 +231,7 @@ def load_chain(run,
     ========================================================
     """
     path = kwargs.get('path', GRIDS_PATH)
-    b_str = batch_string(batches)
+    b_str = batch_daisychain(batches)
 
     chain_path = os.path.join(path, source, 'concord')
     chain_str = 'chain_{src}_{bstr}_R{run}_S{stp}.npy'.format(src=source, bstr=b_str,
@@ -328,6 +283,7 @@ def save_summaries(n_runs,
                         ignore=250,
                         source='gs1826',
                         param_names=['d', 'i', '1+z'],
+                        exclude=[],
                         **kwargs):
     """
     ========================================================
@@ -336,6 +292,7 @@ def save_summaries(n_runs,
     Parameters
     --------------------------------------------------------
     n_runs  = int   : number of runs in each batch
+    exclude = [int] : runs to skip over/exclude from analysis
     --------------------------------------------------------
     Notes:
             - Assumes each batch contains models numbered from 1 to [n_runs]
@@ -369,6 +326,10 @@ def save_summaries(n_runs,
     unconstrained_flag = False
 
     for run in range(1, n_runs+1):
+        if run in exclude:
+            results['lhood'][run-1] = np.nan
+            continue
+
         models = load_models(runs=[run], batches=batches, source=source, **kwargs)
         summary = get_summary(run=run, batches=batches, source=source, step=step,
                                 ignore=ignore, param_names=param_names, **kwargs)
@@ -410,7 +371,8 @@ def save_summaries(n_runs,
     col_order = ['run', 'lhood'] + param_names + sigma_bounds_names
     out_table = out_table[col_order]    # fix column order
 
-    batch_str = full_string(run=run, batches=batches, step=step, source=source)
+    # batch_str = full_string(run=run, batches=batches, step=step, source=source)
+    batch_str = '{src}_{b}_S{s}'.format(src=source, b=batch_daisychain(batches), s=step)
     file_str = 'mcmc_' + batch_str + '.txt'
     file_path = os.path.join(path, source, 'mcmc', file_str)
 
@@ -423,37 +385,104 @@ def save_summaries(n_runs,
 
 
 
-def construct_t_params(n):
+def write_batch(run,
+                batches,
+                qos = 'medium',
+                auto_qos = True,
+                **kwargs):
     """
     ========================================================
-    Creates list of time-param labels (t1, t2, t3...)
+    Writes batch script for job-submission on Monarch
     ========================================================
     Parameters
     --------------------------------------------------------
-    n = int  : number of time parameters
+    auto_qos  = bool   : split jobs between node types (overrides qos)
     ========================================================
     """
-    t_params = []
+
+#TODO: !!Needs finishing!!
+    path = kwargs.get('path', os.path.join(GRIDS_PATH, 'logs'))
+    print('Writing slurm sbatch script')
+    span = '{n0}-{n1}'.format(n0=n0, n1=n1)
+    slurmfile = path+'{prep}{gbase}{grid}_{span}.sh'.format(prep=prepend, gbase=grid_basename, grid=grid_num, span=span)
+
+    with open(slurmfile, 'w') as f:
+        f.write("""#!/bin/bash
+
+#SBATCH --job-name={jobname}
+#SBATCH --output=arrayJob_%A_%a.out
+#SBATCH --error=arrayJob_%A_%a.err
+#SBATCH --array={n0}-{n1}
+#SBATCH --time={time}
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task={threads}
+{qos_str}
+#SBATCH --mem-per-cpu=2000
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=zac.johnston@monash.edu
+
+######################
+# Begin work section #
+######################
+
+N=$SLURM_ARRAY_TASK_ID
+module load python/3.5.1-gcc
+cd /home/zacpetej/id43/python/concord/
+python3 run_concord {source} {batches} $N no_restart""".format(jobname=jobname,
+                n0=n0, n1=n1, source=source, batches=batches, threads=threds, qos_str=qos_str, time=time))
+
+
+
+def plot_lightcurves(run,
+                        batches,
+                        step,
+                        source='gs1826',
+                        **kwargs):
+    """
+    ========================================================
+    Plots lightcurves with best-fit params from an mcmc chain
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+    run
+    batches    = [int] :
+    step       = int   : emcee step to load (used in file label)
+    source
+    path       = str   : path to kepler_grids directory
+    ========================================================
+    """
+    path = kwargs.get('path', GRIDS_PATH)
+    source_path = os.path.join(path, source)
+
+    obs = load_obs(source=source, **kwargs)
+    models = load_models(runs=[run], batches=batches, source=source, **kwargs)
+
+    n = len(obs)
+    param_names = ['d', 'i', '1+z']
+    t_params = construct_t_params(n)
+    param_names = param_names + t_params
+
+    batch_str = '{src}_{b}_S{s}'.format(src=source, b=batch_daisychain(batches), s=step)
+    table_name = 'mcmc_' + batch_str + '.txt'
+    table_filepath = os.path.join(source_path, 'mcmc', table_name)
+
+    table = pd.read_table(table_filepath, delim_whitespace=True)
+    run_idx = np.argwhere(table['run'] == run)[0][0]
+
+    params = {}
+
+    for p in param_names:
+        params[p] = table[p][run_idx]
+
+    print(params)
 
     for i in range(n):
-        tname = 't' + str(i+1)
-        t_params.append(tname)
+        t = 't' + str(i+1)
+        base_input_params = [params['d']*u.kpc, params['i']*u.degree, params['1+z']]
+        input_params = base_input_params + [params[t]*u.s] # append relevant time only
 
-    return t_params
+        obs[i].compare(models[i], input_params, plot=True)
 
-
-
-# TODO
-# def get_likelihood(params,
-#                     obs,
-#                     models):
-#     """
-#     ========================================================
-#     Gets likelihood of given set of parameters
-#     ========================================================
-#     Parameters
-#     --------------------------------------------------------
-#     """
 
 
 def save_contours(runs,
@@ -481,8 +510,13 @@ def save_contours(runs,
     parameters=[r"$d$",r"$i$",r"$1+z$"]
     c = ChainConsumer()
 
+    triplet_str = triplet_string(batches=batches, source=source, **kwargs)
+
     chain_dir = os.path.join(path, source, 'concord')
-    save_dir = os.path.join(path, source, 'contours')
+    plot_dir = os.path.join(path, source, 'plots')
+    save_dir = os.path.join(plot_dir, triplet_str)
+
+    try_mkdir(save_dir, skip=True)
 
     print('Source: ', source)
     print('Loading from : ', chain_dir)
@@ -492,9 +526,11 @@ def save_contours(runs,
 
     for run in runs:
         print('Run ', run)
-        batch_str = full_string(run=run, batches=batches, source=source, step=step)
-        chain_str = 'chain_{batch_str}.npy'.format(batch_str=batch_str)
-        save_str = 'contour_{batch_str}.png'.format(batch_str=batch_str)
+        full_str = full_string(run=run, batches=batches, source=source, step=step)
+
+        chain_str = 'chain_{full_str}.npy'.format(full_str=full_str)
+        save_str = 'contour_{full_str}.png'.format(full_str=full_str)
+
 
         chain_file = os.path.join(chain_dir, chain_str)
         save_file = os.path.join(save_dir, save_str)
@@ -505,7 +541,7 @@ def save_contours(runs,
         c.add_chain(chain, parameters=parameters)
 
         fig = c.plotter.plot()
-        fig.set_size_inches(6,6)
+        fig.set_size_inches(7,7)
         fig.savefig(save_file)
 
         plt.close(fig)
@@ -561,25 +597,55 @@ def animate_contours(run,
 
 
 
+def construct_t_params(n):
+    """
+    ========================================================
+    Creates list of time-param labels (t1, t2, t3...)
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+    n = int  : number of time parameters
+    ========================================================
+    """
+    t_params = []
+
+    for i in range(n):
+        tname = 't' + str(i+1)
+        t_params.append(tname)
+
+    return t_params
+
+
+
 def full_string(run,
-                        batches,
-                        step,
-                        source='gs1826'):
+                batches,
+                step,
+                source='gs1826'):
     """
     ========================================================
     constructs a standardised string for a batch model
     ========================================================
     """
-    b_string = batch_string(batches)
-    string = '{src}_{bstr}_R{run}_S{stp}'.format(src=source, bstr=b_string,
+    b_string = batch_daisychain(batches)
+    full_string = '{src}_{bstr}_R{run}_S{stp}'.format(src=source, bstr=b_string,
                                                     run=run, stp=step)
 
-    return string
+    return full_string
 
 
 
-def batch_string(batches,
-                    delim='-'):
+def triplet_string(batches,
+                   source='gs1826',
+                   **kwargs):
+    batch_daisy = batch_daisychain(batches, **kwargs)
+    triplet_str = '{source}_{batches}'.format(source=source, batches=batch_daisy)
+
+    return triplet_str
+
+
+
+def batch_daisychain(batches,
+                     delim='-'):
     """
     ========================================================
     constructs a string of generic number of batch IDs
@@ -588,12 +654,12 @@ def batch_string(batches,
     delim    = str     : delimiter to place between IDs
     ========================================================
     """
-    b_string = ''
+    batch_daisy = ''
 
     for b in batches[:-1]:
-        b_string += str(b)
-        b_string += delim
+        batch_daisy += str(b)
+        batch_daisy += delim
 
-    b_string += str(batches[-1])
+    batch_daisy += str(batches[-1])
 
-    return b_string
+    return batch_daisy
