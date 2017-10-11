@@ -30,7 +30,7 @@ models = ctools.load_models(runs=[run,run,run], batches=batches)
 #models = ctools.load_models(runs=[run], source=source, batches=batches)[0] #!!!
 
 pos = ctools.setup_positions(obs)
-sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200, threads=4)
+sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200, threads=2)
 
 batch_str = '{src}_{b1}-{b2}-{b3}_R{r}'.format(src=source, b1=batches[0], b2=batches[1], b3=batches[2], r=run)
 #batch_str = '{src}_B{b1}_R{r}'.format(src=source, b1=batches[0], r=run)  #!!!
@@ -50,9 +50,9 @@ else:
     restart = False
     start=0
 
-total_steps = 1500
+total_steps = 2000
 net_steps = total_steps - start
-nsteps = 2      # No. of steps to do between savedumps
+nsteps = 500      # No. of steps to do between savedumps
 iters = round(net_steps/nsteps)
 n0 = round(start/nsteps)
 

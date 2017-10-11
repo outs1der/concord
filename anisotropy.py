@@ -112,3 +112,16 @@ def inclination(xi,model='he16',burst=True):
     else:
         print ("** ERROR ** model ",model," not yet implemented!")
         return None
+
+
+
+def inclination_ratio(xi_ratio, model='he16'):
+    '''Returns the inclination corresponding to a given xi_p/xi_b ratio.
+        Returned in units of degrees'''
+    inc = np.linspace(0, 90, 180)
+
+    xi_b, xi_p = anisotropy(inclination=inc, model=model)
+    inc_func = interp1d(x=xi_p/xi_b, y=inc)
+    inc_out = inc_func(xi_ratio)
+
+    return inc_out * u.degree
