@@ -218,6 +218,7 @@ def run_sampler(sampler,
 def load_chain(run,
                 batches,
                 step,
+                con_ver,
                 source='gs1826',
                 **kwargs):
     """
@@ -233,11 +234,10 @@ def load_chain(run,
     ========================================================
     """
     path = kwargs.get('path', GRIDS_PATH)
-    b_str = batch_daisychain(batches)
-
     chain_path = os.path.join(path, source, 'concord')
-    chain_str = 'chain_{src}_{bstr}_R{run}_S{stp}.npy'.format(src=source, bstr=b_str,
-                                        run=run, stp=step)
+
+    full_str = full_string(run=run, batches=batches, step=step, source=source, con_ver=con_ver)
+    chain_str = 'chain_{full}.npy'.format(full=full_str)
     chain_file = os.path.join(chain_path, chain_str)
 
     print('Loading chain: ', chain_file)
@@ -250,6 +250,7 @@ def load_chain(run,
 def get_summary(run,
                 batches,
                 step,
+                con_ver,
                 ignore=250,
                 source='gs1826',
                 param_names=["d", "i", "1+z"],
@@ -261,7 +262,7 @@ def get_summary(run,
     """
     path = kwargs.get('path', GRIDS_PATH)
 
-    chain = load_chain(run=run, batches=batches, step=step, source=source, path=path)
+    chain = load_chain(run=run, batches=batches, step=step, source=source, con_ver=con_ver, path=path)
     chain = chain[:, ignore:, :]  # cut out "burn-in" steps
 
     # ===== Construct time parameter strings =====
@@ -282,6 +283,7 @@ def get_summary(run,
 def save_summaries(n_runs,
                         batches,
                         step,
+                        con_ver,
                         ignore=250,
                         source='gs1826',
                         param_names=['d', 'i', '1+z'],
@@ -334,7 +336,7 @@ def save_summaries(n_runs,
 
         models = load_models(runs=[run], batches=batches, source=source, **kwargs)
         summary = get_summary(run=run, batches=batches, source=source, step=step,
-                                ignore=ignore, param_names=param_names, **kwargs)
+                                con_ver=con_ver, ignore=ignore, param_names=param_names, **kwargs)
 
         # ===== get mean +/- 1-sigma for each param =====
         means = []
@@ -374,7 +376,7 @@ def save_summaries(n_runs,
     out_table = out_table[col_order]    # fix column order
 
     # batch_str = full_string(run=run, batches=batches, step=step, source=source)
-    batch_str = '{src}_{b}_S{s}'.format(src=source, b=batch_daisychain(batches), s=step)
+    batch_str = '{src}_{b}_S{s}_C{c:02}'.format(src=source, b=batch_daisychain(batches), s=step, c=con_ver)
     file_str = 'mcmc_' + batch_str + '.txt'
     file_path = os.path.join(path, source, 'mcmc', file_str)
 
@@ -405,7 +407,7 @@ def write_batch(run,
 #TODO: !!Needs finishing!!
     path = kwargs.get('path', os.path.join(GRIDS_PATH))
     log_path = os.path.join(path, 'logs')
-    
+
     print('Writing slurm sbatch script')
     span = '{n0}-{n1}'.format(n0=n0, n1=n1)
     slurmfile = path+'{prep}{gbase}{grid}_{span}.sh'.format(prep=prepend, gbase=grid_basename, grid=grid_num, span=span)
@@ -440,6 +442,7 @@ python3 run_concord {source} {batches} $N no_restart""".format(jobname=jobname,
 def plot_lightcurves(run,
                         batches,
                         step,
+                        con_ver,
                         source='gs1826',
                         **kwargs):
     """
@@ -466,7 +469,8 @@ def plot_lightcurves(run,
     t_params = construct_t_params(n)
     param_names = param_names + t_params
 
-    batch_str = '{src}_{b}_S{s}'.format(src=source, b=batch_daisychain(batches), s=step)
+    # special case string without run
+    batch_str = '{src}_{b}_S{s}_C{c:02}'.format(src=source, b=batch_daisychain(batches), s=step, c=con_ver)
     table_name = 'mcmc_' + batch_str + '.txt'
     table_filepath = os.path.join(source_path, 'mcmc', table_name)
 
@@ -624,6 +628,7 @@ def construct_t_params(n):
 def full_string(run,
                 batches,
                 step,
+                con_ver,
                 source='gs1826'):
     """
     ========================================================
@@ -631,10 +636,10 @@ def full_string(run,
     ========================================================
     """
     b_string = batch_daisychain(batches)
-    full_string = '{src}_{bstr}_R{run}_S{stp}'.format(src=source, bstr=b_string,
-                                                    run=run, stp=step)
+    full_str = '{src}_{bstr}_R{run}_S{stp}_C{cv:02}'.format(src=source, bstr=b_string,
+                                                    run=run, stp=step, cv=con_ver)
 
-    return full_string
+    return full_str
 
 
 

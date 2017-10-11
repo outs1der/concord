@@ -6,20 +6,22 @@ import os
 
 # =============================================================================
 # Usage:
-#       python run_concord.py [source] [batch1] [batch2] [batch3] [run] [restart] (step)
+#       python run_concord.py [source] [batch1] [batch2] [batch3] [run] [concord_version] [restart] (step)
 # =============================================================================
 
 GRIDS_PATH = os.environ['KEPLER_GRIDS']
 
-batches = [int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])]
 #batches = [1]   #!!!
-run = int(sys.argv[5])
 #run = int(sys.argv[2])  #!!!
+source = sys.argv[1]
+batches = [int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])]
+run = int(sys.argv[5])
+con_ver = int(sys.argv[6])
+restart = sys.argv[7]
 
 print('Loading observed and model data: Run {r} from batches [{b1}, {b2}, {b3}]'.format(r=run, b1=batches[0], b2=batches[1], b3=batches[2]))
 #print('Loading observed and model data: Run {r} from batches [{b1}]'.format(r=run, b1=batches[0]))  #!!!
 
-source = sys.argv[1]
 obs = ctools.load_obs(source)
 #obs = ctools.load_obs(source)[1] # !!!
 
@@ -36,21 +38,21 @@ batch_str = '{src}_{b1}-{b2}-{b3}_R{r}'.format(src=source, b1=batches[0], b2=bat
 chain_path = os.path.join(GRIDS_PATH, source, 'concord')
 
 # TODO: restarting needs testing/debugging (also tracking step labels correctly)
-if sys.argv[3] == 'restart':
+if restart == 'restart':
     load_step = sys.argv[7]
     chain_str0 = 'chain_{batch}'.format(batch=batch_str)
     pname = '{chain}_S{step}.npy'.format(chain=chain_str, step=load_step)
     pfile = os.path.join(chain_path, pname)
     pos = np.load(pfile)[:,-1,:]
     restart = True
-    start = int(sys.argv[3])
+    start = int(sys.argv[8])
 else:
     restart = False
     start=0
 
 total_steps = 1500
 net_steps = total_steps - start
-nsteps = 100      # No. of steps to do between savedumps
+nsteps = 2      # No. of steps to do between savedumps
 iters = round(net_steps/nsteps)
 n0 = round(start/nsteps)
 
@@ -62,7 +64,7 @@ for i in range(n0, n0+iters):
     restart = False
 
     # === save chain state ===
-    step_str = '{batch}_S{step}'.format(batch=batch_str, step=step+nsteps)
+    step_str = '{batch}_S{step}_C{cv:02}'.format(batch=batch_str, step=step+nsteps, cv=con_ver)
 
     chain_filepath = os.path.join(chain_path, 'chain_' + step_str)
     lnprob_filepath = os.path.join(chain_path, 'lnprob_' + step_str)
