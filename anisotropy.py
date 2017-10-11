@@ -4,23 +4,26 @@ import matplotlib.pyplot as plt
 import astropy.io.ascii as ascii
 from scipy.interpolate import interp1d
 import astropy.units as u
+import os
+
+CONCORD_PATH = os.environ['CONCORD_PATH']
 
 def anisotropy(inclination,model='he16',test=False):
     '''This function returns the burst and persistent anisotropy factors
-    
+
     Factors are defined as for Fujimoto et al. 1988, i.e. the xi_b,p such that
     L_b,p = 4pi d^2 xi_b,p F_b,p
     This can be understood as xi_b,p<1 indicating flux that is beamed
     preferentially towards us (so that the luminosity would otherwise be
     exaggerated), and xi_b,p>1 indicating flux beamed preferentially away
-    
-    Generate a test of the model using 
+
+    Generate a test of the model using
     xi_b, xi_p = anisotropy(45.,test=True)'''
-    
+
     global anisotropy_he16
 
     if test == True:
-        
+
 # Optionally plot a figure showing the behaviour
 # want to replicate Figure 2 from fuji88
 
@@ -39,7 +42,7 @@ def anisotropy(inclination,model='he16',test=False):
             xi_b = np.zeros(len(_theta))
             for i, _th in enumerate(_theta):
                 xi_b[i], xi_p[i] = anisotropy(_th,model=m)
-  
+
             plt.plot(ct,1./xi_b,'b'+s,label=r"$\xi_b^{-1}$ ("+m+")")
             plt.plot(ct,1./xi_p,'r'+s,label=r"$\xi_p^{-1}$ ("+m+")")
             plt.plot(ct,xi_p/xi_b,'g'+s,label=r"$\xi_p/\xi_b$ ("+m+")")
@@ -61,15 +64,16 @@ def anisotropy(inclination,model='he16',test=False):
 #    else:
 #        if inclination.unit == u.degree:
 #            theta = inclination/180.*pi
-        
+
     if model == 'fuji88':
-        
+
         return 1./(0.5+abs(np.cos(theta))), 0.5/abs(np.cos(theta))
 
     elif model == 'he16':
 
         if 'anisotropy_he16' not in globals():
-            a=ascii.read('anisotropy_he16.txt')
+            he16_filepath = os.path.join(CONCORD_PATH, 'anisotropy_he16.txt')
+            a=ascii.read(he16_filepath)
             v=np.stack((a['col2'],a['col3'],a['col4']),axis=1).T
             anisotropy_he16 = interp1d(a['col1'],v)
 
@@ -83,12 +87,12 @@ def anisotropy(inclination,model='he16',test=False):
         return None, None
 
 def inclination(xi,model='he16',burst=True):
-    '''This function returns the inclination given a burst or persistent 
+    '''This function returns the inclination given a burst or persistent
        anisotropy factor. It is the inverse of anisotropy():
-       
+
     burst=True indicates that the given xi is the burst anisotropy factor
     burst=False indicates that it is the persistent anisotropy factor
-    
+
     results are returned in units of degrees'''
 
     if model == 'fuji88':
@@ -97,7 +101,8 @@ def inclination(xi,model='he16',burst=True):
         else:
             return np.arccos(0.5/xi) * 180./np.pi * u.degree / u.rad
     elif model == 'he16':
-        a=ascii.read('anisotropy_he16.txt')
+        he16_filepath = os.path.join(CONCORD_PATH, 'anisotropy_he16.txt')
+        a=ascii.read(he16_filepath)
         if burst:
             q = 1./(a['col2']+a['col3'])
             incl_he16 = interp1d(q,a['col1'])

@@ -346,8 +346,7 @@ class ObservedBurst(Lightcurve):
 # lightcurve, you may want to weight these greater than one so that the
 # MCMC code will try to match those preferentially
 
-#        tdelwt=2.5e3
-        tdelwt=1.0
+        tdelwt=100.0
         fluxwt=1.0
 
 # Calculate the rescaled model flux with the passed parameters
