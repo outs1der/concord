@@ -18,6 +18,7 @@
 
 import numpy as np
 from math import *
+import os
 
 import astropy.units as u
 import astropy.constants as const
@@ -32,6 +33,7 @@ from chainconsumer import ChainConsumer
 
 from anisotropy import *
 
+CONCORD_PATH = os.environ['CONCORD_PATH']
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 def decode_LaTeX(string):
@@ -224,7 +226,7 @@ class ObservedBurst(Lightcurve):
 ##        print (tdel, tdel_err)
 
 #        self.table_file = '/Users/duncan/burst/reference/doc/table2.tex'
-        self.table_file = '/home/zacpetej/projects/codes/concord/table2.tex'
+        self.table_file = os.path.join(CONCORD_PATH, 'table2.tex')
         self.table = Table.read(self.table_file)
 
 # Below we associate each epoch with a file
