@@ -63,7 +63,8 @@ def load_obs(source='gs1826',
     ========================================================
     """
     obs = []
-    obs_path = kwargs.get('path', GRIDS_PATH+'obs_data/')
+    path = kwargs.get('path', GRIDS_PATH)
+    obs_path = os.path.join(path, 'obs_data')
     source_path = os.path.join(obs_path, source)
 
     obs_files = {'gs1826':['gs1826-24_3.530h.dat',
@@ -402,7 +403,9 @@ def write_batch(run,
     """
 
 #TODO: !!Needs finishing!!
-    path = kwargs.get('path', os.path.join(GRIDS_PATH, 'logs'))
+    path = kwargs.get('path', os.path.join(GRIDS_PATH))
+    log_path = os.path.join(path, 'logs')
+    
     print('Writing slurm sbatch script')
     span = '{n0}-{n1}'.format(n0=n0, n1=n1)
     slurmfile = path+'{prep}{gbase}{grid}_{span}.sh'.format(prep=prepend, gbase=grid_basename, grid=grid_num, span=span)

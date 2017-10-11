@@ -5,10 +5,11 @@ import sys
 import os
 
 # =============================================================================
-# How to use: python run_concord.py [source] [batch1] [batch2] [batch3] [run] [restart] (step)
+# Usage:
+#       python run_concord.py [source] [batch1] [batch2] [batch3] [run] [restart] (step)
 # =============================================================================
 
-save_path = '/home/zacpetej/projects/kepler_grids/'
+GRIDS_PATH = os.environ['KEPLER_GRIDS']
 
 batches = [int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])]
 #batches = [1]   #!!!
@@ -32,7 +33,7 @@ sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200, threads=4)
 batch_str = '{src}_{b1}-{b2}-{b3}_R{r}'.format(src=source, b1=batches[0], b2=batches[1], b3=batches[2], r=run)
 #batch_str = '{src}_B{b1}_R{r}'.format(src=source, b1=batches[0], r=run)  #!!!
 
-chain_path = os.path.join(save_path, source, 'concord')
+chain_path = os.path.join(GRIDS_PATH, source, 'concord')
 
 # TODO: restarting needs testing/debugging (also tracking step labels correctly)
 if sys.argv[3] == 'restart':
