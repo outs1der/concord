@@ -46,8 +46,9 @@ from misc import try_mkdir
 # If you wish to use a different path for a specific function call,
 # include it as the parameter 'path' when calling the function
 #---------------------------------------------------
-GRIDS_PATH = '/home/zacpetej/projects/kepler_grids/'
-CONCORD_PATH = '/home/zacpetej/projects/codes/concord/'
+# You need to set these as bash environment variables
+GRIDS_PATH = os.environ['KEPLER_GRIDS']
+CONCORD_PATH = os.environ['CONCORD_PATH']
 #===================================================
 
 def load_obs(source='gs1826',
