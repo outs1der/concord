@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sys, os
 import emcee
+import subprocess
 import astropy.units as u
 import astropy.constants as const
 from math import sqrt
@@ -488,13 +489,16 @@ def plot_lightcurves(run,
         base_input_params = [params['d']*u.kpc, params['i']*u.degree, params['1+z']]
         input_params = base_input_params + [params[t]*u.s] # append relevant time only
 
-        obs[i].compare(models[i], input_params, plot=True)
+        obs[i].compare(models[i], input_params, breakdown=True, plot=True)
+
+    plt.show(block=False)
 
 
 
 def save_contours(runs,
                 batches,
                 step,
+                con_ver,
                 ignore=250,
                 source='gs1826',
                 **kwargs):
@@ -517,7 +521,7 @@ def save_contours(runs,
     parameters=[r"$d$",r"$i$",r"$1+z$"]
     c = ChainConsumer()
 
-    triplet_str = triplet_string(batches=batches, source=source, **kwargs)
+    triplet_str = triplet_string(batches=batches, source=source)
 
     chain_dir = os.path.join(path, source, 'concord')
     plot_dir = os.path.join(path, source, 'plots')
@@ -533,7 +537,7 @@ def save_contours(runs,
 
     for run in runs:
         print('Run ', run)
-        full_str = full_string(run=run, batches=batches, source=source, step=step)
+        full_str = full_string(run=run, batches=batches, source=source, step=step, con_ver=con_ver)
 
         chain_str = 'chain_{full_str}.npy'.format(full_str=full_str)
         save_str = 'contour_{full_str}.png'.format(full_str=full_str)
@@ -643,9 +647,8 @@ def full_string(run,
 
 
 def triplet_string(batches,
-                   source='gs1826',
-                   **kwargs):
-    batch_daisy = batch_daisychain(batches, **kwargs)
+                   source='gs1826'):
+    batch_daisy = batch_daisychain(batches)
     triplet_str = '{source}_{batches}'.format(source=source, batches=batch_daisy)
 
     return triplet_str

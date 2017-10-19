@@ -321,8 +321,10 @@ class ObservedBurst(Lightcurve):
 
         dist, inclination, opz, t_off = param
 
-        if inclination > 90.*u.degree or inclination < 0.*u.degree:
-            return 0.
+# Even though this is already in the prior, lhoodClass calls compare()
+# before the prior, resulting in an out-of-domain error in anisotropy
+        if not 0. < inclination.value < 90.:
+            return -np.inf
 
 
         xi_b, xi_p = anisotropy(inclination)
@@ -369,6 +371,7 @@ class ObservedBurst(Lightcurve):
             fig = plt.figure()
             gs = gridspec.GridSpec(4, 3)
             ax1 = fig.add_subplot(gs[0:3,:])
+            fig.set_size_inches([6,4])
 
             self.plot()
 
@@ -390,7 +393,9 @@ class ObservedBurst(Lightcurve):
 # http://matplotlib.org/examples/pylab_examples/axes_demo.html for
 # illustrative example
 
-                a = plt.axes([.55, .5, .3, .3], facecolor='y')
+                # a = plt.axes([.55, .5, .3, .3], facecolor='y')
+                a = plt.axes([.55, .5, .3, .3]) # yellow is kinda ugly
+
 #                print (self.tdel,self.tdel_err)
                 a.errorbar([0.95], self.tdel.value,
                        yerr=self.tdel_err.value, fmt='o')
@@ -648,8 +653,8 @@ def lnprior(theta):
     if (dist.value > 0.0 and 0.0 < inclination.value < 90.
         and 1. < opz < 2):
         return np.log(np.cos(inclination))
-
-    return -np.inf
+    else:
+        return -np.inf
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 

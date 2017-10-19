@@ -7,8 +7,21 @@ import astropy.units as u
 import os
 
 CONCORD_PATH = os.environ['CONCORD_PATH']
+he16_models = ['he16_a', 'he16_b', 'he16_c', 'he16_c_short', 'he16_d']
 
-def anisotropy(inclination,model='he16',test=False):
+
+def load_he16(model):
+    """Reads in and returns the He & Keek (2016) model specified."""
+    model_str = model.split('he16_')[1]
+    he16_filename = 'anisotropy_{}.txt'.format(model_str)
+    he16_filepath = os.path.join(CONCORD_PATH, he16_filename)
+    a=ascii.read(he16_filepath)
+
+    return a
+
+
+
+def anisotropy(inclination, model='he16_a', test=False):
     '''This function returns the burst and persistent anisotropy factors
 
     Factors are defined as for Fujimoto et al. 1988, i.e. the xi_b,p such that
@@ -58,35 +71,41 @@ def anisotropy(inclination,model='he16',test=False):
     theta = inclination
     if (hasattr(inclination,'unit') == False):
         print ("** WARNING ** assuming inclination in degrees")
-#        theta = inclination/180.*pi
         theta *= u.degree
 
-#    else:
-#        if inclination.unit == u.degree:
-#            theta = inclination/180.*pi
-
     if model == 'fuji88':
+        xi_b = 1./(0.5+abs(np.cos(theta)))
+        xi_p = 0.5/abs(np.cos(theta))
 
-        return 1./(0.5+abs(np.cos(theta))), 0.5/abs(np.cos(theta))
+        return xi_b, xi_p
 
-    elif model == 'he16':
+
+    elif model in he16_models:
+        model_str = model.split('he16_')[1]   # cut out prefix
 
         if 'anisotropy_he16' not in globals():
-            he16_filepath = os.path.join(CONCORD_PATH, 'anisotropy_he16.txt')
-            a=ascii.read(he16_filepath)
-            v=np.stack((a['col2'],a['col3'],a['col4']),axis=1).T
-            anisotropy_he16 = interp1d(a['col1'],v)
+            anisotropy_he16 = {}
 
-        inv_xi_d, inv_xi_r, inv_xi_p = anisotropy_he16(theta.to(u.degree))
+        if model_str not in globals()['anisotropy_he16']:
+            a = load_he16(model=model)
+            v = np.stack((a['col2'],a['col3'],a['col4']),axis=1).T
+            anisotropy_he16[model_str] = interp1d(a['col1'],v)
 
-        return 1./(inv_xi_d+inv_xi_r), 1./inv_xi_p
+        inv_xi_d, inv_xi_r, inv_xi_p = anisotropy_he16[model_str](theta.to(u.degree))
+
+        with np.errstate(divide='ignore'):
+            xi_b = 1./(inv_xi_d+inv_xi_r)
+            xi_p = 1./inv_xi_p
+
+        return xi_b, xi_p
+
 
     else:
-
         print ("** ERROR ** model ",model," not yet implemented!")
         return None, None
 
-def inclination(xi,model='he16',burst=True):
+
+def inclination(xi, model='he16_a', burst=True):
     '''This function returns the inclination given a burst or persistent
        anisotropy factor. It is the inverse of anisotropy():
 
@@ -100,28 +119,49 @@ def inclination(xi,model='he16',burst=True):
             return np.arccos(1.0/xi - 0.5) * 180./np.pi * u.degree / u.rad
         else:
             return np.arccos(0.5/xi) * 180./np.pi * u.degree / u.rad
-    elif model == 'he16':
-        he16_filepath = os.path.join(CONCORD_PATH, 'anisotropy_he16.txt')
-        a=ascii.read(he16_filepath)
+
+    elif model in he16_models:
+        a = load_he16(model=model)
+
         if burst:
-            q = 1./(a['col2']+a['col3'])
-            incl_he16 = interp1d(q,a['col1'])
+            with np.errstate(divide='ignore'):
+                q = 1./(a['col2'] + a['col3'])
+
+            incl_he16 = interp1d(q, a['col1'])
+
         else:
-            incl_he16 = interp1d(1./a['col4'],a['col1'])
+            with np.errstate(divide='ignore'):
+                incl_he16 = interp1d(1./a['col4'], a['col1'])
+
         return incl_he16(xi) * u.degree
+
     else:
         print ("** ERROR ** model ",model," not yet implemented!")
         return None
 
 
 
-def inclination_ratio(xi_ratio, model='he16'):
+def inclination_ratio(xi_ratio, model='he16_a'):
     '''Returns the inclination corresponding to a given xi_p/xi_b ratio.
         Returned in units of degrees'''
-    inc = np.linspace(0, 90, 180)
+    inc = np.linspace(0*u.deg, 90*u.deg, 180)
 
     xi_b, xi_p = anisotropy(inclination=inc, model=model)
-    inc_func = interp1d(x=xi_p/xi_b, y=inc)
-    inc_out = inc_func(xi_ratio)
+
+    with np.errstate(invalid='ignore'):
+        x=xi_p/xi_b
+    # === check and replace nans with adjacent value ===
+    nan_idx = np.where(np.isnan(x))[0]
+    x[nan_idx] = x[nan_idx - 1]
+
+    # === account for ratio being outside the model
+    try:
+        inc_func = interp1d(x=x, y=inc)
+        inc_out = inc_func(xi_ratio)
+    except ValueError:
+        x_max = np.max(x)
+        inc_max = inc[np.argmax(x)]
+        print('!Ratio not possible in this model! - maximum ratio is {max:.3f} at {i:.3f} deg'.format(max=x_max, i=inc_max))
+        return np.nan
 
     return inc_out * u.degree
