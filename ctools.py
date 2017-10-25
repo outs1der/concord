@@ -94,6 +94,7 @@ def load_models(runs,
     batches = [] : batches that the models in runs[] belong to (one-to-one correspondence)
     ========================================================
     """
+    batches = expand_batches(batches, source)
     models = []
     path = kwargs.get('path', GRIDS_PATH)
 
@@ -227,6 +228,7 @@ def load_chain(run,
     source
     ========================================================
     """
+    batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     chain_path = os.path.join(path, source, 'concord')
 
@@ -254,6 +256,7 @@ def get_summary(run,
     Get summary stats (mean + std) from a given mcmc chain
     ========================================================
     """
+    batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
 
     chain = load_chain(run=run, batches=batches, step=step, source=source, con_ver=con_ver, path=path)
@@ -296,6 +299,7 @@ def save_summaries(n_runs,
             - Assumes each batch contains models numbered from 1 to [n_runs]
     ========================================================
     """
+    batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     obs = load_obs(source=source, **kwargs)
 
@@ -406,6 +410,7 @@ def write_batch(nruns,
     time      = int    : time in hours
     threads   = int    : number of cores per run
     ========================================================"""
+    batches = expand_batches(batches, source)
     path = kwargs.get('path', os.path.join(GRIDS_PATH))
     log_path = os.path.join(path, source, 'logs')
 
@@ -470,6 +475,7 @@ def plot_lightcurves(run,
     path       = str   : path to kepler_grids directory
     ========================================================
     """
+    batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     source_path = os.path.join(path, source)
 
@@ -529,6 +535,7 @@ def save_contours(runs,
     path       = str   : path to kepler_grids directory
     ========================================================
     """
+    batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     ndim = 6
     parameters=[r"$d$",r"$i$",r"$1+z$"]
@@ -651,6 +658,7 @@ def full_string(run,
     constructs a standardised string for a batch model
     ========================================================
     """
+    batches = expand_batches(batches, source)
     b_string = daisychain(batches)
 
     if run == 0:
@@ -672,10 +680,31 @@ def full_string(run,
 
 def triplet_string(batches,
                    source='gs1826'):
+    batches = expand_batches(batches, source)
     batch_daisy = daisychain(batches)
     triplet_str = '{source}_{batches}'.format(source=source, batches=batch_daisy)
 
     return triplet_str
+
+
+
+def expand_batches(batches, source):
+    """Checks format of 'batches' parameter and returns relevant array
+    if batches is arraylike: keep
+    if batches is integer N: assume first batch of batch set"""
+    N = {'gs1826': 3, '4u1820': 2}  # number of epochs
+
+    if type(batches) == int:   # assume batches gives first batch
+        batches_out = np.arange(batches, batches+N[source])
+
+    elif type(batches) == list   or   type(batches) == np.ndarray:
+        batches_out = batches
+
+    else:
+        print('Invalid type(batches). Must be array-like or int')
+        sys.exit()
+
+    return batches_out
 
 
 
