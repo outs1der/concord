@@ -120,7 +120,7 @@ def load_models(runs,
         # TODO: - account for different Eddington composition
         #----------------------------------
 
-        mtable = pd.read_csv(summ_file)
+        mtable = pd.read_table(summ_file, delim_whitespace=True)
         ptable = pd.read_table(param_file, delim_whitespace=True)  # parameter table
         idx = np.where(ptable['id'] == run)[0][0]    # index of model/run
         # NOTE: Assumes that models in ptable exactly match those in mtable
@@ -212,7 +212,7 @@ def run_sampler(sampler,
         print('Autocorrelation: ', autocorr)
     except:
         print('Too few steps for autocorrelation estimate')
-        
+
     return pos_new, lnprob, rstate
 
 
