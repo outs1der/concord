@@ -19,14 +19,8 @@ import burstclass
 # Tools in progress for using X-ray burst matcher Concord
 #============================================
 # TODO:
-#    - generalised function to plot best fit contours/lightcurves
-#    - write simple pipeline/recipe for setting up grids --> analyser --> concord
 #
 # --- Functions ---
-# def setup_all():
-#     """
-#     Sets up observed/modelled burst objects and initiallises sampler
-#     """
 #
 # def plot_walkers():
 #     """
@@ -119,7 +113,7 @@ def load_models(runs,
         source_path = os.path.join(path, source)
         param_file = os.path.join(source_path, 'params', param_str)
         summ_file = os.path.join(source_path, 'summary', summ_str)
-        mean_path = os.path.join(source_path, 'mean_lightcurves')
+        mean_path = os.path.join(source_path, 'mean_lightcurves', batch_str)
         #----------------------------------
         # TODO: - account for different Eddington composition
         #----------------------------------
@@ -376,7 +370,7 @@ def save_summaries(n_runs,
     out_table = out_table[col_order]    # fix column order
 
     # batch_str = full_string(run=run, batches=batches, step=step, source=source)
-    batch_str = '{src}_{b}_S{s}_C{c:02}'.format(src=source, b=batch_daisychain(batches), s=step, c=con_ver)
+    batch_str = '{src}_{b}_S{s}_C{c:02}'.format(src=source, b=daisychain(batches), s=step, c=con_ver)
     file_str = 'mcmc_' + batch_str + '.txt'
     file_path = os.path.join(path, source, 'mcmc', file_str)
 
@@ -389,10 +383,16 @@ def save_summaries(n_runs,
 
 
 
-def write_batch(run,
+def write_batch(nruns,
                 batches,
-                qos = 'medium',
+                con_ver,
+                n0=1,
+                source='gs1826',
+                qos = 'short',
                 auto_qos = True,
+                prepend='con',
+                time=10,
+                threads=4,
                 **kwargs):
     """
     ========================================================
@@ -401,29 +401,39 @@ def write_batch(run,
     Parameters
     --------------------------------------------------------
     auto_qos  = bool   : split jobs between node types (overrides qos)
-    ========================================================
-    """
-
-#TODO: !!Needs finishing!!
+    n0        = int    : run to start with (assumes all runs between n0 and nruns)
+    prepend   = str    : label to prepend filename with
+    time      = int    : time in hours
+    threads   = int    : number of cores per run
+    ========================================================"""
     path = kwargs.get('path', os.path.join(GRIDS_PATH))
-    log_path = os.path.join(path, 'logs')
+    log_path = os.path.join(path, source, 'logs')
 
     print('Writing slurm sbatch script')
-    span = '{n0}-{n1}'.format(n0=n0, n1=n1)
-    slurmfile = path+'{prep}{gbase}{grid}_{span}.sh'.format(prep=prepend, gbase=grid_basename, grid=grid_num, span=span)
+    triplet_str = triplet_string(batches=batches, source=source)
+    run_str = '{n0}-{n1}'.format(n0=n0, n1=nruns)
+    filename = '{prep}_{triplet}_{runs}.sh'.format(prep=prepend, triplet=triplet_str, runs=run_str)
+    filepath = os.path.join(log_path, filename)
 
-    with open(slurmfile, 'w') as f:
+    job_str = '{prep}_{src}{b1}'.format(prep=prepend, src=source[:2], b1=batches[0])
+    time_str = '{hr:02}:00:00'.format(hr=time)
+    batch_list = ''
+
+    for b in batches:
+        batch_list += '{b} '.format(b=b)
+
+    with open(filepath, 'w') as f:
         f.write("""#!/bin/bash
 
-#SBATCH --job-name={jobname}
+#SBATCH --job-name={job_str}
 #SBATCH --output=arrayJob_%A_%a.out
 #SBATCH --error=arrayJob_%A_%a.err
-#SBATCH --array={n0}-{n1}
-#SBATCH --time={time}
+#SBATCH --array={run_str}
+#SBATCH --time={time_str}
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={threads}
-{qos_str}
-#SBATCH --mem-per-cpu=2000
+#SBATCH --qos={qos}_qos
+#SBATCH --mem-per-cpu=1000
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=zac.johnston@monash.edu
 
@@ -431,11 +441,13 @@ def write_batch(run,
 # Begin work section #
 ######################
 
-N=$SLURM_ARRAY_TASK_ID
 module load python/3.5.1-gcc
+
+N=$SLURM_ARRAY_TASK_ID
 cd /home/zacpetej/id43/python/concord/
-python3 run_concord {source} {batches} $N no_restart""".format(jobname=jobname,
-                n0=n0, n1=n1, source=source, batches=batches, threads=threds, qos_str=qos_str, time=time))
+python3 run_concord.py {source} {batch_list} $N {con_ver} no_restart""".format(job_str=job_str,
+            run_str=run_str, source=source, batch_list=batch_list, threads=threads,
+            qos=qos, time_str=time_str, con_ver=con_ver))
 
 
 
@@ -470,7 +482,8 @@ def plot_lightcurves(run,
     param_names = param_names + t_params
 
     # special case string without run
-    batch_str = '{src}_{b}_S{s}_C{c:02}'.format(src=source, b=batch_daisychain(batches), s=step, c=con_ver)
+    # batch_str = '{src}_{b}_S{s}_C{c:02}'.format(src=source, b=daisychain(batches), s=step, c=con_ver)
+    batch_str = full_string(run=0, batches=batches, source=source, step=step, con_ver=con_ver)
     table_name = 'mcmc_' + batch_str + '.txt'
     table_filepath = os.path.join(source_path, 'mcmc', table_name)
 
@@ -638,9 +651,20 @@ def full_string(run,
     constructs a standardised string for a batch model
     ========================================================
     """
-    b_string = batch_daisychain(batches)
-    full_str = '{src}_{bstr}_R{run}_S{stp}_C{cv:02}'.format(src=source, bstr=b_string,
-                                                    run=run, stp=step, cv=con_ver)
+    b_string = daisychain(batches)
+
+    if run == 0:
+        run_str = ''
+    else:
+        run_str = '_R{}'.format(run)
+
+    if con_ver == 0:
+        con_str = ''
+    else:
+        con_str = '_C{:02}'.format(con_ver)
+
+    full_str = '{src}_{bstr}{run}_S{stp}{cv}'.format(src=source, bstr=b_string,
+                                                    run=run_str, stp=step, cv=con_str)
 
     return full_str
 
@@ -648,32 +672,32 @@ def full_string(run,
 
 def triplet_string(batches,
                    source='gs1826'):
-    batch_daisy = batch_daisychain(batches)
+    batch_daisy = daisychain(batches)
     triplet_str = '{source}_{batches}'.format(source=source, batches=batch_daisy)
 
     return triplet_str
 
 
 
-def batch_daisychain(batches,
-                     delim='-'):
+def daisychain(daisies,
+                delim='-'):
     """
     ========================================================
-    constructs a string of generic number of batch IDs
+    returns a string of daisies seperated by a delimiter (e.g. 1-2-3-4)
     ========================================================
-    batches  = [int]
+    daisies  = [int]
     delim    = str     : delimiter to place between IDs
     ========================================================
     """
-    batch_daisy = ''
+    daisy = ''
 
-    for b in batches[:-1]:
-        batch_daisy += str(b)
-        batch_daisy += delim
+    for i in daisies[:-1]:
+        daisy += str(i)
+        daisy += delim
 
-    batch_daisy += str(batches[-1])
+    daisy += str(daisies[-1])
 
-    return batch_daisy
+    return daisy
 
 
 def try_mkdir(path, skip=False):
