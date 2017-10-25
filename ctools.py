@@ -94,6 +94,7 @@ def load_models(runs,
     batches = [] : batches that the models in runs[] belong to (one-to-one correspondence)
     ========================================================
     """
+    runs = expand_runs(runs)
     batches = expand_batches(batches, source)
     models = []
     path = kwargs.get('path', GRIDS_PATH)
@@ -206,6 +207,12 @@ def run_sampler(sampler,
 
     pos_new, lnprob, rstate = sampler.run_mcmc(pos,nsteps)
 
+    try:
+        autocorr = sampler.get_autocorr_time()
+        print('Autocorrelation: ', autocorr)
+    except:
+        print('Too few steps for autocorrelation estimate')
+        
     return pos_new, lnprob, rstate
 
 
@@ -706,6 +713,20 @@ def expand_batches(batches, source):
 
     return batches_out
 
+
+def expand_runs(runs):
+    """Checks format of 'runs' parameter and returns relevant array
+    if runs is arraylike: keep
+    if runs is integer N: assume there are N runs from 1 to N"""
+    if type(runs) == int:   # assume runs = n_runs
+        runs_out = np.arange(1, runs+1)
+    elif type(runs) == list   or   type(runs) == np.ndarray:
+        runs_out = runs
+    else:
+        print('Invalid type(runs)')
+        sys.exit()
+
+    return runs_out
 
 
 def daisychain(daisies,
