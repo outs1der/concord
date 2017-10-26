@@ -521,7 +521,7 @@ def plot_lightcurves(run,
 
 
 
-def save_contours(runs,
+def plot_contour(run,
                 batches,
                 step,
                 con_ver,
@@ -530,7 +530,7 @@ def save_contours(runs,
                 **kwargs):
     """
     ========================================================
-    Save contour plots from multiple concord runs
+    Returns contour plot for a run from a given batch set
     ========================================================
     Parameters
     --------------------------------------------------------
@@ -554,39 +554,73 @@ def save_contours(runs,
     plot_dir = os.path.join(path, source, 'plots')
     save_dir = os.path.join(plot_dir, triplet_str)
 
+    full_str = full_string(run=run, batches=batches, source=source, step=step, con_ver=con_ver)
+
+    chain_str = 'chain_{full_str}.npy'.format(full_str=full_str)
+    save_str = 'contour_{full_str}.png'.format(full_str=full_str)
+
+    chain_file = os.path.join(chain_dir, chain_str)
+    save_file = os.path.join(save_dir, save_str)
+
+    chain = np.load(chain_file)[:, ignore:, :]
+    chain = chain.reshape((-1, ndim))
+
+    c.add_chain(chain, parameters=parameters)
+
+    fig = c.plotter.plot()
+    fig.set_size_inches(7,7)
+
+    return fig
+
+
+
+def save_contours(runs,
+                    batches,
+                    step,
+                    con_ver,
+                    ignore=250,
+                    source='gs1826',
+                    **kwargs):
+    """
+    ========================================================
+    Save contour plots from multiple concord runs
+    ========================================================
+    Parameters
+    --------------------------------------------------------
+    run
+    batches    = [int] :
+    step       = int   : emcee step to load (used in file label)
+    ignore     = int   : number of initial chain steps to ignore (burn-in phase)
+    source
+    path       = str   : path to kepler_grids directory
+    ========================================================
+    """
+    batches = expand_batches(batches, source)
+    runs = expand_runs(runs)
+    path = kwargs.get('path', GRIDS_PATH)
+
+    triplet_str = triplet_string(batches=batches, source=source)
+    plot_dir = os.path.join(path, source, 'plots')
+    save_dir = os.path.join(plot_dir, triplet_str)
+
     try_mkdir(save_dir, skip=True)
 
-    print('Source: ', source)
-    print('Loading from : ', chain_dir)
     print('Saving to    : ', save_dir)
     print('Batches: ', batches)
     print('Runs: ', runs)
 
     for run in runs:
         print('Run ', run)
+        fig = plot_contour(run=run, batches=batches, step=step, con_ver=con_ver, ignore=ignore, source=source, **kwargs)
+
         full_str = full_string(run=run, batches=batches, source=source, step=step, con_ver=con_ver)
-
-        chain_str = 'chain_{full_str}.npy'.format(full_str=full_str)
         save_str = 'contour_{full_str}.png'.format(full_str=full_str)
-
-
-        chain_file = os.path.join(chain_dir, chain_str)
         save_file = os.path.join(save_dir, save_str)
 
-        chain = np.load(chain_file)[:, ignore:, :]
-        chain = chain.reshape((-1, ndim))
-
-        c.add_chain(chain, parameters=parameters)
-
-        fig = c.plotter.plot()
-        fig.set_size_inches(7,7)
         fig.savefig(save_file)
-
         plt.close(fig)
-        c.remove_chain()
 
     print('Done!')
-
 
 
 def animate_contours(run,
@@ -602,7 +636,7 @@ def animate_contours(run,
 
     parameters=[r"$d$",r"$i$",r"$1+z$"]
     chain_str = 'chain_{r}'.format(r=run)
-    chain_file = os.path.join(path, 'temp', '{chain}_{st}.npy'.format(chain=chain_str, st=step))
+    chain_file = os.path.join(path, 'temp', '{chain}_{step}.npy'.format(chain=chain_str, step=step))
     chain = np.load(chain_file)
     nwalkers, nsteps, ndim = np.shape(chain)
 
