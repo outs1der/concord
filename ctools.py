@@ -114,7 +114,7 @@ def load_models(runs,
 
         source_path = os.path.join(path, source)
         param_file = os.path.join(source_path, 'params', param_str)
-        summ_file = os.path.join(source_path, 'summary', summ_str)
+        summ_file = os.path.join(source_path, 'summ', summ_str)
         mean_path = os.path.join(source_path, 'mean_lightcurves', batch_str)
         #----------------------------------
         # TODO: - account for different Eddington composition

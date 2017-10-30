@@ -52,7 +52,7 @@ else:
 
 total_steps = 2000
 net_steps = total_steps - start
-nsteps = 250      # No. of steps to do between savedumps
+nsteps = 2000      # No. of steps to do between savedumps
 iters = round(net_steps/nsteps)
 n0 = round(start/nsteps)
 
