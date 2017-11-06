@@ -31,9 +31,6 @@ import burstclass
 #     """
 #     extracts best fits from given batch, prints params
 #     """
-#============================================
-
-
 #===================================================
 # GLOBAL PATHS
 #---------------------------------------------------
@@ -44,6 +41,14 @@ import burstclass
 GRIDS_PATH = os.environ['KEPLER_GRIDS']
 CONCORD_PATH = os.environ['CONCORD_PATH']
 #===================================================
+flt0 = '{:.0f}'.format
+flt2 = '{:.2f}'.format
+flt4 = '{:.4f}'.format
+
+FORMATTERS={'lhood':flt0,
+            'd':flt4,
+            'i':flt4,
+            '1+z':flt4}
 
 def load_obs(source='gs1826',
                 **kwargs):
@@ -122,7 +127,7 @@ def load_models(runs,
 
         mtable = pd.read_table(summ_file, delim_whitespace=True)
         ptable = pd.read_table(param_file, delim_whitespace=True)  # parameter table
-        idx = np.where(ptable['id'] == run)[0][0]    # index of model/run
+        idx = np.where(ptable['run'] == run)[0][0]    # index of model/run
         # NOTE: Assumes that models in ptable exactly match those in mtable
 
         # ====== Extract model parameters/properties ======
@@ -306,6 +311,8 @@ def save_summaries(n_runs,
             - Assumes each batch contains models numbered from 1 to [n_runs]
     ========================================================
     """
+    #TODO: Add lhood breakdown to columns
+
     batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     obs = load_obs(source=source, **kwargs)
@@ -394,6 +401,8 @@ def save_summaries(n_runs,
 
 
 
+
+
 def write_batch(nruns,
                 batches,
                 con_ver,
@@ -427,7 +436,7 @@ def write_batch(nruns,
     filename = '{prep}_{triplet}_{runs}.sh'.format(prep=prepend, triplet=triplet_str, runs=run_str)
     filepath = os.path.join(log_path, filename)
 
-    job_str = '{prep}_{src}{b1}'.format(prep=prepend, src=source[:2], b1=batches[0])
+    job_str = 'c_{src}{b1}'.format(src=source[:2], b1=batches[0])
     time_str = '{hr:02}:00:00'.format(hr=time)
     batch_list = ''
 
@@ -457,7 +466,7 @@ module load python/3.5.1-gcc
 
 N=$SLURM_ARRAY_TASK_ID
 cd /home/zacpetej/id43/python/concord/
-python3 run_concord.py {source} {batch_list} $N {con_ver} no_restart""".format(job_str=job_str,
+python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart""".format(job_str=job_str,
             run_str=run_str, source=source, batch_list=batch_list, threads=threads,
             qos=qos, time_str=time_str, con_ver=con_ver))
 
@@ -478,7 +487,6 @@ def plot_lightcurves(run,
     run
     batches    = [int] :
     step       = int   : emcee step to load (used in file label)
-    source
     path       = str   : path to kepler_grids directory
     ========================================================
     """
@@ -494,8 +502,6 @@ def plot_lightcurves(run,
     t_params = construct_t_params(n)
     param_names = param_names + t_params
 
-    # special case string without run
-    # batch_str = '{src}_{b}_S{s}_C{c:02}'.format(src=source, b=daisychain(batches), s=step, c=con_ver)
     batch_str = full_string(run=0, batches=batches, source=source, step=step, con_ver=con_ver)
     table_name = 'mcmc_' + batch_str + '.txt'
     table_filepath = os.path.join(source_path, 'mcmc', table_name)
@@ -504,17 +510,16 @@ def plot_lightcurves(run,
     run_idx = np.argwhere(table['run'] == run)[0][0]
 
     params = {}
-
     for p in param_names:
         params[p] = table[p][run_idx]
 
-    print(params)
+    for k, v in params.items():
+        print(k, v)
 
     for i in range(n):
         t = 't' + str(i+1)
         base_input_params = [params['d']*u.kpc, params['i']*u.degree, params['1+z']]
         input_params = base_input_params + [params[t]*u.s] # append relevant time only
-
         obs[i].compare(models[i], input_params, breakdown=True, plot=True)
 
     plt.show(block=False)
@@ -669,6 +674,59 @@ def animate_contours(run,
 
 
 
+def combine_mcmc(last_triplet,
+                    source='gs1826',
+                    step=2000,
+                    con_ver=3,
+                    **kwargs):
+    """
+    ========================================================
+    Collects multiple mcmc output tables into a single table
+    ========================================================
+    last_triplet  =  int  : last triplet to include
+    ========================================================
+    """
+    print('Combining mcmc tables')
+    path = kwargs.get('path', os.path.join(GRIDS_PATH))
+    mcmc_path = os.path.join(path, source, 'mcmc')
+
+    # ===== account for special cases =====
+    first_triplets = np.array([7, 9])
+    remaining_triplets = np.arange(12, last_triplet+1, 3)
+    triplets = np.concatenate([first_triplets, remaining_triplets])
+
+    mcmc_out = pd.DataFrame()
+
+    for triplet in triplets:
+        if triplet in [4,7]:
+            batches = np.arange(triplet, triplet-3, -1)
+        else:
+            batches = triplet
+        full_str = full_string(run=0, batches=batches, source=source,
+                                step=step, con_ver=con_ver)
+
+        filename = 'mcmc_{full}.txt'.format(full=full_str)
+        filepath = os.path.join(mcmc_path, filename)
+
+        mcmc_in = pd.read_table(filepath, delim_whitespace=True)
+        cols = list(mcmc_in.columns.values)
+        cols = ['triplet'] + cols
+
+        mcmc_in['triplet'] = triplet
+        mcmc_in = mcmc_in[cols]
+
+        mcmc_out = pd.concat([mcmc_out, mcmc_in])
+
+    mcmc_str = mcmc_out.to_string(index=False, justify='left', formatters=FORMATTERS, col_space=8)
+
+    filename = 'mcmc_{source}.txt'.format(source=source)
+    filepath = os.path.join(mcmc_path, filename)
+
+    with open(filepath, 'w') as f:
+        f.write(mcmc_str)
+
+
+
 def construct_t_params(n):
     """
     ========================================================
@@ -698,6 +756,9 @@ def full_string(run,
     ========================================================
     constructs a standardised string for a batch model
     ========================================================
+    special cases:
+        - run = 0 : don't include run
+        - con_ver = 0 : don't include con version
     """
     batches = expand_batches(batches, source)
     b_string = daisychain(batches)
@@ -735,7 +796,7 @@ def expand_batches(batches, source):
     if batches is integer N: assume first batch of batch set"""
     N = {'gs1826': 3, '4u1820': 2}  # number of epochs
 
-    if type(batches) == int:   # assume batches gives first batch
+    if type(batches) == int or type(batches) == np.int64:   # assume batches gives first batch
         batches_out = np.arange(batches, batches+N[source])
 
     elif type(batches) == list   or   type(batches) == np.ndarray:

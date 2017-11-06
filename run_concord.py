@@ -17,7 +17,8 @@ source = sys.argv[1]
 batches = [int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])]
 run = int(sys.argv[5])
 con_ver = int(sys.argv[6])
-restart = sys.argv[7]
+threads = int(sys.argv[7])
+restart = sys.argv[8]
 
 print('Loading observed and model data: Run {r} from batches [{b1}, {b2}, {b3}]'.format(r=run, b1=batches[0], b2=batches[1], b3=batches[2]))
 #print('Loading observed and model data: Run {r} from batches [{b1}]'.format(r=run, b1=batches[0]))  #!!!
@@ -30,14 +31,14 @@ models = ctools.load_models(runs=[run,run,run], batches=batches)
 #models = ctools.load_models(runs=[run], source=source, batches=batches)[0] #!!!
 
 pos = ctools.setup_positions(obs)
-sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200, threads=2)
+sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200, threads=threads)
 
 batch_str = '{src}_{b1}-{b2}-{b3}_R{r}'.format(src=source, b1=batches[0], b2=batches[1], b3=batches[2], r=run)
 #batch_str = '{src}_B{b1}_R{r}'.format(src=source, b1=batches[0], r=run)  #!!!
 
 chain_path = os.path.join(GRIDS_PATH, source, 'concord')
 
-# TODO: restarting needs testing/debugging (also tracking step labels correctly)
+# TODO: restarting needs testing/debugging
 if restart == 'restart':
     load_step = sys.argv[7]
     chain_str0 = 'chain_{batch}'.format(batch=batch_str)
