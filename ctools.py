@@ -168,8 +168,9 @@ def setup_sampler(obs,
                     **kwargs):
     """
     Initialises and returns EnsembleSampler object
+    NOTE: Only uses pos to get nwalkers and ndimensions
     """
-    if pos == None:
+    if type(pos) == type(None):
         pos = setup_positions(obs=obs, **kwargs)
 
     nwalkers = len(pos)
@@ -397,6 +398,8 @@ def save_summaries(n_runs,
     with open(file_path, 'w') as f:
         f.write(table_str)
 
+    combine_mcmc(last_triplet = batches[-1])
+
     return out_table
 
 
@@ -411,7 +414,7 @@ def write_batch(nruns,
                 qos = 'short',
                 auto_qos = True,
                 prepend='con',
-                time=10,
+                time=8,
                 threads=4,
                 **kwargs):
     """
@@ -691,7 +694,7 @@ def combine_mcmc(last_triplet,
     mcmc_path = os.path.join(path, source, 'mcmc')
 
     # ===== account for special cases =====
-    first_triplets = np.array([7, 9])
+    first_triplets = np.array([4, 7, 9])
     remaining_triplets = np.arange(12, last_triplet+1, 3)
     triplets = np.concatenate([first_triplets, remaining_triplets])
 
@@ -766,15 +769,20 @@ def full_string(run,
     if run == 0:
         run_str = ''
     else:
-        run_str = '_R{}'.format(run)
+        run_str = '_R{run}'.format(run=run)
+
+    if step == 0:
+        step_str = ''
+    else:
+        step_str = '_S{step}'.format(step=step)
 
     if con_ver == 0:
         con_str = ''
     else:
-        con_str = '_C{:02}'.format(con_ver)
+        con_str = '_C{cv:02}'.format(cv=con_ver)
 
-    full_str = '{src}_{bstr}{run}_S{stp}{cv}'.format(src=source, bstr=b_string,
-                                                    run=run_str, stp=step, cv=con_str)
+    full_str = '{src}_{b_str}{run_str}{step_str}{c_str}'.format(src=source, b_str=b_string,
+                                                    run_str=run_str, step_str=step_str, c_str=con_str)
 
     return full_str
 
@@ -791,13 +799,19 @@ def triplet_string(batches,
 
 
 def expand_batches(batches, source):
-    """Checks format of 'batches' parameter and returns relevant array
+    """
+    Checks format of 'batches' parameter and returns relevant array
     if batches is arraylike: keep
-    if batches is integer N: assume first batch of batch set"""
+    if batches is integer N: assume first batch of batch set
+    """
     N = {'gs1826': 3, '4u1820': 2}  # number of epochs
-
+    special = {4, 7}    # special cases (reverse order)
+    
     if type(batches) == int or type(batches) == np.int64:   # assume batches gives first batch
-        batches_out = np.arange(batches, batches+N[source])
+        if batches in special and source == 'gs1826':
+            batches_out = np.arange(batches, batches-3, -1)
+        else:
+            batches_out = np.arange(batches, batches+N[source])
 
     elif type(batches) == list   or   type(batches) == np.ndarray:
         batches_out = batches
