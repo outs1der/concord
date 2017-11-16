@@ -316,7 +316,7 @@ class ObservedBurst(Lightcurve):
 # also returns a likelihood value
 
     def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s],
-		breakdown = False, plot = False, subplot = True,
+		breakdown = False, plot = False, subplot = True, tdelwt=2.5e3,
                 debug = False):
 
         dist, inclination, opz, t_off = param
@@ -349,8 +349,6 @@ class ObservedBurst(Lightcurve):
 # flux for the likelihood. Since you have many more points in the
 # lightcurve, you may want to weight these greater than one so that the
 # MCMC code will try to match those preferentially
-
-        tdelwt=100.0
         fluxwt=1.0
 
 # Calculate the rescaled model flux with the passed parameters
