@@ -398,11 +398,27 @@ def save_summaries(n_runs,
     with open(file_path, 'w') as f:
         f.write(table_str)
 
-    combine_mcmc(last_triplet = batches[-1])
+    combine_mcmc(last_triplet = batches[-1], con_ver=con_ver)
 
     return out_table
 
 
+
+def get_nruns(batch,
+                source='gs1826',
+                **kwargs):
+    """
+    Returns number of runs (models) in a given batch
+    """
+    path = kwargs.get('path', GRIDS_PATH)
+
+    batch_str = full_string(run=0, batches=[batch], step=0, con_ver=0)
+    filename = 'params_{batch_str}.txt'.format(batch_str=batch_str)
+    filepath = os.path.join(path, source, 'params', filename)
+
+    params = pd.read_table(filepath, delim_whitespace=True)
+
+    return len(params.iloc[:,0])
 
 
 
@@ -412,7 +428,6 @@ def write_batch(nruns,
                 n0=1,
                 source='gs1826',
                 qos = 'short',
-                auto_qos = True,
                 prepend='con',
                 time=8,
                 threads=4,
@@ -423,14 +438,13 @@ def write_batch(nruns,
     ========================================================
     Parameters
     --------------------------------------------------------
-    auto_qos  = bool   : split jobs between node types (overrides qos)
     n0        = int    : run to start with (assumes all runs between n0 and nruns)
     prepend   = str    : label to prepend filename with
     time      = int    : time in hours
     threads   = int    : number of cores per run
     ========================================================"""
     batches = expand_batches(batches, source)
-    path = kwargs.get('path', os.path.join(GRIDS_PATH))
+    path = kwargs.get('path', GRIDS_PATH)
     log_path = os.path.join(path, source, 'logs')
 
     print('Writing slurm sbatch script')
@@ -681,12 +695,14 @@ def combine_mcmc(last_triplet,
                     source='gs1826',
                     step=2000,
                     con_ver=3,
+                    exclude=[],
                     **kwargs):
     """
     ========================================================
     Collects multiple mcmc output tables into a single table
     ========================================================
     last_triplet  =  int  : last triplet to include
+    exclude       = [int] : skip these triplets
     ========================================================
     """
     print('Combining mcmc tables')
@@ -701,6 +717,9 @@ def combine_mcmc(last_triplet,
     mcmc_out = pd.DataFrame()
 
     for triplet in triplets:
+        if triplet in exclude:
+            continue
+
         if triplet in [4,7]:
             batches = np.arange(triplet, triplet-3, -1)
         else:
@@ -806,7 +825,7 @@ def expand_batches(batches, source):
     """
     N = {'gs1826': 3, '4u1820': 2}  # number of epochs
     special = {4, 7}    # special cases (reverse order)
-    
+
     if type(batches) == int or type(batches) == np.int64:   # assume batches gives first batch
         if batches in special and source == 'gs1826':
             batches_out = np.arange(batches, batches-3, -1)
