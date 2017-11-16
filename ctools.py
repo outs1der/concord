@@ -317,9 +317,10 @@ def save_summaries(batches,
     batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     obs = load_obs(source=source, **kwargs)
-
+    weights = get_weights(con_ver)
     n_runs = get_nruns(batch=batches[0], source=source)
     n_obs = len(obs)
+
     t_params = construct_t_params(n_obs)
     param_names = param_names + t_params
 
@@ -370,7 +371,7 @@ def save_summaries(batches,
             lhood = np.nan
             unconstrained_flag = False
         else:
-            lhood = burstclass.lhoodClass(params=means, obs=obs, model=models)
+            lhood = burstclass.lhoodClass(params=means, obs=obs, model=models, weights=weights)
 
         results['lhood'][run-1] = lhood
 
@@ -693,9 +694,9 @@ def animate_contours(run,
 
 
 def combine_mcmc(last_triplet,
+                    con_ver,
                     source='gs1826',
                     step=2000,
-                    con_ver=3,
                     exclude=[],
                     **kwargs):
     """
@@ -879,6 +880,15 @@ def daisychain(daisies,
     daisy += str(daisies[-1])
 
     return daisy
+
+
+def get_weights(con_ver):
+    """Returns pre-defined lhood weights, based on con_ver"""
+    tdelwts = {1:1., 2:2.5e3, 3:100.}   # tdel weights for fitting (for different con_ver)
+    tdelwt = tdelwts[con_ver]
+
+    return {'tdelwt':tdelwt, 'fluxwt':1.}
+
 
 
 def try_mkdir(path, skip=False):
