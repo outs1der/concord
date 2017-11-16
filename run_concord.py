@@ -11,6 +11,18 @@ import os
 
 GRIDS_PATH = os.environ['KEPLER_GRIDS']
 
+if len(sys.argv) != 9:
+    print("""Must provide 8 parameters:
+                1. source
+                2. batch1
+                3. batch2
+                4. batch3
+                5. run
+                6. con_ver
+                7. threads
+                8. restart""")
+    sys.exit()
+
 #batches = [1]   #!!!
 #run = int(sys.argv[2])  #!!!
 source = sys.argv[1]
@@ -26,8 +38,12 @@ print('Loading observed and model data: Run {r} from batches [{b1}, {b2}, {b3}]'
 obs = ctools.load_obs(source)
 models = ctools.load_models(runs=[run,run,run], batches=batches)
 
+tdelwts = {1:1., 2:2.5e3, 3:100.}   # tdel weights for fitting (for different con_ver)
+tdelwt = tdelwts[con_ver]
+weights = {'tdelwt':tdelwt, 'fluxwt':1.}
+
 pos = ctools.setup_positions(obs)
-sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200, threads=threads)
+sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200, threads=threads, weights=weights)
 
 batch_str = '{src}_{b1}-{b2}-{b3}_R{r}'.format(src=source, b1=batches[0], b2=batches[1], b3=batches[2], r=run)
 chain_path = os.path.join(GRIDS_PATH, source, 'concord')
@@ -47,7 +63,7 @@ else:
 
 total_steps = 2000
 net_steps = total_steps - start
-nsteps = 2000      # No. of steps to do between savedumps
+nsteps = 2      # No. of steps to do between savedumps
 iters = round(net_steps/nsteps)
 n0 = round(start/nsteps)
 

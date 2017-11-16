@@ -316,8 +316,8 @@ class ObservedBurst(Lightcurve):
 # also returns a likelihood value
 
     def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s],
-		breakdown = False, plot = False, subplot = True, tdelwt=2.5e3,
-                debug = False):
+        		breakdown = False, plot = False, subplot = True,
+                weights={'fluxwt':1.0, 'tdelwt':2.5e3}, debug = False):
 
         dist, inclination, opz, t_off = param
 
@@ -349,7 +349,7 @@ class ObservedBurst(Lightcurve):
 # flux for the likelihood. Since you have many more points in the
 # lightcurve, you may want to weight these greater than one so that the
 # MCMC code will try to match those preferentially
-        fluxwt=1.0
+
 
 # Calculate the rescaled model flux with the passed parameters
 
@@ -440,14 +440,14 @@ class ObservedBurst(Lightcurve):
         fper_pred = ( mburst.mdot*Q_grav/
                (4.*pi*opz*dist**2*xi_p*self.cbol) )
         fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
-        lhood_cpt = np.append(lhood_cpt, -fluxwt*(
+        lhood_cpt = np.append(lhood_cpt, -weights['fluxwt']*(
                (self.fper.value-fper_pred.value)**2*fper_sig2
                +np.log(2.*pi/fper_sig2) ) )
 
 # recurrence time
 
         tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*opz)**2)
-        lhood_cpt = np.append(lhood_cpt, -tdelwt*(
+        lhood_cpt = np.append(lhood_cpt, -weights['tdelwt']*(
                (self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2
                +np.log(2.*pi/tdel_sig2) ) )
 
@@ -457,9 +457,6 @@ class ObservedBurst(Lightcurve):
         lhood_cpt = np.append(lhood_cpt,
         	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2
                 +np.log(2.0*pi/inv_sigma2) ) )
-# troubleshooting the likelihood comparison
-#        print ( (model.value-self.flux.value)**2*inv_sigma2
-#                - np.log(2.0*pi*inv_sigma2) )
 
 # Printing the values to test
 
@@ -477,22 +474,16 @@ class ObservedBurst(Lightcurve):
 # Also a possible minor error that the tdel weight doesn't apply to the
 # entire likelihood component
 
-#        return ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2
-#                               - np.log(2.0*pi*inv_sigma2) )
-#               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2
-#               -np.log(2.*pi*tdel_sig2))
-
-        lhood_p = ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2
-                               - np.log(2.0*pi*inv_sigma2) )
-               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2
-               -np.log(2.*pi*tdel_sig2))
+        # lhood_p = ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2
+        #                        - np.log(2.0*pi*inv_sigma2) )
+        #        -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2
+        #        -np.log(2.*pi*tdel_sig2))
 
         if breakdown:
             print ("Likelihood component breakdown (fper, tdel, lightcurve): ",lhood_cpt)
 
 # Finally we return the sum of the likelihoods
 
-#        print (lhood_cpt,lhood_cpt.sum())
         return lhood_cpt.sum()
 #        return lhood_p
 
@@ -695,13 +686,13 @@ def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def lhoodClass(params,obs,model):
+def lhoodClass(params, obs, model, weights):
     '''
     Calculate the likelihood related to one or more model-observation
     comparisons The corresponding call to emcee will (necessarily) look
     something like this:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, lhoodClass, args=[obs, models ])
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lhoodClass, args=[obs, models, weights])
     '''
 
     uparams = apply_units(params)
@@ -723,14 +714,14 @@ def lhoodClass(params,obs,model):
             _params = uparams[0:3]
             _params.append(uparams[3+i])
 #            alh += lhoodClass(uparams,obs[i],model[i])
-            alh += lhoodClass(_params,obs[i],model[i])
+            alh += lhoodClass(_params, obs[i], model[i], weights)
 #            print (i,n,alh)
 
     else:
 
 # Or if we have just one burst, here's what we do
 
-        alh = obs.compare(model,uparams)
+        alh = obs.compare(mburst=model, param=uparams, weights=weights)
 
     return alh + lnprior(uparams[0:4])
 

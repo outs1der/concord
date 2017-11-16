@@ -161,32 +161,11 @@ def load_models(runs,
 
 
 
-def setup_sampler(obs,
-                    models,
-                    pos = None,
-                    threads = 4,
-                    **kwargs):
-    """
-    Initialises and returns EnsembleSampler object
-    NOTE: Only uses pos to get nwalkers and ndimensions
-    """
-    if type(pos) == type(None):
-        pos = setup_positions(obs=obs, **kwargs)
-
-    nwalkers = len(pos)
-    ndim = len(pos[0])
-
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, burstclass.lhoodClass,
-                                    args=(obs,models), threads=threads)
-    return sampler
-
-
-
 def setup_positions(obs,
-                        nwalkers = 200,
-                        params0 = [6.09, 60., 1.28],
-                        tshift = -6.5,
-                        mag = 1e-3):
+                    nwalkers = 200,
+                    params0 = [6.09, 60., 1.28],
+                    tshift = -6.5,
+                    mag = 1e-3):
     """
     Sets up and returns posititons of walkers
     """
@@ -201,10 +180,32 @@ def setup_positions(obs,
 
 
 
+def setup_sampler(obs,
+                    models,
+                    pos = None,
+                    threads = 4,
+                    weights={'fluxwt':1., 'tdelwt':100.},
+                    **kwargs):
+    """
+    Initialises and returns EnsembleSampler object
+    NOTE: Only uses pos to get nwalkers and ndimensions
+    """
+    if type(pos) == type(None):
+        pos = setup_positions(obs=obs, **kwargs)
+
+    nwalkers = len(pos)
+    ndim = len(pos[0])
+
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, burstclass.lhoodClass,
+                                    args=(obs,models,weights), threads=threads)
+    return sampler
+
+
+
 def run_sampler(sampler,
-                    pos,
-                    nsteps,
-                    restart=False):
+                pos,
+                nsteps,
+                restart=False):
     """
     Runs emcee chain for nsteps
     """
@@ -290,15 +291,15 @@ def get_summary(run,
 
 
 
-def save_summaries(n_runs,
-                        batches,
-                        step,
-                        con_ver,
-                        ignore=250,
-                        source='gs1826',
-                        param_names=['d', 'i', '1+z'],
-                        exclude=[],
-                        **kwargs):
+def save_summaries(batches,
+                    step,
+                    con_ver,
+                    ignore=250,
+                    source='gs1826',
+                    param_names=['d', 'i', '1+z'],
+                    exclude=[],
+                    combine=True,
+                    **kwargs):
     """
     ========================================================
     Extracts summary mcmc stats for a batch and saves as a table
@@ -313,11 +314,11 @@ def save_summaries(n_runs,
     ========================================================
     """
     #TODO: Add lhood breakdown to columns
-
     batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     obs = load_obs(source=source, **kwargs)
 
+    n_runs = get_nruns(batch=batches[0], source=source)
     n_obs = len(obs)
     t_params = construct_t_params(n_obs)
     param_names = param_names + t_params
@@ -398,7 +399,8 @@ def save_summaries(n_runs,
     with open(file_path, 'w') as f:
         f.write(table_str)
 
-    combine_mcmc(last_triplet = batches[-1], con_ver=con_ver)
+    if combine:
+        combine_mcmc(last_triplet = batches[-1], con_ver=con_ver)
 
     return out_table
 
@@ -422,13 +424,11 @@ def get_nruns(batch,
 
 
 
-def write_batch(nruns,
-                batches,
+def write_batch(batches,
                 con_ver,
                 n0=1,
                 source='gs1826',
                 qos = 'short',
-                prepend='con',
                 time=8,
                 threads=4,
                 **kwargs):
@@ -439,21 +439,21 @@ def write_batch(nruns,
     Parameters
     --------------------------------------------------------
     n0        = int    : run to start with (assumes all runs between n0 and nruns)
-    prepend   = str    : label to prepend filename with
     time      = int    : time in hours
     threads   = int    : number of cores per run
     ========================================================"""
     batches = expand_batches(batches, source)
+    nruns = get_nruns(batches[0])
     path = kwargs.get('path', GRIDS_PATH)
     log_path = os.path.join(path, source, 'logs')
 
     print('Writing slurm sbatch script')
     triplet_str = triplet_string(batches=batches, source=source)
     run_str = '{n0}-{n1}'.format(n0=n0, n1=nruns)
-    filename = '{prep}_{triplet}_{runs}.sh'.format(prep=prepend, triplet=triplet_str, runs=run_str)
+    filename = 'con{cv}_{triplet}_{runs}.sh'.format(cv=con_ver, triplet=triplet_str, runs=run_str)
     filepath = os.path.join(log_path, filename)
 
-    job_str = 'c_{src}{b1}'.format(src=source[:2], b1=batches[0])
+    job_str = 'c{cv}_{src}{b1}'.format(cv=con_ver, src=source[:2], b1=batches[0])
     time_str = '{hr:02}:00:00'.format(hr=time)
     batch_list = ''
 
@@ -494,6 +494,7 @@ def plot_lightcurves(run,
                         step,
                         con_ver,
                         source='gs1826',
+                        weights={'fluxwt':1., 'tdelwt':100.},
                         **kwargs):
     """
     ========================================================
@@ -537,7 +538,7 @@ def plot_lightcurves(run,
         t = 't' + str(i+1)
         base_input_params = [params['d']*u.kpc, params['i']*u.degree, params['1+z']]
         input_params = base_input_params + [params[t]*u.s] # append relevant time only
-        obs[i].compare(models[i], input_params, breakdown=True, plot=True)
+        obs[i].compare(models[i], input_params, weights=weights, breakdown=True, plot=True)
 
     plt.show(block=False)
 
@@ -706,11 +707,13 @@ def combine_mcmc(last_triplet,
     ========================================================
     """
     print('Combining mcmc tables')
+    print('last triplet: {last_triplet}'.format(last_triplet=last_triplet))
+    print('con_ver {:02}'.format(con_ver))
     path = kwargs.get('path', os.path.join(GRIDS_PATH))
     mcmc_path = os.path.join(path, source, 'mcmc')
 
     # ===== account for special cases =====
-    first_triplets = np.array([4, 7, 9])
+    first_triplets = np.array([4, 7, 9])    # first few irregular
     remaining_triplets = np.arange(12, last_triplet+1, 3)
     triplets = np.concatenate([first_triplets, remaining_triplets])
 
@@ -741,7 +744,7 @@ def combine_mcmc(last_triplet,
 
     mcmc_str = mcmc_out.to_string(index=False, justify='left', formatters=FORMATTERS, col_space=8)
 
-    filename = 'mcmc_{source}.txt'.format(source=source)
+    filename = 'mcmc_{source}_C{con:02}.txt'.format(source=source, con=con_ver)
     filepath = os.path.join(mcmc_path, filename)
 
     with open(filepath, 'w') as f:
