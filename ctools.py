@@ -50,17 +50,14 @@ FORMATTERS={'lhood':flt0,
             'i':flt4,
             '1+z':flt4}
 
-def load_obs(source='gs1826',
-                **kwargs):
-    """
-    ========================================================
+def load_obs(source='gs1826', **kwargs):
+    """========================================================
     Loads observed burst data
     ========================================================
     Parameters
     --------------------------------------------------------
     source   = str : astrophysical source being matched (gs1826, 4u1820)
-    ========================================================
-    """
+    ========================================================"""
     obs = []
     path = kwargs.get('path', GRIDS_PATH)
     obs_path = os.path.join(path, 'obs_data')
@@ -82,23 +79,16 @@ def load_obs(source='gs1826',
 
 
 
-def load_models(runs,
-                  batches,
-                  source = 'gs1826',
-                  basename = 'xrb',
-                  params_prefix = 'params',
-                  summ_prefix = 'summ',
-                  **kwargs):
-    """
-    ========================================================
+def load_models(runs, batches, source='gs1826', basename='xrb',
+                  params_prefix='params', summ_prefix='summ', **kwargs):
+    """========================================================
     Loads a set of models (parameters and lightcurves)
     ========================================================
     Parameters
     --------------------------------------------------------
     runs    = [] : list of models to use (assumed to be identical if only one given)
     batches = [] : batches that the models in runs[] belong to (one-to-one correspondence)
-    ========================================================
-    """
+    ========================================================"""
     runs = expand_runs(runs)
     batches = expand_batches(batches, source)
     models = []
@@ -161,14 +151,11 @@ def load_models(runs,
 
 
 
-def setup_positions(obs,
-                    nwalkers = 200,
-                    params0 = [6.09, 60., 1.28],
-                    tshift = -6.5,
-                    mag = 1e-3):
-    """
+def setup_positions(obs, nwalkers = 200, params0 = [6.09, 60., 1.28],
+                    tshift = -6.5, mag = 1e-3):
+    """========================================================
     Sets up and returns posititons of walkers
-    """
+    ========================================================"""
     params = list(params0)   # prevent persistence between calls
     for i in range(len(obs)):
         params.append(tshift)
@@ -180,16 +167,12 @@ def setup_positions(obs,
 
 
 
-def setup_sampler(obs,
-                    models,
-                    pos = None,
-                    threads = 4,
-                    weights={'fluxwt':1., 'tdelwt':100.},
-                    **kwargs):
-    """
+def setup_sampler(obs, models, pos=None, threads=4,
+                    weights={'fluxwt':1., 'tdelwt':100.}, **kwargs):
+    """========================================================
     Initialises and returns EnsembleSampler object
     NOTE: Only uses pos to get nwalkers and ndimensions
-    """
+    ========================================================"""
     if type(pos) == type(None):
         pos = setup_positions(obs=obs, **kwargs)
 
@@ -202,13 +185,10 @@ def setup_sampler(obs,
 
 
 
-def run_sampler(sampler,
-                pos,
-                nsteps,
-                restart=False):
-    """
+def run_sampler(sampler, pos, nsteps, restart=False):
+    """========================================================
     Runs emcee chain for nsteps
-    """
+    ========================================================"""
     if restart:
         sampler.reset()
 
@@ -224,14 +204,9 @@ def run_sampler(sampler,
 
 
 
-def load_chain(run,
-                batches,
-                step,
-                con_ver,
-                source='gs1826',
-                **kwargs):
-    """
-    ========================================================
+def load_chain(run, batches, step, con_ver,
+                source='gs1826', **kwargs):
+    """========================================================
     Load chain file from completed emcee run
     ========================================================
     Parameters
@@ -240,8 +215,7 @@ def load_chain(run,
     batches
     step
     source
-    ========================================================
-    """
+    ========================================================"""
     batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     chain_path = os.path.join(path, source, 'concord')
@@ -257,19 +231,11 @@ def load_chain(run,
 
 
 
-def get_summary(run,
-                batches,
-                step,
-                con_ver,
-                ignore=250,
-                source='gs1826',
-                param_names=["d", "i", "1+z"],
-                **kwargs):
-    """
-    ========================================================
+def get_summary(run, batches, step, con_ver, ignore=250, source='gs1826',
+                param_names=["d", "i", "1+z"], **kwargs):
+    """========================================================
     Get summary stats (mean + std) from a given mcmc chain
-    ========================================================
-    """
+    ========================================================"""
     batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
 
@@ -291,17 +257,10 @@ def get_summary(run,
 
 
 
-def save_summaries(batches,
-                    step,
-                    con_ver,
-                    ignore=250,
-                    source='gs1826',
-                    param_names=['d', 'i', '1+z'],
-                    exclude=[],
-                    combine=True,
+def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
+                    param_names=['d', 'i', '1+z'], exclude=[], combine=True,
                     **kwargs):
-    """
-    ========================================================
+    """========================================================
     Extracts summary mcmc stats for a batch and saves as a table
     ========================================================
     Parameters
@@ -311,8 +270,7 @@ def save_summaries(batches,
     --------------------------------------------------------
     Notes:
             - Assumes each batch contains models numbered from 1 to [n_runs]
-    ========================================================
-    """
+    ========================================================"""
     #TODO: Add lhood breakdown to columns
     batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
@@ -401,18 +359,16 @@ def save_summaries(batches,
         f.write(table_str)
 
     if combine:
-        combine_mcmc(last_triplet = batches[-1], con_ver=con_ver)
+        combine_mcmc(last_batch = batches[-1], con_ver=con_ver)
 
     return out_table
 
 
 
-def get_nruns(batch,
-                source='gs1826',
-                **kwargs):
-    """
+def get_nruns(batch, source='gs1826', **kwargs):
+    """========================================================
     Returns number of runs (models) in a given batch
-    """
+    ========================================================"""
     path = kwargs.get('path', GRIDS_PATH)
 
     batch_str = full_string(run=0, batches=[batch], step=0, con_ver=0)
@@ -425,16 +381,9 @@ def get_nruns(batch,
 
 
 
-def write_batch(batches,
-                con_ver,
-                n0=1,
-                source='gs1826',
-                qos = 'short',
-                time=8,
-                threads=4,
-                **kwargs):
-    """
-    ========================================================
+def write_batch(batches, con_ver, n0=1, source='gs1826',
+                qos = 'short', time=8, threads=4, **kwargs):
+    """========================================================
     Writes batch script for job-submission on Monarch
     ========================================================
     Parameters
@@ -490,15 +439,9 @@ python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart""
 
 
 
-def plot_lightcurves(run,
-                        batches,
-                        step,
-                        con_ver,
-                        source='gs1826',
-                        weights={'fluxwt':1., 'tdelwt':100.},
-                        **kwargs):
-    """
-    ========================================================
+def plot_lightcurves(run, batches, step, con_ver,
+                        source='gs1826', weights=None, **kwargs):
+    """========================================================
     Plots lightcurves with best-fit params from an mcmc chain
     ========================================================
     Parameters
@@ -507,12 +450,13 @@ def plot_lightcurves(run,
     batches    = [int] :
     step       = int   : emcee step to load (used in file label)
     path       = str   : path to kepler_grids directory
-    ========================================================
-    """
+    ========================================================"""
     batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     source_path = os.path.join(path, source)
 
+    if type(weights) == type(None):
+        weights = get_weights(con_ver)
     obs = load_obs(source=source, **kwargs)
     models = load_models(runs=[run], batches=batches, source=source, **kwargs)
 
@@ -545,15 +489,9 @@ def plot_lightcurves(run,
 
 
 
-def plot_contour(run,
-                batches,
-                step,
-                con_ver,
-                ignore=250,
-                source='gs1826',
-                **kwargs):
-    """
-    ========================================================
+def plot_contour(run, batches, step, con_ver,
+                ignore=250, source='gs1826', **kwargs):
+    """========================================================
     Returns contour plot for a run from a given batch set
     ========================================================
     Parameters
@@ -564,8 +502,7 @@ def plot_contour(run,
     ignore     = int   : number of initial chain steps to ignore (burn-in phase)
     source
     path       = str   : path to kepler_grids directory
-    ========================================================
-    """
+    ========================================================"""
     batches = expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     ndim = 6
@@ -598,15 +535,9 @@ def plot_contour(run,
 
 
 
-def save_contours(runs,
-                    batches,
-                    step,
-                    con_ver,
-                    ignore=250,
-                    source='gs1826',
-                    **kwargs):
-    """
-    ========================================================
+def save_contours(runs, batches, step, con_ver,
+                    ignore=250, source='gs1826', **kwargs):
+    """========================================================
     Save contour plots from multiple concord runs
     ========================================================
     Parameters
@@ -617,8 +548,7 @@ def save_contours(runs,
     ignore     = int   : number of initial chain steps to ignore (burn-in phase)
     source
     path       = str   : path to kepler_grids directory
-    ========================================================
-    """
+    ========================================================"""
     batches = expand_batches(batches, source)
     runs = expand_runs(runs)
     path = kwargs.get('path', GRIDS_PATH)
@@ -647,15 +577,10 @@ def save_contours(runs,
     print('Done!')
 
 
-def animate_contours(run,
-                        step,
-                        dt=5,
-                        fps=30,
-                        ffmpeg=True,
-                        **kwargs):
-    """
+def animate_contours(run, step, dt=5, fps=30, ffmpeg=True, **kwargs):
+    """========================================================
     Saves frames of contour evolution, to make an animation
-    """
+    ========================================================"""
     path = kwargs.get('path', CONCORD_PATH)
 
     parameters=[r"$d$",r"$i$",r"$1+z$"]
@@ -693,29 +618,23 @@ def animate_contours(run,
 
 
 
-def combine_mcmc(last_triplet,
-                    con_ver,
-                    source='gs1826',
-                    step=2000,
-                    exclude=[],
-                    **kwargs):
-    """
-    ========================================================
+def combine_mcmc(last_batch, con_ver, source='gs1826', step=2000,
+                    exclude=[], **kwargs):
+    """========================================================
     Collects multiple mcmc output tables into a single table
     ========================================================
-    last_triplet  =  int  : last triplet to include
+      =  int  : last triplet to include
     exclude       = [int] : skip these triplets
-    ========================================================
-    """
+    ========================================================"""
     print('Combining mcmc tables')
-    print('last triplet: {last_triplet}'.format(last_triplet=last_triplet))
+    print('last batch: {last_batch}'.format(last_batch=last_batch))
     print('con_ver {:02}'.format(con_ver))
     path = kwargs.get('path', os.path.join(GRIDS_PATH))
     mcmc_path = os.path.join(path, source, 'mcmc')
 
     # ===== account for special cases =====
     first_triplets = np.array([4, 7, 9])    # first few irregular
-    remaining_triplets = np.arange(12, last_triplet+1, 3)
+    remaining_triplets = np.arange(12, last_batch+1, 3)
     triplets = np.concatenate([first_triplets, remaining_triplets])
 
     mcmc_out = pd.DataFrame()
@@ -754,15 +673,13 @@ def combine_mcmc(last_triplet,
 
 
 def construct_t_params(n):
-    """
-    ========================================================
+    """========================================================
     Creates list of time-param labels (t1, t2, t3...)
     ========================================================
     Parameters
     --------------------------------------------------------
     n = int  : number of time parameters
-    ========================================================
-    """
+    ========================================================"""
     t_params = []
 
     for i in range(n):
@@ -773,19 +690,14 @@ def construct_t_params(n):
 
 
 
-def full_string(run,
-                batches,
-                step,
-                con_ver,
-                source='gs1826'):
-    """
-    ========================================================
+def full_string(run, batches, step, con_ver, source='gs1826'):
+    """========================================================
     constructs a standardised string for a batch model
     ========================================================
     special cases:
         - run = 0 : don't include run
         - con_ver = 0 : don't include con version
-    """
+    ========================================================"""
     batches = expand_batches(batches, source)
     b_string = daisychain(batches)
 
@@ -811,8 +723,10 @@ def full_string(run,
 
 
 
-def triplet_string(batches,
-                   source='gs1826'):
+def triplet_string(batches, source='gs1826'):
+    """========================================================
+    Returns triplet string, e.g.: gs1826_12-13-14
+    ========================================================"""
     batches = expand_batches(batches, source)
     batch_daisy = daisychain(batches)
     triplet_str = '{source}_{batches}'.format(source=source, batches=batch_daisy)
@@ -822,11 +736,11 @@ def triplet_string(batches,
 
 
 def expand_batches(batches, source):
-    """
+    """========================================================
     Checks format of 'batches' parameter and returns relevant array
     if batches is arraylike: keep
     if batches is integer N: assume first batch of batch set
-    """
+    ========================================================"""
     N = {'gs1826': 3, '4u1820': 2}  # number of epochs
     special = {4, 7}    # special cases (reverse order)
 
@@ -847,9 +761,11 @@ def expand_batches(batches, source):
 
 
 def expand_runs(runs):
-    """Checks format of 'runs' parameter and returns relevant array
+    """========================================================
+    Checks format of 'runs' parameter and returns relevant array
     if runs is arraylike: keep
-    if runs is integer N: assume there are N runs from 1 to N"""
+    if runs is integer N: assume there are N runs from 1 to N
+    ========================================================"""
     if type(runs) == int:   # assume runs = n_runs
         runs_out = np.arange(1, runs+1)
     elif type(runs) == list   or   type(runs) == np.ndarray:
@@ -861,16 +777,13 @@ def expand_runs(runs):
     return runs_out
 
 
-def daisychain(daisies,
-                delim='-'):
-    """
-    ========================================================
+def daisychain(daisies, delim='-'):
+    """========================================================
     returns a string of daisies seperated by a delimiter (e.g. 1-2-3-4)
     ========================================================
     daisies  = [int]
     delim    = str     : delimiter to place between IDs
-    ========================================================
-    """
+    ========================================================"""
     daisy = ''
 
     for i in daisies[:-1]:
@@ -883,8 +796,10 @@ def daisychain(daisies,
 
 
 def get_weights(con_ver):
-    """Returns pre-defined lhood weights, based on con_ver"""
-    tdelwts = {1:1., 2:2.5e3, 3:100.}   # tdel weights for fitting (for different con_ver)
+    """========================================================
+    Returns pre-defined lhood weights, based on con_ver
+    ========================================================"""
+    tdelwts = {1:1., 2:2.5e3, 3:100., 4:2.5e3}   # tdel weights for fitting (for different con_ver)
     tdelwt = tdelwts[con_ver]
 
     return {'tdelwt':tdelwt, 'fluxwt':1.}
@@ -892,6 +807,9 @@ def get_weights(con_ver):
 
 
 def try_mkdir(path, skip=False):
+    """========================================================
+    Tries to create directory, skip if exists or ask to overwrite
+    ========================================================"""
     try:
         print('Creating directory  {}'.format(path))
         subprocess.run(['mkdir', path], check=True)
