@@ -83,7 +83,6 @@ for i in range(n0, n0+iters):
 
     np.save(chain_filepath, sampler.chain)
     # np.save(lnprob_filepath, np.array(lnprob))
-
     # with open(rstate_filepath, 'wb') as output:
     #     pickle.dump(rstate, output, -1)
 
