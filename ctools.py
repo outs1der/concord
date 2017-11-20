@@ -161,7 +161,8 @@ def setup_positions(obs, nwalkers = 200, params0 = [6.09, 60., 1.28],
 
 
 def setup_sampler(obs, models, pos=None, threads=4,
-                    weights={'fluxwt':1., 'tdelwt':100.}, **kwargs):
+                    weights={'fluxwt':1., 'tdelwt':100.},
+                    disc_model='he16_a', **kwargs):
     """========================================================
     Initialises and returns EnsembleSampler object
     NOTE: Only uses pos to get nwalkers and ndimensions
@@ -173,7 +174,8 @@ def setup_sampler(obs, models, pos=None, threads=4,
     ndim = len(pos[0])
 
     sampler = emcee.EnsembleSampler(nwalkers, ndim, burstclass.lhoodClass,
-                                    args=(obs,models,weights), threads=threads)
+                                    args=(obs,models,weights,disc_model),
+                                    threads=threads)
     return sampler
 
 
@@ -217,7 +219,7 @@ def load_chain(run, batches, step, con_ver,
     chain_str = 'chain_{full}.npy'.format(full=full_str)
     chain_file = os.path.join(chain_path, chain_str)
 
-    print('Loading chain: ', chain_file)
+    print(chain_str)
     chain = np.load(chain_file)
 
     return chain
@@ -231,7 +233,6 @@ def get_summary(run, batches, step, con_ver, ignore=250, source='gs1826',
     ========================================================"""
     batches = manipulation.expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
-
     chain = load_chain(run=run, batches=batches, step=step, source=source, con_ver=con_ver, path=path)
     chain = chain[:, ignore:, :]  # cut out "burn-in" steps
 
@@ -294,6 +295,8 @@ def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
 
     # ===== get summaries from each set =====
     unconstrained_flag = False
+    chain_path = os.path.join(path, source, 'concord')
+    print('Loading chains from: ', chain_path)
 
     for run in range(1, n_runs+1):
         if run in exclude:
