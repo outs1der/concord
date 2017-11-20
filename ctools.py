@@ -242,9 +242,9 @@ def get_summary(run, batches, step, con_ver, ignore=250, source='gs1826',
     param_names = param_names + t_params
 
     # ===== Get summary values =====
-    cs = ChainConsumer()
-    cs.add_chain(chain.reshape(-1, ndim), parameters=param_names)
-    summary = cs.analysis.get_summary()
+    cc = ChainConsumer()
+    cc.add_chain(chain.reshape(-1, ndim), parameters=param_names)
+    summary = cc.analysis.get_summary()
 
     return summary
 
@@ -307,22 +307,24 @@ def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
         # ===== get mean +/- 1-sigma for each param =====
         means = []
         for p in param_names:
-            results[p][run-1] = summary[p][1]
+            mean = summary[p][1]
+            means.append(mean)
+
+            results[p][run-1] = mean
             results[p + '_low'][run-1] = summary[p][0]
             results[p + '_high'][run-1] = summary[p][2]
 
-            means.append(summary[p][0])
 
             # ===== Test for unconstrained parameter =====
-            if summary[p][0] == None:       # an unconstrained param won't have any bounds
+            if summary[p][0] == None:       # an unconstrained param won't have bounds
                 unconstrained_flag = True
 
         # ===== get likelihood value =====
-        if unconstrained_flag:
-            lhood = np.nan
-            unconstrained_flag = False
-        else:
-            lhood = burstclass.lhoodClass(params=means, obs=obs, model=models, weights=weights)
+        # if unconstrained_flag:
+        #     lhood = np.nan
+        #     unconstrained_flag = False
+        # else:
+        lhood = burstclass.lhoodClass(params=means, obs=obs, model=models, weights=weights)
 
         results['lhood'][run-1] = lhood
 
@@ -408,8 +410,8 @@ def plot_lightcurves(run, batches, step, con_ver,
 
 
 
-def plot_contour(run, batches, step, con_ver,
-                ignore=250, source='gs1826', **kwargs):
+def plot_contour(run, batches, step, con_ver, ignore=250,
+                    source='gs1826', show=True, **kwargs):
     """========================================================
     Returns contour plot for a run from a given batch set
     ========================================================
@@ -449,6 +451,9 @@ def plot_contour(run, batches, step, con_ver,
 
     fig = c.plotter.plot()
     fig.set_size_inches(7,7)
+
+    if show:
+        plt.show(block=False)
 
     return fig
 
