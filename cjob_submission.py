@@ -7,7 +7,7 @@ GRIDS_PATH = os.environ['KEPLER_GRIDS']
 CONCORD_PATH = os.environ['CONCORD_PATH']
 
 def write_submission(batches, con_ver, n0=1, source='gs1826',
-                qos = 'short', time=8, threads=4, **kwargs):
+                qos = 'short', time=8, threads=8, **kwargs):
     """========================================================
     Writes batch script for job-submission on Monarch
     ========================================================
@@ -26,16 +26,17 @@ def write_submission(batches, con_ver, n0=1, source='gs1826',
     run_str = '{n0}-{n1}'.format(n0=n0, n1=nruns)
     job_str = 'c{cv}_{src}{b1}'.format(cv=con_ver, src=source[:2], b1=batches[0])
     time_str = '{hr:02}:00:00'.format(hr=time)
+    extensions = {'monarch':'.sh', 'icer':'.qsub'}
     batch_list = ''
 
     for b in batches:
         batch_list += '{b} '.format(b=b)
 
-    extensions = {'monarch':'.sh', 'icer':'.qsub'}
+
     for cluster in ['monarch', 'icer']:
         print('Writing submission script for cluster:', cluster)
         extension = extensions[cluster]
-        filename = '{cluster}_con{cv}_{triplet}_{runs}{ext}'.format(cluster=cluster[:3],
+        filename = '{cluster}_con{cv}_{triplet}_{runs}{ext}'.format(cluster=cluster,
                         cv=con_ver, triplet=triplet_str, runs=run_str, ext=extension)
         filepath = os.path.join(log_path, filename)
 
