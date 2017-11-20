@@ -67,7 +67,7 @@ def decode_LaTeX(string):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def modelFunc(p,obs,model):
+def modelFunc(p,obs,model, disc_model):
     '''
     This function performs the stretching and rescaling of the (model
     predicted) burst lightcurve based on the input parameter set
@@ -288,7 +288,8 @@ class ObservedBurst(Lightcurve):
     #======================================================
     def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s],
         		breakdown = False, plot = False, subplot = True,
-                weights={'fluxwt':1.0, 'tdelwt':2.5e3}, debug = False):
+                weights={'fluxwt':1.0, 'tdelwt':2.5e3},
+                disc_model='disc_a', debug = False):
 
 # 'weights' give the relative weight to the tdel and persistent
 # flux for the likelihood. Since you have many more points in the
@@ -303,7 +304,7 @@ class ObservedBurst(Lightcurve):
             return -np.inf
 
 
-        xi_b, xi_p = anisotropy(inclination)
+        xi_b, xi_p = anisotropy(inclination, model=disc_model)
 
 # Here we calculate the equivalent mass and radius given the redshift and
 # radius. Since we allow the redshift to vary, but the model is calculated
@@ -320,7 +321,7 @@ class ObservedBurst(Lightcurve):
 
 # Calculate the rescaled model flux with the passed parameters
 
-        model = modelFunc(param,self,mburst)
+        model = modelFunc(param, self, mburst, disc_model)
         assert model.unit == self.flux.unit == self.flux_err.unit
 
 # Plot the observed burst
@@ -629,7 +630,7 @@ def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def lhoodClass(params, obs, model, weights):
+def lhoodClass(params, obs, model, weights, disc_model):
     '''
     Calculate the likelihood related to one or more model-observation
     comparisons The corresponding call to emcee will (necessarily) look
@@ -656,13 +657,14 @@ def lhoodClass(params, obs, model, weights):
 
             _params = uparams[0:3]
             _params.append(uparams[3+i])
-            alh += lhoodClass(_params, obs[i], model[i], weights)
+            alh += lhoodClass(_params, obs[i], model[i], weights, disc_model)
 
     else:
 
 # Or if we have just one burst, here's what we do
 
-        alh = obs.compare(mburst=model, param=uparams, weights=weights)
+        alh = obs.compare(mburst=model, param=uparams, weights=weights,
+                            disc_model=disc_model)
 
     return alh + lnprior(uparams[0:4])
 
