@@ -6,10 +6,22 @@ import manipulation
 GRIDS_PATH = os.environ['KEPLER_GRIDS']
 CONCORD_PATH = os.environ['CONCORD_PATH']
 
-def write_submission(batches, con_ver, n0=1, source='gs1826',
-                qos = 'short', time=8, threads=8, **kwargs):
+def write_new_submissions(last_batch, con_ver, **kwargs):
     """========================================================
-    Writes batch script for job-submission on Monarch
+    Writes entire set of submission scripts for newly-defined con_ver
+    ========================================================"""
+    batches = np.arange(12, last_batch+1, 3)
+    batches = np.concatenate([[4,7,9], batches])
+
+    for batch in batches:
+        write_submission(batches=batch, con_ver=con_ver, **kwargs)
+
+        
+
+def write_submission(batches, con_ver, n0=1, source='gs1826',
+                qos = 'short', time=4, threads=8, **kwargs):
+    """========================================================
+    Writes batch script for job-submission on Monarch and ICER
     ========================================================
     Parameters
     --------------------------------------------------------
@@ -51,7 +63,7 @@ def write_submission(batches, con_ver, n0=1, source='gs1826',
 def get_submission_str(job_str, run_str, source, batch_list,
                     threads, qos, time_str, con_ver, cluster):
     """========================================================
-    Returns string of submission script for monarch
+    Returns string of submission script for given cluster
     ========================================================
     cluster  =  str  : cluster type, one of [monarch, icer]
     ========================================================"""
