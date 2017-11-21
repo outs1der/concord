@@ -289,7 +289,7 @@ class ObservedBurst(Lightcurve):
     def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s],
         		breakdown = False, plot = False, subplot = True,
                 weights={'fluxwt':1.0, 'tdelwt':2.5e3},
-                disc_model='disc_a', debug = False):
+                disc_model='he16_a', debug = False):
 
 # 'weights' give the relative weight to the tdel and persistent
 # flux for the likelihood. Since you have many more points in the

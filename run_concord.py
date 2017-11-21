@@ -4,6 +4,7 @@ import pickle
 import sys
 import os
 
+import con_versions
 # =============================================================================
 # Usage:
 #       python run_concord.py [source] [batch1] [batch2] [batch3] [run] [concord_version] [restart] (step)
@@ -38,11 +39,8 @@ obs = ctools.load_obs(source)
 models = ctools.load_models(runs=[run,run,run], batches=batches)
 
 # === Con_ver parameters ===
-tdelwts = {1:1., 2:2.5e3, 3:100., 4:2.5e3}
-discs = {1:'he16_a', 2:'he16_a', 3:'he16_a', 4:'he16_d'}
-tdelwt = tdelwts[con_ver]
-weights = {'tdelwt':tdelwt, 'fluxwt':1.}
-disc_model = discs[con_ver]
+weights = con_versions.get_weights(con_ver)
+disc_model = con_versions.get_disc_model(con_ver)
 
 pos = ctools.setup_positions(obs)
 sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200,

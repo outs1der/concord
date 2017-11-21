@@ -13,6 +13,7 @@ from chainconsumer import ChainConsumer
 # homebrew
 import burstclass
 import manipulation
+import con_versions
 #============================================
 # Author: Zac Johnston (2017)
 # zac.johnston@monash.edu
@@ -269,7 +270,9 @@ def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
     batches = manipulation.expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     obs = load_obs(source=source, **kwargs)
-    weights = get_weights(con_ver)
+
+    weights = con_versions.get_weights(con_ver)
+    disc_model = con_versions.get_disc_model(con_ver)
     n_runs = manipulation.get_nruns(batch=batches[0], source=source)
     n_obs = len(obs)
 
@@ -303,9 +306,11 @@ def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
             results['lhood'][run-1] = np.nan
             continue
 
-        models = load_models(runs=[run], batches=batches, source=source, **kwargs)
-        summary = get_summary(run=run, batches=batches, source=source, step=step,
-                                con_ver=con_ver, ignore=ignore, param_names=param_names, **kwargs)
+        models = load_models(runs=[run], batches=batches, source=source,
+                                **kwargs)
+        summary = get_summary(run=run, batches=batches, source=source,
+                                step=step, con_ver=con_ver, ignore=ignore,
+                                param_names=param_names, **kwargs)
 
         # ===== get mean +/- 1-sigma for each param =====
         means = []
@@ -327,7 +332,8 @@ def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
         #     lhood = np.nan
         #     unconstrained_flag = False
         # else:
-        lhood = burstclass.lhoodClass(params=means, obs=obs, model=models, weights=weights)
+        lhood = burstclass.lhoodClass(params=means, obs=obs, model=models,
+                                    weights=weights, disc_model=disc_model)
 
         results['lhood'][run-1] = lhood
 
@@ -364,7 +370,7 @@ def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
 
 
 def plot_lightcurves(run, batches, step, con_ver,
-                        source='gs1826', weights=None, **kwargs):
+                        source='gs1826', **kwargs):
     """========================================================
     Plots lightcurves with best-fit params from an mcmc chain
     ========================================================
@@ -378,9 +384,10 @@ def plot_lightcurves(run, batches, step, con_ver,
     batches = manipulation.expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     source_path = os.path.join(path, source)
+    weights = con_versions.get_weights(con_ver)
 
     if type(weights) == type(None):
-        weights = get_weights(con_ver)
+        weights = con_versions.get_weights(con_ver)
     obs = load_obs(source=source, **kwargs)
     models = load_models(runs=[run], batches=batches, source=source, **kwargs)
 
@@ -596,13 +603,3 @@ def combine_mcmc(last_batch, con_ver, source='gs1826', step=2000,
 
     with open(filepath, 'w') as f:
         f.write(mcmc_str)
-
-
-def get_weights(con_ver):
-    """========================================================
-    Returns pre-defined lhood weights, based on con_ver
-    ========================================================"""
-    tdelwts = {1:1., 2:2.5e3, 3:100., 4:2.5e3}   # tdel weights for fitting (for different con_ver)
-    tdelwt = tdelwts[con_ver]
-
-    return {'tdelwt':tdelwt, 'fluxwt':1.}
