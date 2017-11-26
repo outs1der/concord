@@ -10,14 +10,14 @@ import astropy.constants as const
 from math import sqrt
 from chainconsumer import ChainConsumer
 
-# homebrew
+# Custom
 import burstclass
 import manipulation
 import con_versions
 #============================================
+# Tools for using X-ray burst matcher Concord
 # Author: Zac Johnston (2017)
 # zac.johnston@monash.edu
-# Tools in progress for using X-ray burst matcher Concord
 #============================================
 # TODO:
 #
@@ -55,8 +55,6 @@ def load_obs(source='gs1826', **kwargs):
     """========================================================
     Loads observed burst data
     ========================================================
-    Parameters
-    --------------------------------------------------------
     source   = str : astrophysical source being matched (gs1826, 4u1820)
     ========================================================"""
     obs = []
@@ -85,8 +83,6 @@ def load_models(runs, batches, source='gs1826', basename='xrb',
     """========================================================
     Loads a set of models (parameters and lightcurves)
     ========================================================
-    Parameters
-    --------------------------------------------------------
     runs    = [] : list of models to use (assumed to be identical if only one given)
     batches = [] : batches that the models in runs[] belong to (one-to-one correspondence)
     ========================================================"""
@@ -205,8 +201,6 @@ def load_chain(run, batches, step, con_ver,
     """========================================================
     Load chain file from completed emcee run
     ========================================================
-    Parameters
-    --------------------------------------------------------
     run
     batches
     step
@@ -252,18 +246,30 @@ def get_summary(run, batches, step, con_ver, ignore=250, source='gs1826',
 
 
 
-def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
+def save_all_summaries(last_batch, con_ver, **kwargs):
+    """========================================================
+    Saves all batch summaries (e.g. for a new con_ver)
+    ========================================================"""
+    batches = np.arange(12, last_batch, 3)
+    batches = np.concatenate([[4,7,9], batches])
+
+    for batch in batches:
+        save_summaries(batch, con_ver, combine=False, **kwargs)
+
+    save_summaries(last_batch, con_ver, combine=True, **kwargs)
+
+
+
+def save_summaries(batches, con_ver, step=2000, ignore=250, source='gs1826',
                     param_names=['d', 'i', '1+z'], exclude=[], combine=True,
                     **kwargs):
     """========================================================
     Extracts summary mcmc stats for a batch and saves as a table
     ========================================================
-    Parameters
-    --------------------------------------------------------
     n_runs  = int   : number of runs in each batch
     exclude = [int] : runs to skip over/exclude from analysis
     --------------------------------------------------------
-    Notes:
+    Note:
             - Assumes each batch contains models numbered from 1 to [n_runs]
     ========================================================"""
     #TODO: Add lhood breakdown to columns
@@ -319,7 +325,7 @@ def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
             means.append(mean)
 
             results[p][run-1] = mean
-            results[p + '_low'][run-1] = summary[p][0]
+            results[p + '_low'][run-1] = summary[p][0]  #TODO: use column names?
             results[p + '_high'][run-1] = summary[p][2]
 
 
@@ -369,13 +375,11 @@ def save_summaries(batches, step, con_ver, ignore=250, source='gs1826',
 
 
 
-def plot_lightcurves(run, batches, step, con_ver,
+def plot_lightcurves(run, batches, con_ver, step=2000,
                         source='gs1826', **kwargs):
     """========================================================
     Plots lightcurves with best-fit params from an mcmc chain
     ========================================================
-    Parameters
-    --------------------------------------------------------
     run
     batches    = [int] :
     step       = int   : emcee step to load (used in file label)
@@ -425,8 +429,6 @@ def plot_contour(run, batches, step, con_ver, ignore=250,
     """========================================================
     Returns contour plot for a run from a given batch set
     ========================================================
-    Parameters
-    --------------------------------------------------------
     run
     batches    = [int] :
     step       = int   : emcee step to load (used in file label)
@@ -474,8 +476,6 @@ def save_contours(runs, batches, step, con_ver,
     """========================================================
     Save contour plots from multiple concord runs
     ========================================================
-    Parameters
-    --------------------------------------------------------
     run
     batches    = [int] :
     step       = int   : emcee step to load (used in file label)
