@@ -16,7 +16,7 @@ def write_new_submissions(last_batch, con_ver, **kwargs):
     for batch in batches:
         write_submission(batches=batch, con_ver=con_ver, **kwargs)
 
-        
+
 
 def write_submission(batches, con_ver, n0=1, source='gs1826',
                 qos = 'short', time=4, threads=8, **kwargs):
@@ -95,24 +95,15 @@ python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart""
 
     elif cluster == 'icer':
         return """#!/bin/bash --login
-# Time job will take to execute (HH:MM:SS format)
-#PBS -l walltime={time_str}
-# Memory needed by the job
-#PBS -l mem=1000mb
-# Number of shared memory nodes required and the number of processors per node
-#PBS -l nodes=1:ppn={threads}
-# Make output and error files the same file
-#PBS -j oe
-# Send an email when a job is aborted, begins or ends
-#PBS -m abe
-# Email to send to
-#PBS -M zac.johnston@monash.edu
-# Give the job a name
 #PBS -N {job_str}
-# Request temporary local disk space for this job
-#PBS -l file=1gb
-# Request a job array
 #PBS -t {run_str}
+#PBS -l nodes=1:ppn={threads}
+#PBS -l walltime={time_str}
+#PBS -l mem=1000mb
+#PBS -l file=1gb
+#PBS -j oe
+#PBS -m abe
+#PBS -M zac.johnston@monash.edu
 
 N=$PBS_ARRAYID
 source /mnt/home/f0003004/mypy/bin/activate
