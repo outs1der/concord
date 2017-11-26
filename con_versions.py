@@ -24,5 +24,5 @@ def get_lhood_floor(con_ver):
     """========================================================
     Returns lhood floor for plotting
     ========================================================"""
-    floors = {2:-5e4, 3:-1e4, 4:-1e4, 5:-1e4}    # lower cutoff for lhood plotting
+    floors = {2:-5e4, 3:-1e4, 4:-5e4, 5:0.0}    # lower cutoff for lhood plotting
     return floors[con_ver]
