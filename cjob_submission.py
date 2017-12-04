@@ -46,7 +46,7 @@ def write_submission(batches, con_ver, n0=1, source='gs1826',
 
 
     for cluster in ['monarch', 'icer']:
-        print('Writing submission script for cluster:', cluster)
+        print(f'Writing submission script: C{con_ver},  {cluster}')
         extension = extensions[cluster]
         filename = '{cluster}_con{cv}_{triplet}_{runs}{ext}'.format(cluster=cluster,
                         cv=con_ver, triplet=triplet_str, runs=run_str, ext=extension)
@@ -100,7 +100,7 @@ python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart""
 #PBS -l nodes=1:ppn={threads}
 #PBS -l walltime={time_str}
 #PBS -l mem=1000mb
-#PBS -l file=1gb
+#PBS -l file=1500mb
 #PBS -j oe
 #PBS -m abe
 #PBS -M zac.johnston@monash.edu

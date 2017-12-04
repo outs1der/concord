@@ -111,7 +111,6 @@ def load_models(runs, batches, source='gs1826', basename='xrb',
         summ_file = os.path.join(source_path, 'summ', summ_str)
         mean_path = os.path.join(source_path, 'mean_lightcurves', batch_str)
 
-
         mtable = pd.read_table(summ_file, delim_whitespace=True)
         ptable = pd.read_table(param_file, delim_whitespace=True)  # parameter table
         idx = np.where(ptable['run'] == run)[0][0]    # index of model/run
@@ -119,7 +118,7 @@ def load_models(runs, batches, source='gs1826', basename='xrb',
 
         # ====== Extract model parameters/properties ======
         xi = 1.12             # currently constant, could change in future
-        R_NS = 12.1 * u.km    # add this as colum to parameter file (or g)?
+        R_NS = 11.6 * u.km    # add this as colum to parameter file (or g)?
         M_NS = ptable['mass'][idx] * const.M_sun
         X = ptable['x'][idx]
         Z = ptable['z'][idx]
@@ -311,12 +310,17 @@ def save_summaries(batches, con_ver, step=2000, ignore=250, source='gs1826',
         if run in exclude:
             results['lhood'][run-1] = np.nan
             continue
+        try:
+            summary = get_summary(run=run, batches=batches, source=source,
+                                    step=step, con_ver=con_ver, ignore=ignore,
+                                    param_names=param_names, **kwargs)
+        except:
+            results['lhood'][run-1] = np.nan
+            continue
 
         models = load_models(runs=[run], batches=batches, source=source,
                                 **kwargs)
-        summary = get_summary(run=run, batches=batches, source=source,
-                                step=step, con_ver=con_ver, ignore=ignore,
-                                param_names=param_names, **kwargs)
+
 
         # ===== get mean +/- 1-sigma for each param =====
         means = []
@@ -369,7 +373,7 @@ def save_summaries(batches, con_ver, step=2000, ignore=250, source='gs1826',
         f.write(table_str)
 
     if combine:
-        combine_mcmc(last_batch = batches[-1], con_ver=con_ver)
+        combine_mcmc(last_batch = batches[-1], con_ver=con_ver, step=step)
 
     return out_table
 
@@ -390,30 +394,33 @@ def plot_lightcurves(run, batches, con_ver, step=2000,
     source_path = os.path.join(path, source)
     weights = con_versions.get_weights(con_ver)
 
-    if type(weights) == type(None):
-        weights = con_versions.get_weights(con_ver)
+    # ===== create obs and models objects =====
     obs = load_obs(source=source, **kwargs)
     models = load_models(runs=[run], batches=batches, source=source, **kwargs)
 
+    # ===== create list of param names =====
     n = len(obs)
-    param_names = ['d', 'i', '1+z']
-    t_params = manipulation.construct_t_params(n)
-    param_names = param_names + t_params
+    pnames_base = ['d', 'i', '1+z']
+    pnames_time = manipulation.construct_t_params(n)
+    pnames_all = pnames_base + pnames_time
 
+    # ===== read in mcmc table =====
     batch_str = manipulation.full_string(run=0, batches=batches, source=source, step=step, con_ver=con_ver)
-    table_name = 'mcmc_' + batch_str + '.txt'
-    table_filepath = os.path.join(source_path, 'mcmc', table_name)
+    mcmc_filename = 'mcmc_' + batch_str + '.txt'
+    mcmc_filepath = os.path.join(source_path, 'mcmc', mcmc_filename)
+    mcmc_table = pd.read_table(mcmc_filepath, delim_whitespace=True)
 
-    table = pd.read_table(table_filepath, delim_whitespace=True)
-    run_idx = np.argwhere(table['run'] == run)[0][0]
+    run_idx = np.argwhere(mcmc_table['run'] == run)[0][0]
 
+    # ===== read in params from table =====
     params = {}
-    for p in param_names:
-        params[p] = table[p][run_idx]
+    for p in pnames_all:
+        params[p] = mcmc_table[p][run_idx]
 
-    for k, v in params.items():
-        print(k, v)
+        if p in pnames_base:
+            print(p, params[p])
 
+    # ===== plot each epoch =====
     for i in range(n):
         t = 't' + str(i+1)
         base_input_params = [params['d']*u.kpc, params['i']*u.degree, params['1+z']]
