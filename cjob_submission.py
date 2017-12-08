@@ -6,7 +6,7 @@ import manipulation
 GRIDS_PATH = os.environ['KEPLER_GRIDS']
 CONCORD_PATH = os.environ['CONCORD_PATH']
 
-def write_new_submissions(last_batch, con_ver, **kwargs):
+def write_all_submissions_scripts(last_batch, con_ver, **kwargs):
     """========================================================
     Writes entire set of submission scripts for newly-defined con_ver
     ========================================================"""
@@ -14,11 +14,11 @@ def write_new_submissions(last_batch, con_ver, **kwargs):
     batches = np.concatenate([[4,7,9], batches])
 
     for batch in batches:
-        write_submission(batches=batch, con_ver=con_ver, **kwargs)
+        write_submission_script(batches=batch, con_ver=con_ver, **kwargs)
 
 
 
-def write_submission(batches, con_ver, n0=1, source='gs1826',
+def write_submission_script(batches, con_ver, n0=1, source='gs1826',
                 qos = 'short', time=4, threads=8, **kwargs):
     """========================================================
     Writes batch script for job-submission on Monarch and ICER
@@ -75,9 +75,11 @@ def get_submission_str(job_str, run_str, source, batch_list,
 #SBATCH --array={run_str}
 #SBATCH --time={time_str}
 #SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task={threads}
+#SBATCH --partition=batch,short,medium
 #SBATCH --qos={qos}_qos
-#SBATCH --mem-per-cpu=1000
+#SBATCH --mem-per-cpu=2000
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=zac.johnston@monash.edu
 
@@ -99,8 +101,8 @@ python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart""
 #PBS -t {run_str}
 #PBS -l nodes=1:ppn={threads}
 #PBS -l walltime={time_str}
-#PBS -l mem=1000mb
-#PBS -l file=1500mb
+#PBS -l mem=2000mb
+#PBS -l file=2000mb
 #PBS -j oe
 #PBS -m abe
 #PBS -M zac.johnston@monash.edu

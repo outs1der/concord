@@ -312,12 +312,13 @@ class ObservedBurst(Lightcurve):
 # R_NS to obtain a self-consistent set of parameters.
 # Because many equations of state have roughly constant radius over a
 # range of masses, we choose to keep R_NS constant and to vary M_NS
-
+        #TODO: Could actually just get Q_grav from (c^2*z)/(1+z)
+        #        thus no need for mass - though might be good for sanity-check
         M_NS = mburst.g*mburst.R_NS**2/(const.G*opz)
         M_NS = M_NS.to(u.kg)
         if debug:
             print ('Inferred mass = {:.4f} M_sun'.format(M_NS/const.M_sun))
-        Q_grav = const.G*M_NS/mburst.R_NS
+        Q_grav = const.G*M_NS/mburst.R_NS   #TODO This is Newtonian?
 
 # Calculate the rescaled model flux with the passed parameters
 

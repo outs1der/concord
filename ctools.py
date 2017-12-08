@@ -495,7 +495,7 @@ def save_contours(runs, batches, step, con_ver,
     path = kwargs.get('path', GRIDS_PATH)
 
     triplet_str = manipulation.triplet_string(batches=batches, source=source)
-    plot_dir = os.path.join(path, source, 'plots')
+    plot_dir = os.path.join(path, source, 'plots', 'contours')
     save_dir = os.path.join(plot_dir, triplet_str)
 
     manipulation.try_mkdir(save_dir, skip=True)
