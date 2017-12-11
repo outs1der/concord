@@ -259,7 +259,7 @@ def save_all_summaries(last_batch, con_ver, **kwargs):
 
 
 
-def save_summaries(batches, con_ver, step=2000, ignore=250, source='gs1826',
+def save_summaries(batches, con_ver=[], step=2000, ignore=250, source='gs1826',
                     param_names=['d', 'i', '1+z'], exclude=[], combine=True,
                     **kwargs):
     """========================================================
@@ -272,12 +272,21 @@ def save_summaries(batches, con_ver, step=2000, ignore=250, source='gs1826',
             - Assumes each batch contains models numbered from 1 to [n_runs]
     ========================================================"""
     #TODO: Add lhood breakdown to columns
+
+    # ===== self-iterate function if passed multiple con_vers =====
+    if (type(con_ver) == list) or (type(con_ver) == tuple):
+        print('Iterating over multiple con_vers')
+        for con in con_ver:
+            out = save_summaries(batches=batches, con_ver=con, step=step,
+                            ignore=ignore, source=source, exclude=exclude,
+                            param_names=param_names, combine=combine, **kwargs)
+            print(out)
+        return
+
     batches = manipulation.expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     obs = load_obs(source=source, **kwargs)
 
-    weights = con_versions.get_weights(con_ver)
-    disc_model = con_versions.get_disc_model(con_ver)
     n_runs = manipulation.get_nruns(batch=batches[0], source=source)
     n_obs = len(obs)
 
@@ -305,6 +314,9 @@ def save_summaries(batches, con_ver, step=2000, ignore=250, source='gs1826',
     unconstrained_flag = False
     chain_path = os.path.join(path, source, 'concord')
     print('Loading chains from: ', chain_path)
+
+    weights = con_versions.get_weights(con_ver)
+    disc_model = con_versions.get_disc_model(con_ver)
 
     for run in range(1, n_runs+1):
         if run in exclude:
@@ -337,11 +349,6 @@ def save_summaries(batches, con_ver, step=2000, ignore=250, source='gs1826',
             if summary[p][0] == None:       # an unconstrained param won't have bounds
                 unconstrained_flag = True
 
-        # ===== get likelihood value =====
-        # if unconstrained_flag:
-        #     lhood = np.nan
-        #     unconstrained_flag = False
-        # else:
         lhood = burstclass.lhoodClass(params=means, obs=obs, model=models,
                                     weights=weights, disc_model=disc_model)
 
