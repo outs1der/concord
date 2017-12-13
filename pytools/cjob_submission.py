@@ -90,7 +90,7 @@ def get_submission_str(job_str, run_str, source, batch_list,
 module load python/3.5.1-gcc
 
 N=$SLURM_ARRAY_TASK_ID
-cd /home/zacpetej/id43/python/concord/
+cd /home/zacpetej/id43/python/concord/pytools
 python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart""".format(job_str=job_str,
         run_str=run_str, source=source, batch_list=batch_list, threads=threads,
         qos=qos, time_str=time_str, con_ver=con_ver)
@@ -108,8 +108,8 @@ python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart""
 #PBS -M zac.johnston@monash.edu
 
 N=$PBS_ARRAYID
-source /mnt/home/f0003004/mypy/bin/activate
-cd /mnt/home/f0003004/codes/concord
+source /mnt/home/f0003004/mypy3.6/bin/activate
+cd /mnt/home/f0003004/codes/concord/pytools
 python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart
 qstat -f $PBS_JOBID     # Print out final statistics about resource uses before job exits""".format(job_str=job_str,
             run_str=run_str, source=source, batch_list=batch_list, threads=threads,
