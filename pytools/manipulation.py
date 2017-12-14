@@ -116,8 +116,9 @@ def get_nruns(batch, source='gs1826', **kwargs):
     Returns number of runs (models) in a given batch
     ========================================================"""
     path = kwargs.get('path', GRIDS_PATH)
-
-    batch_str = full_string(run=0, batches=[batch], step=0, con_ver=0)
+    print(f'get nruns: {source}')
+    batch_str = full_string(run=0, batches=[batch], step=0,
+                            source=source, con_ver=0)
     filename = 'params_{batch_str}.txt'.format(batch_str=batch_str)
     filepath = os.path.join(path, source, 'params', filename)
 

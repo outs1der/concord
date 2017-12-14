@@ -272,7 +272,6 @@ def save_summaries(batches, con_ver=[], step=2000, ignore=250, source='gs1826',
             - Assumes each batch contains models numbered from 1 to [n_runs]
     ========================================================"""
     #TODO: Add lhood breakdown to columns
-
     # ===== self-iterate function if passed multiple con_vers =====
     if (type(con_ver) == list) or (type(con_ver) == tuple):
         print('Iterating over multiple con_vers')
@@ -286,7 +285,6 @@ def save_summaries(batches, con_ver=[], step=2000, ignore=250, source='gs1826',
     batches = manipulation.expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
     obs = load_obs(source=source, **kwargs)
-
     n_runs = manipulation.get_nruns(batch=batches[0], source=source)
     n_obs = len(obs)
 
