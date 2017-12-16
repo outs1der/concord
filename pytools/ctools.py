@@ -51,7 +51,7 @@ FORMATTERS={'lhood':flt0,
             'i':flt4,
             '1+z':flt4}
 
-def load_obs(source='gs1826', **kwargs):
+def load_obs(source, **kwargs):
     """========================================================
     Loads observed burst data
     ========================================================
@@ -78,7 +78,7 @@ def load_obs(source='gs1826', **kwargs):
 
 
 
-def load_models(runs, batches, source='gs1826', basename='xrb',
+def load_models(runs, batches, source, basename='xrb',
                   params_prefix='params', summ_prefix='summ', **kwargs):
     """========================================================
     Loads a set of models (parameters and lightcurves)
@@ -196,7 +196,7 @@ def run_sampler(sampler, pos, nsteps, restart=False):
 
 
 def load_chain(run, batches, step, con_ver,
-                source='gs1826', **kwargs):
+                source, **kwargs):
     """========================================================
     Load chain file from completed emcee run
     ========================================================
@@ -220,7 +220,7 @@ def load_chain(run, batches, step, con_ver,
 
 
 
-def get_summary(run, batches, step, con_ver, ignore=250, source='gs1826',
+def get_summary(run, batches,  source, step, con_ver, ignore=250,
                 param_names=["d", "i", "1+z"], **kwargs):
     """========================================================
     Get summary stats (mean + std) from a given mcmc chain
@@ -245,7 +245,7 @@ def get_summary(run, batches, step, con_ver, ignore=250, source='gs1826',
 
 
 
-def save_all_summaries(last_batch, con_ver, **kwargs):
+def save_all_summaries(last_batch, con_ver, combine=True, **kwargs):
     """========================================================
     Saves all batch summaries (e.g. for a new con_ver)
     ========================================================"""
@@ -255,11 +255,11 @@ def save_all_summaries(last_batch, con_ver, **kwargs):
     for batch in batches:
         save_summaries(batch, con_ver, combine=False, **kwargs)
 
-    save_summaries(last_batch, con_ver, combine=True, **kwargs)
+    save_summaries(last_batch, con_ver, combine=combine, **kwargs)
 
 
 
-def save_summaries(batches, con_ver=[], step=2000, ignore=250, source='gs1826',
+def save_summaries(batches, source, con_ver=[], step=2000, ignore=250,
                     param_names=['d', 'i', '1+z'], exclude=[], combine=True,
                     **kwargs):
     """========================================================
@@ -384,8 +384,7 @@ def save_summaries(batches, con_ver=[], step=2000, ignore=250, source='gs1826',
 
 
 
-def plot_lightcurves(run, batches, con_ver, step=2000,
-                        source='gs1826', **kwargs):
+def plot_lightcurves(run, batches, source, con_ver, step=2000, **kwargs):
     """========================================================
     Plots lightcurves with best-fit params from an mcmc chain
     ========================================================
@@ -436,8 +435,8 @@ def plot_lightcurves(run, batches, con_ver, step=2000,
 
 
 
-def plot_contour(run, batches, step, con_ver, ignore=250,
-                    source='gs1826', show=True, **kwargs):
+def plot_contour(run, batches, source, step, con_ver, ignore=250,
+                    show=True, **kwargs):
     """========================================================
     Returns contour plot for a run from a given batch set
     ========================================================
@@ -483,8 +482,8 @@ def plot_contour(run, batches, step, con_ver, ignore=250,
 
 
 
-def save_contours(runs, batches, step, con_ver,
-                    ignore=250, source='gs1826', **kwargs):
+def save_contours(runs, batches, source, step, con_ver,
+                    ignore=250, **kwargs):
     """========================================================
     Save contour plots from multiple concord runs
     ========================================================
@@ -564,7 +563,7 @@ def animate_contours(run, step, dt=5, fps=30, ffmpeg=True, **kwargs):
 
 
 
-def combine_mcmc(last_batch, con_ver, source='gs1826', step=2000,
+def combine_mcmc(last_batch, con_ver, source, step=2000,
                     exclude=[], **kwargs):
     """========================================================
     Collects multiple mcmc output tables into a single table

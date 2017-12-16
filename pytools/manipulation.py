@@ -23,7 +23,7 @@ def construct_t_params(n):
 
 
 
-def full_string(run, batches, step, con_ver, source='gs1826'):
+def full_string(run, batches, step, con_ver, source):
     """========================================================
     constructs a standardised string for a batch model
     ========================================================
@@ -56,7 +56,7 @@ def full_string(run, batches, step, con_ver, source='gs1826'):
 
 
 
-def triplet_string(batches, source='gs1826'):
+def triplet_string(batches, source):
     """========================================================
     Returns triplet string, e.g.: gs1826_12-13-14
     ========================================================"""
@@ -111,7 +111,7 @@ def expand_runs(runs):
 
 
 
-def get_nruns(batch, source='gs1826', **kwargs):
+def get_nruns(batch, source, **kwargs):
     """========================================================
     Returns number of runs (models) in a given batch
     ========================================================"""

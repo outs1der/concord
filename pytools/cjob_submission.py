@@ -18,7 +18,7 @@ def write_all_submissions_scripts(last_batch, con_ver, **kwargs):
 
 
 
-def write_submission_script(batches, con_ver, n0=1, source='gs1826',
+def write_submission_script(batches, source, con_ver, n0=1,
                 qos = 'short', time=4, threads=8, **kwargs):
     """========================================================
     Writes batch script for job-submission on Monarch and ICER
@@ -30,7 +30,7 @@ def write_submission_script(batches, con_ver, n0=1, source='gs1826',
     threads   = int    : number of cores per run
     ========================================================"""
     batches = manipulation.expand_batches(batches, source)
-    nruns = manipulation.get_nruns(batches[0])
+    nruns = manipulation.get_nruns(batches[0], source=source)
     path = kwargs.get('path', GRIDS_PATH)
     log_path = os.path.join(path, source, 'logs')
 
@@ -82,12 +82,10 @@ def get_submission_str(job_str, run_str, source, batch_list,
 #SBATCH --mem-per-cpu=2000
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=zac.johnston@monash.edu
-
-######################
-# Begin work section #
 ######################
 
-module load python/3.5.1-gcc
+# module load python/3.5.1-gcc
+source $HOME/python/mypy-3.6.3/bin/activate
 
 N=$SLURM_ARRAY_TASK_ID
 cd /home/zacpetej/id43/python/concord/pytools
