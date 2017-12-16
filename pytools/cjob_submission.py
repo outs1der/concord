@@ -6,15 +6,19 @@ import manipulation
 GRIDS_PATH = os.environ['KEPLER_GRIDS']
 CONCORD_PATH = os.environ['CONCORD_PATH']
 
-def write_all_submissions_scripts(last_batch, con_ver, **kwargs):
+def write_all_submission_scripts(last_batch, con_ver, source, **kwargs):
     """========================================================
     Writes entire set of submission scripts for newly-defined con_ver
     ========================================================"""
-    batches = np.arange(12, last_batch+1, 3)
-    batches = np.concatenate([[4,7,9], batches])
+    if source == 'gs1826':
+        batches = np.arange(12, last_batch+1, 3)
+        batches = np.concatenate([[4,7,9], batches])
+    elif source == '4u1820':
+        batches = np.arange(2, last_batch+1, 2)
 
     for batch in batches:
-        write_submission_script(batches=batch, con_ver=con_ver, **kwargs)
+        write_submission_script(batches=batch, con_ver=con_ver,
+                                source=source, **kwargs)
 
 
 
