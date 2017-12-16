@@ -39,21 +39,20 @@ def write_submission_script(batches, source, con_ver, n0=1,
     log_path = os.path.join(path, source, 'logs')
 
     triplet_str = manipulation.triplet_string(batches=batches, source=source)
-    run_str = '{n0}-{n1}'.format(n0=n0, n1=nruns)
-    job_str = 'c{cv}_{src}{b1}'.format(cv=con_ver, src=source[:2], b1=batches[0])
-    time_str = '{hr:02}:00:00'.format(hr=time)
+    run_str = f'{n0}-{nruns}'
+    job_str = f'c{con_ver}_{source[:2]}{batches[0]}'
+    time_str = f'{time:02}:00:00'
     extensions = {'monarch':'.sh', 'icer':'.qsub'}
     batch_list = ''
 
     for b in batches:
-        batch_list += '{b} '.format(b=b)
+        batch_list += f'{b} '
 
 
     for cluster in ['monarch', 'icer']:
         print(f'Writing submission script: C{con_ver},  {cluster}')
         extension = extensions[cluster]
-        filename = '{cluster}_con{cv}_{triplet}_{runs}{ext}'.format(cluster=cluster,
-                        cv=con_ver, triplet=triplet_str, runs=run_str, ext=extension)
+        filename = f'{cluster}_con{con_ver}_{triplet_str}_{run_str}{extension}'
         filepath = os.path.join(log_path, filename)
 
         script_str = get_submission_str(job_str=job_str, run_str=run_str,
@@ -72,7 +71,7 @@ def get_submission_str(job_str, run_str, source, batch_list,
     cluster  =  str  : cluster type, one of [monarch, icer]
     ========================================================"""
     if cluster == 'monarch':
-        return """#!/bin/bash
+        return f"""#!/bin/bash
 #SBATCH --job-name={job_str}
 #SBATCH --output=arrayJob_%A_%a.out
 #SBATCH --error=arrayJob_%A_%a.err
@@ -93,12 +92,10 @@ source $HOME/python/mypy-3.6.3/bin/activate
 
 N=$SLURM_ARRAY_TASK_ID
 cd /home/zacpetej/id43/python/concord/pytools
-python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart""".format(job_str=job_str,
-        run_str=run_str, source=source, batch_list=batch_list, threads=threads,
-        qos=qos, time_str=time_str, con_ver=con_ver)
+python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart"""
 
     elif cluster == 'icer':
-        return """#!/bin/bash --login
+        return f"""#!/bin/bash --login
 #PBS -N {job_str}
 #PBS -t {run_str}
 #PBS -l nodes=1:ppn={threads}
@@ -113,9 +110,7 @@ N=$PBS_ARRAYID
 source /mnt/home/f0003004/mypy3.6/bin/activate
 cd /mnt/home/f0003004/codes/concord/pytools
 python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart
-qstat -f $PBS_JOBID     # Print out final statistics about resource uses before job exits""".format(job_str=job_str,
-            run_str=run_str, source=source, batch_list=batch_list, threads=threads,
-            time_str=time_str, con_ver=con_ver)
+qstat -f $PBS_JOBID     # Print out final statistics about resource uses before job exits"""
 
     else:
         print('ERROR: Not a valid cluster type. Must be one of [monarch, icer]')

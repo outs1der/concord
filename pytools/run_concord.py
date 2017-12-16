@@ -31,9 +31,8 @@ con_ver = int(sys.argv[6])
 threads = int(sys.argv[7])
 restart = sys.argv[8]
 
-print("""Loading observed and model data:
-        Run {r} from batches [{b1}, {b2}, {b3}]""".format(r=run, b1=batches[0],
-                                                b2=batches[1], b3=batches[2]))
+print(f"""Loading observed and model data:
+        Run {run} from batches [{batches[0]}, {batches[1]}, {batches[2]}]""")
 
 obs = ctools.load_obs(source)
 models = ctools.load_models(runs=[run,run,run], batches=batches)
@@ -46,15 +45,14 @@ pos = ctools.setup_positions(obs)
 sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200,
                     threads=threads, weights=weights, disc_model=disc_model)
 
-batch_str = '{src}_{b1}-{b2}-{b3}_R{r}'.format(src=source, b1=batches[0],
-                                        b2=batches[1], b3=batches[2], r=run)
+batch_str = f'{source}_{batches[0]}-{batches[1]}-{batches[2]}_R{run}'
 chain_path = os.path.join(GRIDS_PATH, source, 'concord')
 
 # TODO: restarting needs testing/debugging
 if restart == 'restart':
     load_step = sys.argv[7]
-    chain_str0 = 'chain_{batch}'.format(batch=batch_str)
-    pname = '{chain}_S{step}.npy'.format(chain=chain_str, step=load_step)
+    chain_str0 = f'chain_{batch_str}'
+    pname = f'{chain_str}_S{load_step}.npy'
     pfile = os.path.join(chain_path, pname)
     pos = np.load(pfile)[:,-1,:]
     restart = True
@@ -70,16 +68,16 @@ iters = round(net_steps/nsteps)
 n0 = round(start/nsteps)
 
 for i in range(n0, n0+iters):
-    step = i*nsteps
-    print('Doing steps: {0} - {1}'.format(step, (i+1)*nsteps))
+    step0 = i * nsteps
+    step1 = (i+1) * nsteps
+    print(f'Doing steps: {step0} - {step1}')
 
     pos, lnprob, rstate = ctools.run_sampler(sampler, pos=pos, nsteps=nsteps,
                                                 restart=restart)
     restart = False
 
     # === save chain state ===
-    step_str = '{batch}_S{step}_C{cv:02}'.format(batch=batch_str,
-                                                step=step+nsteps, cv=con_ver)
+    step_str = f'{batch_str}_S{step1}_C{con_ver:02}'
 
     chain_filepath = os.path.join(chain_path, 'chain_' + step_str)
     np.save(chain_filepath, sampler.chain)

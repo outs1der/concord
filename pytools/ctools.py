@@ -101,10 +101,10 @@ def load_models(runs, batches, source, basename='xrb',
     for i, run in enumerate(runs):
         batch = batches[i]
 
-        batch_str = '{source}_{batch}'.format(source=source, batch=batch)
-        mean_str = '{batch_str}_{base}{run}_mean.data'.format(batch_str=batch_str, base=basename, run=run)
-        param_str = '{prefix}_{batch_str}.txt'.format(prefix=params_prefix, batch_str=batch_str)
-        summ_str = '{prefix}_{batch_str}.txt'.format(prefix=summ_prefix, batch_str=batch_str)
+        batch_str = f'{source}_{batch}'
+        mean_str = f'{batch_str}_{base}{run}_mean.data'
+        param_str = f'{params_prefix}_{batch_str}.txt'
+        summ_str = f'{summ_prefix}_{batch_str}.txt'
 
         source_path = os.path.join(path, source)
         param_file = os.path.join(source_path, 'params', param_str)
@@ -210,7 +210,7 @@ def load_chain(run, batches, step, con_ver,
     chain_path = os.path.join(path, source, 'concord')
 
     full_str = manipulation.full_string(run=run, batches=batches, step=step, source=source, con_ver=con_ver)
-    chain_str = 'chain_{full}.npy'.format(full=full_str)
+    chain_str = f'chain_{full_str}.npy'
     chain_file = os.path.join(chain_path, chain_str)
 
     print(chain_str)
@@ -368,7 +368,8 @@ def save_summaries(batches, source, con_ver=[], step=2000, ignore=250,
     out_table = out_table[col_order]    # fix column order
 
     # batch_str = manipulation.full_string(run=run, batches=batches, step=step, source=source)
-    batch_str = '{src}_{b}_S{s}_C{c:02}'.format(src=source, b=manipulation.daisychain(batches), s=step, c=con_ver)
+    batch_str = manipulation.daisychain(batches)
+    batch_str = f'{source}_{batch_str}_S{step}_C{con_ver:02}'
     file_str = 'mcmc_' + batch_str + '.txt'
     file_path = os.path.join(path, source, 'mcmc', file_str)
 
@@ -461,8 +462,8 @@ def plot_contour(run, batches, source, step, con_ver, ignore=250,
 
     full_str = manipulation.full_string(run=run, batches=batches, source=source, step=step, con_ver=con_ver)
 
-    chain_str = 'chain_{full_str}.npy'.format(full_str=full_str)
-    save_str = 'contour_{full_str}.png'.format(full_str=full_str)
+    chain_str = f'chain_{full_str}.npy'
+    save_str = f'contour_{full_str}.png'
 
     chain_file = os.path.join(chain_dir, chain_str)
     save_file = os.path.join(save_dir, save_str)
@@ -513,7 +514,7 @@ def save_contours(runs, batches, source, step, con_ver,
         fig = plot_contour(run=run, batches=batches, step=step, con_ver=con_ver, ignore=ignore, source=source, **kwargs)
 
         full_str = manipulation.full_string(run=run, batches=batches, source=source, step=step, con_ver=con_ver)
-        save_str = 'contour_{full_str}.png'.format(full_str=full_str)
+        save_str = f'contour_{full_str}.png'
         save_file = os.path.join(save_dir, save_str)
 
         fig.savefig(save_file)
@@ -529,8 +530,8 @@ def animate_contours(run, step, dt=5, fps=30, ffmpeg=True, **kwargs):
     path = kwargs.get('path', CONCORD_PATH)
 
     parameters=[r"$d$",r"$i$",r"$1+z$"]
-    chain_str = 'chain_{r}'.format(r=run)
-    chain_file = os.path.join(path, 'temp', '{chain}_{step}.npy'.format(chain=chain_str, step=step))
+    chain_str = f'chain_{run}'
+    chain_file = os.path.join(path, 'temp', f'{chain_str}_{step}.npy')
     chain = np.load(chain_file)
     nwalkers, nsteps, ndim = np.shape(chain)
 
@@ -548,7 +549,7 @@ def animate_contours(run, step, dt=5, fps=30, ffmpeg=True, **kwargs):
         fig.set_size_inches(6,6)
         cnt = round(i/dt)
 
-        filename = '{chain}_{n:04d}.png'.format(chain=chain_str, n=cnt)
+        filename = f'{chain_str}_{cnt:04d}.png'
         filepath = os.path.join(ftarget, filename)
         fig.savefig(filepath)
 
@@ -557,8 +558,8 @@ def animate_contours(run, step, dt=5, fps=30, ffmpeg=True, **kwargs):
 
     if ffmpeg:
         print('Creating movie')
-        framefile = os.path.join(ftarget, '{chain}_%04d.png'.format(chain=chain_str))
-        savefile = os.path.join(mtarget, '{chain}.mp4'.format(chain=chain_str))
+        framefile = os.path.join(ftarget, f'{chain_str}_%04d.png')
+        savefile = os.path.join(mtarget, f'{chain_str}.mp4')
         subprocess.run(['ffmpeg', '-r', str(fps), '-i', framefile, savefile])
 
 
@@ -572,8 +573,8 @@ def combine_mcmc(last_batch, con_ver, source, step=2000,
     exclude       = [int] : skip these triplets
     ========================================================"""
     print('Combining mcmc tables')
-    print('last batch: {last_batch}'.format(last_batch=last_batch))
-    print('con_ver {:02}'.format(con_ver))
+    print(f'last batch: {last_batch}')
+    print(f'con_ver {con_ver:02}')
     path = kwargs.get('path', os.path.join(GRIDS_PATH))
     mcmc_path = os.path.join(path, source, 'mcmc')
 
@@ -595,7 +596,7 @@ def combine_mcmc(last_batch, con_ver, source, step=2000,
         full_str = manipulation.full_string(run=0, batches=batches, source=source,
                                 step=step, con_ver=con_ver)
 
-        filename = 'mcmc_{full}.txt'.format(full=full_str)
+        filename = f'mcmc_{full_str}.txt'
         filepath = os.path.join(mcmc_path, filename)
 
         mcmc_in = pd.read_table(filepath, delim_whitespace=True)
@@ -609,7 +610,7 @@ def combine_mcmc(last_batch, con_ver, source, step=2000,
 
     mcmc_str = mcmc_out.to_string(index=False, justify='left', formatters=FORMATTERS, col_space=8)
 
-    filename = 'mcmc_{source}_C{con:02}.txt'.format(source=source, con=con_ver)
+    filename = f'mcmc_{source}_C{con_ver:02}.txt'
     filepath = os.path.join(mcmc_path, filename)
 
     with open(filepath, 'w') as f:
