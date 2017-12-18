@@ -10,10 +10,11 @@ import astropy.constants as const
 from math import sqrt
 from chainconsumer import ChainConsumer
 
-# Custom
+# Concord
 import burstclass
 import manipulation
 import con_versions
+import define_sources
 #============================================
 # Tools for using X-ray burst matcher Concord
 # Author: Zac Johnston (2017)
@@ -62,11 +63,8 @@ def load_obs(source, **kwargs):
     obs_path = os.path.join(path, 'obs_data')
     source_path = os.path.join(obs_path, source)
 
-    obs_files = {'gs1826':['gs1826-24_3.530h.dat',
-                            'gs1826-24_4.177h.dat',
-                            'gs1826-24_5.14h.dat'],
-                '4u1820': ['4u1820-303_1.892h.dat',
-                            '4u1820-303_2.681h.dat']}
+    source_object = define_sources.Source(source=source)
+    obs_files =source_object.obs_files[source]
 
     for ob_file in obs_files[source]:
         b = burstclass.ObservedBurst(ob_file, path=source_path)
