@@ -34,32 +34,33 @@ restart = sys.argv[8]
 print(f"""Loading observed and model data:
         Run {run} from batches [{batches[0]}, {batches[1]}, {batches[2]}]""")
 
-obs = ctools.load_obs(source)
-models = ctools.load_models(runs=[run,run,run], batches=batches)
+obs = ctools.load_obs(source=source)
+models = ctools.load_models(runs=[run,run,run], batches=batches, source=source)
 
 # === Con_ver parameters ===
 weights = con_versions.get_weights(con_ver)
 disc_model = con_versions.get_disc_model(con_ver)
 
-pos = ctools.setup_positions(obs)
-sampler = ctools.setup_sampler(obs=obs, models=models, nwalkers=200,
-                    threads=threads, weights=weights, disc_model=disc_model)
+pos = ctools.setup_positions(source=source)
+sampler = ctools.setup_sampler(obs=obs, source=source, models=models,
+                    nwalkers=200, threads=threads, weights=weights,
+                    disc_model=disc_model)
 
 batch_str = f'{source}_{batches[0]}-{batches[1]}-{batches[2]}_R{run}'
 chain_path = os.path.join(GRIDS_PATH, source, 'concord')
 
 # TODO: restarting needs testing/debugging
-if restart == 'restart':
-    load_step = sys.argv[7]
-    chain_str0 = f'chain_{batch_str}'
-    pname = f'{chain_str}_S{load_step}.npy'
-    pfile = os.path.join(chain_path, pname)
-    pos = np.load(pfile)[:,-1,:]
-    restart = True
-    start = int(sys.argv[8])
-else:
-    restart = False
-    start=0
+# if restart == 'restart':
+#     load_step = sys.argv[7]
+#     chain_str0 = f'chain_{batch_str}'
+#     pname = f'{chain_str}_S{load_step}.npy'
+#     pfile = os.path.join(chain_path, pname)
+#     pos = np.load(pfile)[:,-1,:]
+#     restart = True
+#     start = int(sys.argv[8])
+# else:
+restart = False
+start=0
 
 total_steps = 2000
 net_steps = total_steps - start
