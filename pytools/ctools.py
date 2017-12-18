@@ -63,8 +63,7 @@ def load_obs(source, **kwargs):
     obs_path = os.path.join(path, 'obs_data')
     source_path = os.path.join(obs_path, source)
 
-    source_object = define_sources.Source(source=source)
-    obs_files =source_object.obs_files[source]
+    obs_files = define_sources.get_obs_files(source=source)
 
     for ob_file in obs_files[source]:
         b = burstclass.ObservedBurst(ob_file, path=source_path)
@@ -91,6 +90,7 @@ def load_models(runs, batches, source, basename='xrb',
     batches = manipulation.expand_batches(batches=batches, source=source)
     models = []
     path = kwargs.get('path', GRIDS_PATH)
+    
     if len(runs) == 1:
         nb = len(batches)
         runs = np.full(nb, runs[0])
@@ -137,13 +137,26 @@ def load_models(runs, batches, source, basename='xrb',
 
 
 
-def setup_positions(obs, nwalkers = 200, params0 = [6.09, 60., 1.28],
-                    tshift = -6.5, mag = 1e-3):
+def setup_positions(source, nwalkers=200, params=None, n_epochs=None,
+                    tshift=-6.5, mag=1e-3):
     """========================================================
     Sets up and returns posititons of walkers
+    ========================================================
+    (Can just call with 'source' to use default values)
+
+    nwalkers = int  : number of mcmc walkers to use
+    params   = []   : initial params guess [distance(kpc), inclination (deg),
+                                                redshift (1+z)]
+    tshift   = flt  : initial guess of tshift (for time-shifting lightcurves)
+    mag      = flt  : Magnitude of random seeds to use for initial mcmc 'ball'
     ========================================================"""
-    params = list(params0)   # prevent persistence between calls
-    for i in range(len(obs)):
+    # ===== if not given, pull default values for source =====
+    if params == None:
+        params = define_sources.get_pos(source=source)
+    if n_epochs == None:
+        n_epochs = define_sources.get_n_epochs(source=source)
+
+    for i in range(n_epochs):
         params.append(tshift)
 
     ndim = len(params)
@@ -153,15 +166,15 @@ def setup_positions(obs, nwalkers = 200, params0 = [6.09, 60., 1.28],
 
 
 
-def setup_sampler(obs, models, pos=None, threads=4,
+def setup_sampler(obs, models, source, pos=None, threads=4,
                     weights={'fluxwt':1., 'tdelwt':100.},
                     disc_model='he16_a', **kwargs):
     """========================================================
     Initialises and returns EnsembleSampler object
     NOTE: Only uses pos to get nwalkers and ndimensions
     ========================================================"""
-    if type(pos) == type(None):
-        pos = setup_positions(obs=obs, **kwargs)
+    if pos == None:
+        pos = setup_positions(source=source, **kwargs)
 
     nwalkers = len(pos)
     ndim = len(pos[0])
