@@ -1,10 +1,16 @@
 import numpy as np
 import pandas as pd
 import sys, os
+#========================================================
+# Defined here are the default setup parameters for a given source being matched
+#========================================================
+# You can create object Source(source), which holds all values,
+#   or just call functions individually, e.g. get_mdots(source)
+#========================================================
 
 class Source(object):
     """========================================================
-    Class that holds the setup parameters for a given source object
+    Class that holds all setup parameters for a given source object
     ========================================================"""
     def __init__(self, source):
         self.source = source
@@ -18,7 +24,6 @@ def check_source(source):
     """========================================================
     Check if source is defined
     ========================================================"""
-    check_source(source=source)
     defined_sources = ['gs1826', '4u1820']
     if source not in defined_sources:
         print(f'ERROR: source ({source}) not in {defined_sources}')
