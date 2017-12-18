@@ -65,7 +65,7 @@ def load_obs(source, **kwargs):
 
     obs_files = define_sources.get_obs_files(source=source)
 
-    for ob_file in obs_files[source]:
+    for ob_file in obs_files:
         b = burstclass.ObservedBurst(ob_file, path=source_path)
         obs.append(b)
 
@@ -90,7 +90,7 @@ def load_models(runs, batches, source, basename='xrb',
     batches = manipulation.expand_batches(batches=batches, source=source)
     models = []
     path = kwargs.get('path', GRIDS_PATH)
-    
+
     if len(runs) == 1:
         nb = len(batches)
         runs = np.full(nb, runs[0])
