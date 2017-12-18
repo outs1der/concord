@@ -89,11 +89,10 @@ def load_models(runs, batches, source, basename='xrb',
     #----------------------------------
     # TODO: - account for different Eddington composition
     #----------------------------------
-    runs = manipulation.expand_runs(runs)
-    batches = manipulation.expand_batches(batches, source)
+    runs = manipulation.expand_runs(runs=runs)
+    batches = manipulation.expand_batches(batches=batches, source=source)
     models = []
     path = kwargs.get('path', GRIDS_PATH)
-
     if len(runs) == 1:
         nb = len(batches)
         runs = np.full(nb, runs[0])
@@ -102,7 +101,7 @@ def load_models(runs, batches, source, basename='xrb',
         batch = batches[i]
 
         batch_str = f'{source}_{batch}'
-        mean_str = f'{batch_str}_{base}{run}_mean.data'
+        mean_str = f'{batch_str}_{basename}{run}_mean.data'
         param_str = f'{params_prefix}_{batch_str}.txt'
         summ_str = f'{summ_prefix}_{batch_str}.txt'
 
@@ -117,7 +116,7 @@ def load_models(runs, batches, source, basename='xrb',
         # NOTE: Assumes that models in ptable exactly match those in mtable
 
         # ====== Extract model parameters/properties ======
-        xi = 1.12             # currently constant, could change in future
+        xi = 1.16             # currently constant, could change in future
         R_NS = 11.6 * u.km    # add this as colum to parameter file (or g)?
         M_NS = ptable['mass'][idx] * const.M_sun
         X = ptable['x'][idx]
@@ -245,7 +244,7 @@ def get_summary(run, batches,  source, step, con_ver, ignore=250,
 
 
 
-def save_all_summaries(last_batch, con_ver, combine=True, **kwargs):
+def save_all_summaries(last_batch, con_ver, source, combine=True, **kwargs):
     """========================================================
     Saves all batch summaries (e.g. for a new con_ver)
     ========================================================"""
@@ -253,9 +252,10 @@ def save_all_summaries(last_batch, con_ver, combine=True, **kwargs):
     batches = np.concatenate([[4,7,9], batches])
 
     for batch in batches:
-        save_summaries(batch, con_ver, combine=False, **kwargs)
+        save_summaries(batch, con_ver, combine=False, source=source **kwargs)
 
-    save_summaries(last_batch, con_ver, combine=combine, **kwargs)
+    save_summaries(last_batch, con_ver, combine=combine,
+                        source=source, **kwargs)
 
 
 
@@ -379,7 +379,8 @@ def save_summaries(batches, source, con_ver=[], step=2000, ignore=250,
         f.write(table_str)
 
     if combine:
-        combine_mcmc(last_batch = batches[-1], con_ver=con_ver, step=step)
+        combine_mcmc(last_batch = batches[-1], source=source,
+                        con_ver=con_ver, step=step, exclude=exclude)
 
     return out_table
 
