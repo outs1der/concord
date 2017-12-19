@@ -712,20 +712,24 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 # to compare
 
     n = len(obs)
-    assert (n == 3)
+    # assert (n == 3)
+    #
+    # b1, b2, b3 = obs
+    # m1, m2, m3 = models
 
-    b1, b2, b3 = obs
-    m1, m2, m3 = models
+    b1, b2 = obs
+    m1, m2 = models
 
 # Can't use the gridspec anymore, as this is used for the individual plots
 
 #    fig = plt.figure()
 #    gs = gridspec.GridSpec(3,2)
-
+    #TODO make this iteratable and generalised to different numbers of epoch
 # plot the model comparisons. Should really do a loop here, but not sure
 # exactly how
 
     _param_best = param_best[0:4]
+
     b1.compare(m1,_param_best,plot=True,subplot=False)
 #    fig.set_size_inches(8,3)
 
@@ -733,9 +737,9 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
     _param_best.append(param_best[4])
     b2.compare(m2,_param_best,plot=True,subplot=False)
 
-    _param_best = param_best[0:3]
-    _param_best.append(param_best[5])
-    b3.compare(m3,_param_best,plot=True,subplot=False)
+    # _param_best = param_best[0:3]
+    # _param_best.append(param_best[5])
+    # b3.compare(m3,_param_best,plot=True,subplot=False)
 
 # Now assemlbe the tdel values for plotting. This is a bit clumsy
 

@@ -23,7 +23,7 @@ def construct_t_params(n):
 
 
 
-def full_string(run, batches, step, con_ver, source):
+def full_string(batches, source, run=None, step=None, con_ver=None):
     """========================================================
     constructs a standardised string for a batch model
     ========================================================
@@ -34,17 +34,17 @@ def full_string(run, batches, step, con_ver, source):
     batches = expand_batches(batches, source)
     batch_str = daisychain(batches)
 
-    if run == 0:
+    if run == None:
         run_str = ''
     else:
         run_str = f'_R{run}'
 
-    if step == 0:
+    if step == None:
         step_str = ''
     else:
         step_str = f'_S{step}'
 
-    if con_ver == 0:
+    if con_ver == None:
         con_str = ''
     else:
         con_str = f'_C{con_ver:02}'
