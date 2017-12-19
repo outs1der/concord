@@ -43,11 +43,6 @@ def write_submission_script(batches, source, con_ver, n0=1,
     job_str = f'c{con_ver}_{source[:2]}{batches[0]}'
     time_str = f'{time:02}:00:00'
     extensions = {'monarch':'.sh', 'icer':'.qsub'}
-    batch_list = ''
-
-    for b in batches:
-        batch_list += f'{b} '
-
 
     for cluster in ['monarch', 'icer']:
         print(f'Writing submission script: C{con_ver},  {cluster}')
@@ -56,14 +51,14 @@ def write_submission_script(batches, source, con_ver, n0=1,
         filepath = os.path.join(log_path, filename)
 
         script_str = get_submission_str(job_str=job_str, run_str=run_str,
-                source=source,  batch_list=batch_list, threads=threads,
+                source=source,  batch0=batches[0], threads=threads,
                 qos=qos, time_str=time_str, con_ver=con_ver, cluster=cluster)
 
         with open(filepath, 'w') as f:
             f.write(script_str)
 
 
-def get_submission_str(job_str, run_str, source, batch_list,
+def get_submission_str(job_str, run_str, source, batch0,
                     threads, qos, time_str, con_ver, cluster):
     """========================================================
     Returns string of submission script for given cluster
@@ -92,7 +87,7 @@ source $HOME/python/mypy-3.6.3/bin/activate
 
 N=$SLURM_ARRAY_TASK_ID
 cd /home/zacpetej/id43/python/concord/pytools
-python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart"""
+python3 run_concord.py {source} {batch0} $N {con_ver} {threads} no_restart"""
 
     elif cluster == 'icer':
         return f"""#!/bin/bash --login
@@ -109,7 +104,7 @@ python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart""
 N=$PBS_ARRAYID
 source /mnt/home/f0003004/mypy3.6/bin/activate
 cd /mnt/home/f0003004/codes/concord/pytools
-python3 run_concord.py {source} {batch_list} $N {con_ver} {threads} no_restart
+python3 run_concord.py {source} {batch0} $N {con_ver} {threads} no_restart
 qstat -f $PBS_JOBID     # Print out final statistics about resource uses before job exits"""
 
     else:
