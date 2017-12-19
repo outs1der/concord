@@ -115,8 +115,7 @@ def get_nruns(batch, source, **kwargs):
     ========================================================"""
     path = kwargs.get('path', GRIDS_PATH)
     print(f'get nruns: {source}')
-    batch_str = full_string(run=0, batches=[batch], step=0,
-                            source=source, con_ver=0)
+    batch_str = full_string(batches=[batch], source=source)
     filename = f'params_{batch_str}.txt'
     filepath = os.path.join(path, source, 'params', filename)
 

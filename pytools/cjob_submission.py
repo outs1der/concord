@@ -23,7 +23,7 @@ def write_all_submission_scripts(last_batch, con_ver, source, **kwargs):
 
 
 def write_submission_script(batches, source, con_ver, n0=1,
-                qos = 'short', time=4, threads=8, **kwargs):
+                qos='short', time=4, threads=8, **kwargs):
     """========================================================
     Writes batch script for job-submission on Monarch and ICER
     ========================================================
