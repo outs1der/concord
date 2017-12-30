@@ -26,5 +26,5 @@ def get_lhood_ylims(con_ver):
     Returns lhood ylims for plotting
     ========================================================"""
     ylims = {2:[-5e4, 3e4], 3:[-2e4, 1.5e4], 4:[-5e4, 3e4],
-             5:[0.0, 3e4], 6:[-1.5e4, 3e4]}
+             5:[0.0, 3e4], 6:[-3e4, 3e4]}
     return ylims[con_ver]

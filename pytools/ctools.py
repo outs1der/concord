@@ -390,7 +390,7 @@ def save_summaries(batches, source, con_ver=[], step=2000, ignore=250,
         f.write(table_str)
 
     if combine:
-        combine_mcmc(last_batch = batches[-1], source=source,
+        combine_mcmc(last_batch=batches[-1], source=source,
                         con_ver=con_ver, step=step, exclude=exclude)
 
     return out_table
@@ -422,7 +422,7 @@ def plot_lightcurves(run, batches, source, con_ver, step=2000, **kwargs):
     pnames_all = pnames_base + pnames_time
 
     # ===== read in mcmc table =====
-    batch_str = manipulation.full_string(run=0, batches=batches, source=source, step=step, con_ver=con_ver)
+    batch_str = manipulation.full_string(batches=batches, source=source, step=step, con_ver=con_ver)
     mcmc_filename = 'mcmc_' + batch_str + '.txt'
     mcmc_filepath = os.path.join(source_path, 'mcmc', mcmc_filename)
     mcmc_table = pd.read_table(mcmc_filepath, delim_whitespace=True)
@@ -462,7 +462,7 @@ def plot_contour(run, batches, source, step, con_ver, ignore=250,
     ========================================================"""
     batches = manipulation.expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
-    ndim = 6
+    ndim = 5
     parameters=[r"$d$",r"$i$",r"$1+z$"]
     c = ChainConsumer()
 
@@ -591,31 +591,32 @@ def combine_mcmc(last_batch, con_ver, source, step=2000,
     mcmc_path = os.path.join(path, source, 'mcmc')
 
     # ===== account for special cases =====
-    first_triplets = np.array([4, 7, 9])    # first few irregular
-    remaining_triplets = np.arange(12, last_batch+1, 3)
-    triplets = np.concatenate([first_triplets, remaining_triplets])
+    if source=='gs1826':
+        first_triplets = np.array([4, 7, 9])    # first few irregular
+        remaining_triplets = np.arange(12, last_batch+1, 3)
+        all_batches = np.concatenate([first_triplets, remaining_triplets])
+    elif source=='4u1820':
+        first_batch=2
+        n_batch = 2
+        all_batches = range(first_batch, last_batch, n_batch)
 
     mcmc_out = pd.DataFrame()
 
-    for triplet in triplets:
-        if triplet in exclude:
+    for batch in all_batches:
+        if batch in exclude:
             continue
 
-        if triplet in [4,7]:
-            batches = np.arange(triplet, triplet-3, -1)
-        else:
-            batches = triplet
-        full_str = manipulation.full_string(run=0, batches=batches, source=source,
+        batches = manipulation.expand_batches(batches=batch, source=source)
+        full_str = manipulation.full_string(batches=batches, source=source,
                                 step=step, con_ver=con_ver)
 
         filename = f'mcmc_{full_str}.txt'
         filepath = os.path.join(mcmc_path, filename)
-
         mcmc_in = pd.read_table(filepath, delim_whitespace=True)
+
         cols = list(mcmc_in.columns.values)
         cols = ['triplet'] + cols
-
-        mcmc_in['triplet'] = triplet
+        mcmc_in['triplet'] = batches[0]
         mcmc_in = mcmc_in[cols]
 
         mcmc_out = pd.concat([mcmc_out, mcmc_in])
