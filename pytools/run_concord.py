@@ -53,7 +53,7 @@ sampler = ctools.setup_sampler(obs=obs, source=source, models=models,
                     disc_model=disc_model)
 
 # batch_str = f'{source}_{batches[0]}-{batches[1]}-{batches[2]}_R{run}'
-chain_path = os.path.join(GRIDS_PATH, source, 'concord')
+chain_path = os.path.join(GRIDS_PATH, 'sources', source, 'concord')
 
 # TODO: restarting needs testing/debugging
 # if restart == 'restart':

@@ -117,7 +117,7 @@ def get_nruns(batch, source, **kwargs):
     print(f'get nruns: {source}')
     batch_str = full_string(batches=[batch], source=source)
     filename = f'params_{batch_str}.txt'
-    filepath = os.path.join(path, source, 'params', filename)
+    filepath = os.path.join(path, 'sources', source, 'params', filename)
 
     params = pd.read_table(filepath, delim_whitespace=True)
 

@@ -86,7 +86,7 @@ def load_models(runs, batches, source, basename='xrb',
     #----------------------------------
     # TODO: - account for different Eddington composition
     #----------------------------------
-    runs = manipulation.expand_runs(runs=runs)
+    # runs = manipulation.expand_runs(runs=runs)
     batches = manipulation.expand_batches(batches=batches, source=source)
     models = []
     path = kwargs.get('path', GRIDS_PATH)
@@ -103,7 +103,7 @@ def load_models(runs, batches, source, basename='xrb',
         param_str = f'{params_prefix}_{batch_str}.txt'
         summ_str = f'{summ_prefix}_{batch_str}.txt'
 
-        source_path = os.path.join(path, source)
+        source_path = os.path.join(path, 'sources', source)
         param_file = os.path.join(source_path, 'params', param_str)
         summ_file = os.path.join(source_path, 'summ', summ_str)
         mean_path = os.path.join(source_path, 'mean_lightcurves', batch_str)
@@ -217,7 +217,7 @@ def load_chain(run, batches, step, con_ver,
     ========================================================"""
     batches = manipulation.expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
-    chain_path = os.path.join(path, source, 'concord')
+    chain_path = os.path.join(path, 'sources', source, 'concord')
 
     full_str = manipulation.full_string(run=run, batches=batches, step=step, source=source, con_ver=con_ver)
     chain_str = f'chain_{full_str}.npy'
@@ -269,8 +269,15 @@ def save_all_summaries(last_batch, con_ver, source, combine=True, **kwargs):
                         source=source, **kwargs)
 
 
+def save_summaries(batch_first, batch_last, source, **kwargs):
+    """========================================================
+    Iterate over save_summary() for multiple sets of batches
+    ========================================================"""
+    for batch in range(batch_first, batch_last+1, 3):
+        save_summary(batches=batch, source=source, **kwargs)
 
-def save_summaries(batches, source, con_ver=[], step=2000, ignore=250,
+
+def save_summary(batches, source, con_ver=[], step=2000, ignore=250,
                     param_names=['d', 'i', '1+z'], exclude=[], combine=True,
                     **kwargs):
     """========================================================
@@ -321,7 +328,7 @@ def save_summaries(batches, source, con_ver=[], step=2000, ignore=250,
 
     # ===== get summaries from each set =====
     unconstrained_flag = False
-    chain_path = os.path.join(path, source, 'concord')
+    chain_path = os.path.join(path, 'sources', source, 'concord')
     print('Loading chains from: ', chain_path)
 
     weights = con_versions.get_weights(con_ver)
@@ -382,7 +389,7 @@ def save_summaries(batches, source, con_ver=[], step=2000, ignore=250,
     batch_str = manipulation.daisychain(batches)
     batch_str = f'{source}_{batch_str}_S{step}_C{con_ver:02}'
     file_str = 'mcmc_' + batch_str + '.txt'
-    file_path = os.path.join(path, source, 'mcmc', file_str)
+    file_path = os.path.join(path, 'sources', source, 'mcmc', file_str)
 
     table_str = out_table.to_string(index=False, justify='left', col_space=8, formatters=FORMATTERS)
 
@@ -408,7 +415,7 @@ def plot_lightcurves(run, batches, source, con_ver, step=2000, **kwargs):
     ========================================================"""
     batches = manipulation.expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
-    source_path = os.path.join(path, source)
+    source_path = os.path.join(path, 'sources', source)
     weights = con_versions.get_weights(con_ver)
 
     # ===== create obs and models objects =====
@@ -462,14 +469,16 @@ def plot_contour(run, batches, source, step, con_ver, ignore=250,
     ========================================================"""
     batches = manipulation.expand_batches(batches, source)
     path = kwargs.get('path', GRIDS_PATH)
-    ndim = 5
+    ndim = 6
     parameters=[r"$d$",r"$i$",r"$1+z$"]
+    # parameters=["d","i","1+z", 't1', 't2', 't3']
+
     c = ChainConsumer()
 
     triplet_str = manipulation.triplet_string(batches=batches, source=source)
-
-    chain_dir = os.path.join(path, source, 'concord')
-    plot_dir = os.path.join(path, source, 'plots')
+    source_path = os.path.join(path, 'sources', source)
+    chain_dir = os.path.join(source_path, 'concord')
+    plot_dir = os.path.join(source_path, 'plots')
     save_dir = os.path.join(plot_dir, triplet_str)
 
     full_str = manipulation.full_string(run=run, batches=batches, source=source, step=step, con_ver=con_ver)
@@ -482,8 +491,8 @@ def plot_contour(run, batches, source, step, con_ver, ignore=250,
 
     chain = np.load(chain_file)[:, ignore:, :]
     chain = chain.reshape((-1, ndim))
-
     c.add_chain(chain, parameters=parameters)
+    # return chain
 
     fig = c.plotter.plot()
     fig.set_size_inches(7,7)
@@ -512,7 +521,7 @@ def save_contours(runs, batches, source, step, con_ver,
     path = kwargs.get('path', GRIDS_PATH)
 
     triplet_str = manipulation.triplet_string(batches=batches, source=source)
-    plot_dir = os.path.join(path, source, 'plots', 'contours')
+    plot_dir = os.path.join(path, 'sources', source, 'plots', 'contours')
     save_dir = os.path.join(plot_dir, triplet_str)
 
     manipulation.try_mkdir(save_dir, skip=True)
@@ -588,7 +597,7 @@ def combine_mcmc(last_batch, con_ver, source, step=2000,
     print(f'last batch: {last_batch}')
     print(f'con_ver {con_ver:02}')
     path = kwargs.get('path', os.path.join(GRIDS_PATH))
-    mcmc_path = os.path.join(path, source, 'mcmc')
+    mcmc_path = os.path.join(path, 'sources', source, 'mcmc')
 
     # ===== account for special cases =====
     if source=='gs1826':
