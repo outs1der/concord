@@ -325,7 +325,7 @@ class ObservedBurst(Lightcurve):
     def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s],
         		breakdown = False, plot = False, subplot = True,
                 weights={'fluxwt':1.0, 'tdelwt':2.5e3},
-                disc_model='disc_a', debug = False):
+                disc_model='he16_a', debug = False):
 
 # 'weights' give the relative weight to the tdel and persistent
 # flux for the likelihood. Since you have many more points in the
@@ -334,9 +334,18 @@ class ObservedBurst(Lightcurve):
 
         dist, inclination, opz, t_off = param
 
-# Since we allow the redshift to vary, but the model is calculated at a
-# fixed surface gravity, we need to adjust one (or both) of M_NS and R_NS
-# to obtain a self-consistent set of parameters. 
+# Even though this is already in the prior, lhoodClass calls compare()
+# before the prior, enabling an out-of-domain error in anisotropy
+        if not 0. < inclination.value < 90.:
+            return -np.inf
+
+
+        xi_b, xi_p = anisotropy(inclination, model=disc_model)
+
+# Here we calculate the equivalent mass and radius given the redshift and
+# radius. Since we allow the redshift to vary, but the model is calculated
+# at a fixed surface gravity, we need to adjust one (or both) of M_NS and
+# R_NS to obtain a self-consistent set of parameters.
 # Because many equations of state have roughly constant radius over a
 # range of masses, we choose to keep R_NS constant and to vary M_NS
 # This replaces (temporarily) the value of M_NS supplied for the model 
@@ -456,7 +465,9 @@ class ObservedBurst(Lightcurve):
 # http://matplotlib.org/examples/pylab_examples/axes_demo.html for
 # illustrative example
 
-                a = plt.axes([.55, .5, .3, .3], facecolor='y')
+                # a = plt.axes([.55, .5, .3, .3], facecolor='y')
+                a = plt.axes([.55, .5, .3, .3]) # yellow is kinda ugly
+
 #                print (self.tdel,self.tdel_err)
                 a.errorbar([0.95], self.tdel.value, 
                        yerr=self.tdel_err.value, fmt='o')
@@ -843,20 +854,24 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 # to compare
 
     n = len(obs)
-    assert (n == 3)
+    # assert (n == 3)
+    #
+    # b1, b2, b3 = obs
+    # m1, m2, m3 = models
 
-    b1, b2, b3 = obs
-    m1, m2, m3 = models
+    b1, b2 = obs
+    m1, m2 = models
 
 # Can't use the gridspec anymore, as this is used for the individual plots
 
 #    fig = plt.figure()
 #    gs = gridspec.GridSpec(3,2)
-
+    #TODO make this iteratable and generalised to different numbers of epoch
 # plot the model comparisons. Should really do a loop here, but not sure
 # exactly how
 
     _param_best = param_best[0:4]
+
     b1.compare(m1,_param_best,plot=True,subplot=False)
 #    fig.set_size_inches(8,3)
 
@@ -864,9 +879,9 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
     _param_best.append(param_best[4])
     b2.compare(m2,_param_best,plot=True,subplot=False)
 
-    _param_best = param_best[0:3]
-    _param_best.append(param_best[5])
-    b3.compare(m3,_param_best,plot=True,subplot=False)
+    # _param_best = param_best[0:3]
+    # _param_best.append(param_best[5])
+    # b3.compare(m3,_param_best,plot=True,subplot=False)
 
 # Now assemlbe the tdel values for plotting. This is a bit clumsy
 

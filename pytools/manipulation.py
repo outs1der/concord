@@ -23,7 +23,7 @@ def construct_t_params(n):
 
 
 
-def full_string(run, batches, step, con_ver, source='gs1826'):
+def full_string(batches, source, run=None, step=None, con_ver=None):
     """========================================================
     constructs a standardised string for a batch model
     ========================================================
@@ -32,37 +32,35 @@ def full_string(run, batches, step, con_ver, source='gs1826'):
         - con_ver = 0 : don't include con version
     ========================================================"""
     batches = expand_batches(batches, source)
-    b_string = daisychain(batches)
+    batch_str = daisychain(batches)
 
-    if run == 0:
+    if run == None:
         run_str = ''
     else:
-        run_str = '_R{run}'.format(run=run)
+        run_str = f'_R{run}'
 
-    if step == 0:
+    if step == None:
         step_str = ''
     else:
-        step_str = '_S{step}'.format(step=step)
+        step_str = f'_S{step}'
 
-    if con_ver == 0:
+    if con_ver == None:
         con_str = ''
     else:
-        con_str = '_C{cv:02}'.format(cv=con_ver)
+        con_str = f'_C{con_ver:02}'
 
-    full_str = '{src}_{b_str}{run_str}{step_str}{c_str}'.format(src=source, b_str=b_string,
-                                                    run_str=run_str, step_str=step_str, c_str=con_str)
-
+    full_str = f'{source}_{batch_str}{run_str}{step_str}{con_str}'
     return full_str
 
 
 
-def triplet_string(batches, source='gs1826'):
+def triplet_string(batches, source):
     """========================================================
     Returns triplet string, e.g.: gs1826_12-13-14
     ========================================================"""
     batches = expand_batches(batches, source)
-    batch_daisy = daisychain(batches)
-    triplet_str = '{source}_{batches}'.format(source=source, batches=batch_daisy)
+    batch_str = daisychain(batches)
+    triplet_str = f'{source}_{batch_str}'
 
     return triplet_str
 
@@ -111,15 +109,15 @@ def expand_runs(runs):
 
 
 
-def get_nruns(batch, source='gs1826', **kwargs):
+def get_nruns(batch, source, **kwargs):
     """========================================================
     Returns number of runs (models) in a given batch
     ========================================================"""
     path = kwargs.get('path', GRIDS_PATH)
-
-    batch_str = full_string(run=0, batches=[batch], step=0, con_ver=0)
-    filename = 'params_{batch_str}.txt'.format(batch_str=batch_str)
-    filepath = os.path.join(path, source, 'params', filename)
+    print(f'get nruns: {source}')
+    batch_str = full_string(batches=[batch], source=source)
+    filename = f'params_{batch_str}.txt'
+    filepath = os.path.join(path, 'sources', source, 'params', filename)
 
     params = pd.read_table(filepath, delim_whitespace=True)
 
@@ -151,7 +149,7 @@ def try_mkdir(path, skip=False):
     Tries to create directory, skip if exists or ask to overwrite
     ========================================================"""
     try:
-        print('Creating directory  {}'.format(path))
+        print(f'Creating directory  {path}')
         subprocess.run(['mkdir', path], check=True)
     except:
         if skip:
