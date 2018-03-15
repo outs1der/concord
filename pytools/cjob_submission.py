@@ -36,7 +36,7 @@ def write_submission_script(batches, source, con_ver, n0=1,
     batches = manipulation.expand_batches(batches, source)
     nruns = manipulation.get_nruns(batches[0], source=source)
     path = kwargs.get('path', GRIDS_PATH)
-    log_path = os.path.join(path, source, 'logs')
+    log_path = os.path.join(path, 'sources', source, 'logs')
 
     triplet_str = manipulation.triplet_string(batches=batches, source=source)
     run_str = f'{n0}-{nruns}'
