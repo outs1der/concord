@@ -3,3 +3,7 @@ syntax: glob
 *.swp
 __pycache__
 kepler_grids/*
+animation/
+temp/
+plots/
+.ipynb_checkpoints/
