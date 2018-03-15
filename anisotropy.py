@@ -5,7 +5,7 @@ import astropy.io.ascii as ascii
 from scipy.interpolate import interp1d
 import astropy.units as u
 
-def anisotropy(inclination,model='he16',test=False):
+def anisotropy(inclination,model='he16',test=False,path=None):
     '''This function returns the burst and persistent anisotropy factors
     
     Factors are defined as for Fujimoto et al. 1988, i.e. the xi_b,p such that
@@ -18,6 +18,10 @@ def anisotropy(inclination,model='he16',test=False):
     xi_b, xi_p = anisotropy(45.,test=True)'''
     
     global anisotropy_he16
+    if path:
+        data_path = path+'/'
+    else:
+        data_path = ''
 
     if test == True:
         
@@ -69,7 +73,7 @@ def anisotropy(inclination,model='he16',test=False):
     elif model == 'he16':
 
         if 'anisotropy_he16' not in globals():
-            a=ascii.read('anisotropy_he16.txt')
+            a=ascii.read(data_path+'anisotropy_he16.txt')
             v=np.stack((a['col2'],a['col3'],a['col4']),axis=1).T
             anisotropy_he16 = interp1d(a['col1'],v)
 
@@ -82,7 +86,7 @@ def anisotropy(inclination,model='he16',test=False):
         print ("** ERROR ** model ",model," not yet implemented!")
         return None, None
 
-def inclination(xi,model='he16',burst=True):
+def inclination(xi,model='he16',burst=True,path=None):
     '''This function returns the inclination given a burst or persistent 
        anisotropy factor. It is the inverse of anisotropy():
        
@@ -91,13 +95,19 @@ def inclination(xi,model='he16',burst=True):
     
     results are returned in units of degrees'''
 
+    global anisotropy_he16
+    if path:
+        data_path = path+'/'
+    else:
+        data_path = ''
+
     if model == 'fuji88':
         if burst:
             return np.arccos(1.0/xi - 0.5) * 180./np.pi * u.degree / u.rad
         else:
             return np.arccos(0.5/xi) * 180./np.pi * u.degree / u.rad
     elif model == 'he16':
-        a=ascii.read('anisotropy_he16.txt')
+        a=ascii.read(data_path+'anisotropy_he16.txt')
         if burst:
             q = 1./(a['col2']+a['col3'])
             incl_he16 = interp1d(q,a['col1'])

@@ -3,6 +3,11 @@
 # This code is a preliminary attempt to develop a burst class for MINBAR,
 # including model-observation comparisons. 
 # 
+# See also the repository on BitBucket:
+#   https://bitbucket.org/minbar/concord
+#
+# Duncan.Galloway@monash.edu, 2018
+#
 # Here are the classes and functions making up this module:
 #
 # class Lightcurve(object):
@@ -31,6 +36,31 @@ from astroquery.vizier import Vizier
 from chainconsumer import ChainConsumer
 
 from anisotropy import *
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def g(M,R,Newt=False,units='cm/s^2'):
+    '''
+    This function calculates the surface gravity given a mass M and radius R,
+    using the Newtonian expression if the flag Newt is set to True
+
+    The result is returned in units of cm/s^2 by default
+    '''
+
+    if Newt:
+        return (const.G*M/R**2).to(units)
+    else:
+#        return const.G*M/(R**2*sqrt(1.-2.*const.G*M/(const.c**2*R))).to(units)
+        return opz(M,R)*g(M,R,Newt=True).to(units)
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def opz(M,R):
+    '''
+    This function calculates the gravitational redshift 1+z
+    '''
+
+    return 1./sqrt(1.-2.*const.G*M/(const.c**2*R))
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -116,7 +146,7 @@ class Lightcurve(object):
 
 # Initialise the various attributes, where present. We expect to have at
 # least one of flux or lumin (and the related uncertainty)
-# Units are handled by the parent classes ObservedBurst and ModelBurst
+# Units are handled by the parent classes ObservedBurst and KeplerBurst
 
         self.time = kwargs.get('time',None)
         self.timepixr = kwargs.get('timepixr',0.0)
@@ -154,18 +184,22 @@ class ObservedBurst(Lightcurve):
     Observed burst class. Apart from the lightcurve (which is
     defined with time, flux, and flux_err columns), the additional
     attributes set are:
+
     filename - source file name
     tdel, tdel_err - recurrence time and error (hr)
     comments - ASCII file header text
     table_file - LaTeX file of table 2 from Galloway et al. (2017)
     table - contents of table 2 
     row - entry in the table corresponding to this burst
-    fper, fper_err - persistent flux level
+    fper, fper_err - persistent flux level (1e-9 erg/cm^2/s)
     cbol - bolometric correction
-    mdot - accretion rate
+    mdot - accretion rate (total, not per unit area)
     fluen - burst fluence
     F_pk - burst peak flux
     alpha - alpha value
+
+    The units for selected parameters are all stored as astropy.units
+    objects
     '''
     
     def __init__(self, filename, path=None, **kwargs):
@@ -320,21 +354,32 @@ class ObservedBurst(Lightcurve):
         dist, inclination, opz, t_off = param
         xi_b, xi_p = anisotropy(inclination)
 
-# Here we calculate the equivalent mass and radius given the redshift and
-# radius. Since we allow the redshift to vary, but the model is calculated
-# at a fixed surface gravity, we need to adjust one (or both) of M_NS and
-# R_NS to obtain a self-consistent set of parameters. 
+# Since we allow the redshift to vary, but the model is calculated at a
+# fixed surface gravity, we need to adjust one (or both) of M_NS and R_NS
+# to obtain a self-consistent set of parameters. 
 # Because many equations of state have roughly constant radius over a
 # range of masses, we choose to keep R_NS constant and to vary M_NS
+# This replaces (temporarily) the value of M_NS supplied for the model 
+# BUT because we're not using the approximate expression for Q_grav below,
+# this is not even used
 
 #        _t = (mburst.g.to(u.cm/u.s**2)*mburst.R_NS.to(u.cm)
 #		/const.c.to(u.cm/u.s)**2)
 #        M_NS = (mburst.g*mburst.R_NS**2/const.G * (-_t + sqrt(_t+1)))
-        M_NS = mburst.g*mburst.R_NS**2/(const.G*opz)
-        M_NS = M_NS.to(u.kg)
+        M_NS = (mburst.g*mburst.R_NS**2/(const.G*opz)).to(u.g)
         if debug:
             print ('Inferred mass = {:.4f} M_sun'.format(M_NS/const.M_sun))
-        Q_grav = const.G*M_NS/mburst.R_NS
+
+# TODO should also make sure to store the inferred mass value here
+
+# Here we calculate Q_grav, to calculate the inferred persistent flux that
+# we should see (based on the accretion rate); that is not given in Lampe
+# et al.  2016, but is given in gal03d
+# Note that (as for the M_NS) we're using the passed parameter opz here,
+# not the value that is associated with the model burst
+
+#        Q_grav = const.G*M_NS/mburst.R_NS # approximate
+        Q_grav = const.c**2*(opz-1)/opz
 
 # These parameters give the relative weight to the tdel and persistent
 # flux for the likelihood. Since you have many more points in the
@@ -352,6 +397,73 @@ class ObservedBurst(Lightcurve):
 
 # can check here if the object to compare is actually a model burst
 #        print (type(mburst))
+
+# Here we assemble an array with the likelihood components from each
+# parameter, for accounting purposes
+# By convention we calculate the observed parameter (from the model) and
+# then do the comparison
+# Should probably incorporate these calculations into the class, so you
+# can just refer to them as an attribute
+
+        lhood_cpt = np.array([])
+
+# persistent flux (see lampe16, eq. 8, noting that our mdot is averaged
+# over the neutron star surface):
+
+        fper_pred = ( mburst.mdot*Q_grav/
+               (4.*pi*opz*dist**2*xi_p*self.cbol) )
+        fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
+
+        fper_sig2 = 1.0/(self.fper_err.value**2)
+        lhood_cpt = np.append(lhood_cpt, -fluxwt*( 
+               (self.fper.value-fper_pred.value)**2*fper_sig2 
+               +np.log(2.*pi/fper_sig2) ) )
+
+# recurrence time
+
+        tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*opz)**2)
+        lhood_cpt = np.append(lhood_cpt, -tdelwt*( 
+               (self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
+               +np.log(2.*pi/tdel_sig2) ) )
+
+# lightcurve
+
+        inv_sigma2 = 1.0/(self.flux_err.value**2)
+        lhood_cpt = np.append(lhood_cpt, 
+        	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
+                +np.log(2.0*pi/inv_sigma2) ) )
+# troubleshooting the likelihood comparison
+#        print ( (model.value-self.flux.value)**2*inv_sigma2 
+#                - np.log(2.0*pi*inv_sigma2) )
+
+# Printing the values to test
+
+        if debug:
+            cl=0.0
+            for i in range(len(self.time)):
+                _lhood = -0.5*((model[i].value-self.flux[i].value)**2*inv_sigma2[i]
+                    +np.log(2.0*pi/inv_sigma2[i]))
+                cl += _lhood
+                print ('{:6.2f} {:.4g} {:.4g} {:.4g} {:8.3f} {:8.3f}'.format(self.time[i],self.flux[i].value,self.flux_err[i].value,
+                    model[i].value,_lhood,cl))
+
+# This is just a preliminary version of the likelihood calculation, that
+# does not include the recurrence time (or other parameters)
+# Also a possible minor error that the tdel weight doesn't apply to the
+# entire likelihood component
+
+#        return ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
+#                               - np.log(2.0*pi*inv_sigma2) ) 
+#               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
+#               -np.log(2.*pi*tdel_sig2))
+
+        lhood_p = ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
+                               - np.log(2.0*pi*inv_sigma2) ) 
+               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
+               -np.log(2.*pi*tdel_sig2))
+
+        if breakdown:
+            print ("Likelihood component breakdown (fper, tdel, lightcurve): ",lhood_cpt)
 
 # Plot the observed burst
 
@@ -415,72 +527,6 @@ class ObservedBurst(Lightcurve):
             ax2.axhline(0.0, linestyle='--', color='k')
             gs.update(hspace=0.0)
     
-# Here we assemble an array with the likelihood components from each
-# parameter, for accounting purposes
-# By convention we calculate the observed parameter (from the model) and
-# then do the comparison
-# Should probably incorporate these calculations into the class, so you
-# can just refer to them as an attribute
-
-        lhood_cpt = np.array([])
-
-# persistent flux (see lampe16, eq. 8, noting that our mdot is averaged
-# over the neutron star surface):
-
-        fper_sig2 = 1.0/(self.fper_err.value**2)
-        fper_pred = ( mburst.mdot*Q_grav/
-               (4.*pi*opz*dist**2*xi_p*self.cbol) )
-        fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
-        lhood_cpt = np.append(lhood_cpt, -fluxwt*( 
-               (self.fper.value-fper_pred.value)**2*fper_sig2 
-               +np.log(2.*pi/fper_sig2) ) )
-
-# recurrence time
-
-        tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*opz)**2)
-        lhood_cpt = np.append(lhood_cpt, -tdelwt*( 
-               (self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
-               +np.log(2.*pi/tdel_sig2) ) )
-
-# lightcurve
-
-        inv_sigma2 = 1.0/(self.flux_err.value**2)
-        lhood_cpt = np.append(lhood_cpt, 
-        	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
-                +np.log(2.0*pi/inv_sigma2) ) )
-# troubleshooting the likelihood comparison
-#        print ( (model.value-self.flux.value)**2*inv_sigma2 
-#                - np.log(2.0*pi*inv_sigma2) )
-
-# Printing the values to test
-
-        if debug:
-            cl=0.0
-            for i in range(len(self.time)):
-                _lhood = -0.5*((model[i].value-self.flux[i].value)**2*inv_sigma2[i]
-                    +np.log(2.0*pi/inv_sigma2[i]))
-                cl += _lhood
-                print ('{:6.2f} {:.4g} {:.4g} {:.4g} {:8.3f} {:8.3f}'.format(self.time[i],self.flux[i].value,self.flux_err[i].value,
-                    model[i].value,_lhood,cl))
-
-# This is just a preliminary version of the likelihood calculation, that
-# does not include the recurrence time (or other parameters)
-# Also a possible minor error that the tdel weight doesn't apply to the
-# entire likelihood component
-
-#        return ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
-#                               - np.log(2.0*pi*inv_sigma2) ) 
-#               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
-#               -np.log(2.*pi*tdel_sig2))
-
-        lhood_p = ( -0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2 
-                               - np.log(2.0*pi*inv_sigma2) ) 
-               -tdelwt*(self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2 
-               -np.log(2.*pi*tdel_sig2))
-
-        if breakdown:
-            print ("Likelihood component breakdown (fper, tdel, lightcurve): ",lhood_cpt)
-
 # Finally we return the sum of the likelihoods
         
 #        print (lhood_cpt,lhood_cpt.sum())
@@ -496,15 +542,30 @@ class KeplerBurst(Lightcurve):
     Example simulated burst class. Apart from the lightcurve (which is
     defined with time, lumin, and lumin_err columns), the additional
     (minimal) attributes requred are:
+
     filename - source file name
     tdel, tdel_err - recurrence time and error (hr)
     Lacc - accretion luminosity (in units of Mdot_Edd)
-    xi - radius factor between assumed (Newtonian) value and the GR equivalent
     R_NS - model-assumed radius of the neutron star (GR)
     g - surface gravity assumed for the run
+
+    An example call is as follows:
+
+    c_loZ=KeplerBurst(filename='mean1.data',path='kepler',
+                  lAcc=0.1164,Z=0.005,H=0.7,
+                  tdel=4.06/opz,tdel_err=0.17/opz,
+                  g = 1.858e+14*u.cm/u.s**2, R_NS=11.2*u.km)
+
+    If you provide a run_id value, like so:
+
+    c = KeplerBurst(run_id='a028',path='../../burst/reference')
+
+    most of these parameters will be populated from the table
     '''
 
     def __init__(self, filename=None, run_id=None, path=None, **kwargs):
+
+        eta = 1e-6	# tolerance level for derived parameters
 
         if run_id != None:
 
@@ -540,6 +601,7 @@ class KeplerBurst(Lightcurve):
         
         if run_id != None:
 
+# ------- --------- --------- --------- --------- --------- --------- ---------
 # For KEPLER models, read information from the burst table
 # Lately we go directly to the online version of the table
 
@@ -581,8 +643,8 @@ class KeplerBurst(Lightcurve):
 # Additional parameter here gives the radius conversion between the assumed
 # (Newtonian) value of 10 km and the GR equivalent for a neutron star of 
 # mass 1.4 M_sun, to achieve the same surface gravity.
-# If your model-defined surface gravity changes, or the radius (or mass)
-# of the NS, this quantity will also have to change
+# This is only true for the KEPLER models of Lampe et al. (2016);
+# otherwise we calculate this parameter from the other inputs
 
             self.xi = 1.12
 
@@ -591,14 +653,18 @@ class KeplerBurst(Lightcurve):
             self.M_NS = 1.4*const.M_sun
             self.R_Newt = 10.*u.km
             self.R_NS = self.R_Newt*self.xi
-            self.opz = 1./sqrt(1.-2.*const.G*self.M_NS/(const.c**2*self.R_NS))
-            self.g = const.G*self.M_NS/(self.R_NS**2/self.opz)
+#            self.opz = 1./sqrt(1.-2.*const.G*self.M_NS/(const.c**2*self.R_NS))
+#            self.g = const.G*self.M_NS/(self.R_NS**2/self.opz)
+            self.opz = opz(self.M_NS,self.R_NS)
+            self.g = g(self.M_NS,self.R_NS)
         
 # Set all the remaining attributes
 
             for attr in self.data.columns:
                 setattr(self,attr,self.data[attr][self.row])
             
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
         elif kwargs != None:
 
 # For non-KEPLER models, you can use kwargs to populate the parameters
@@ -610,6 +676,66 @@ class KeplerBurst(Lightcurve):
                 else:
                     setattr(self,key,kwargs[key])
 
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+# Should check here that you have all the required attributes
+# Make sure you can calculate g, and M_NS, and then you can calculate
+# everything else from those, as well as checking for consistency with any
+# passed values
+
+        if (not hasattr(self,'g')):
+            if (hasattr(self,'M_NS') & hasattr(self,'R_NS')): 
+                self.g = g(self.M_NS,self.R_NS)
+            elif (hasattr(self,'M_NS') & hasattr(self,'R_Newt')):
+                self.g = g(self.M_NS,self.R_Newt,Newt=True)
+            else:
+                print ("** ERROR ** can't calculate g")
+
+        if (not hasattr(self,'M_NS')):
+            if (hasattr(self,'g') & hasattr(self,'R_NS')): 
+# solving for M from the GR radius is a bit tricky...
+                self.M_NS = (self.R_NS**3*self.g**2/(const.G*const.c**2)*
+    (-1.+sqrt(1.+const.c**4/(self.R_NS*self.g)**2))).to(u.g)
+            elif (hasattr(self,'g') & hasattr(self,'R_Newt')):
+                self.M_NS = (self.g*R_Newt**2/const.G).to(u.g)
+                if debug:
+                    print ('Inferred mass = {:.4f} M_sun'.format(M_NS/const.M_sun))
+
+# Here we calculate the redshift, and check for consistency with any
+# already-set value
+
+        if hasattr(self,'R_NS'):
+            _opz = opz(self.M_NS,self.R_NS)
+            if hasattr(self,'opz'):
+#                assert abs(_opz-self.opz)/_opz < eta, "Inconsistent value of opz, {} != {}".format(_opz,self.opz)
+                if abs(_opz-self.opz)/_opz >= eta:
+                  print ("Inconsistent value of opz, {:.4f} != {:.4f}".format(_opz,self.opz))
+            else:
+                self.opz = _opz
+
+# ditto for xi (= ratio of R_NS/R_Newt)
+
+        _xi = sqrt(self.opz)
+        if hasattr(self,'xi'):
+#            assert abs(_xi-self.xi)/_xi < eta, "Inconsistent value of xi, {} != {}".format(_xi,self.xi)
+            if abs(_xi-self.xi)/_xi >= eta:
+                print ("Inconsistent value of xi, {:.4f} != {:.4f}".format(_xi,self.xi))
+        else:
+            self.xi = _xi
+
+# Specifically, for the compare method, we need to know two of g, M_NS,
+# R_Newt, R_NS
+
+        if (not (hasattr(self,'g')) & hasattr(self,'M_NS') and 
+            not (hasattr(self,'g')) & hasattr(self,'R_NS') and 
+            not (hasattr(self,'g')) & hasattr(self,'R_Newt') and 
+            not (hasattr(self,'M_NS')) & hasattr(self,'R_NS') and 
+            not (hasattr(self,'M_NS')) & hasattr(self,'R_Newt')):
+            print ("** WARNING ** insufficient parameters defined to convert to observed frame")
+
+# Some ambiguity with the attribute capitalisation for the accretion rate,
+# so try to fix that here
+
         if ((not hasattr(self,'Lacc')) & hasattr(self,'lAcc')):
             self.Lacc = self.lAcc
             
@@ -617,6 +743,8 @@ class KeplerBurst(Lightcurve):
 
         if hasattr(self,'Lacc'):
             self.mdot = self.Lacc*1.75e-8*const.M_sun/u.yr
+
+# - end of __init__ method -- --------- --------- --------- --------- ---------
 
 # The flux method is supposed to calculate the flux at a particular distance
 

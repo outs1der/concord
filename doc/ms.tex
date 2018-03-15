@@ -1,0 +1,718 @@
+%%
+%% Beginning of file 'ms.tex'
+%%
+%% Copied from sample61.tex by dkg 15.3.2018
+%%
+%% This is the paper describing the use and design of the concord suite of software
+%% for burst observation-model comparisons
+%%
+%% See https://bitbucket.org/minbar/concord
+%%
+%% AASTeX is now based on Alexey Vikhlinin's emulateapj.cls 
+%% (Copyright 2000-2015).  See the classfile for details.
+
+%% AASTeX requires revtex4-1.cls (http://publish.aps.org/revtex4/) and
+%% other external packages (latexsym, graphicx, amssymb, longtable, and epsf).
+%% All of these external packages should already be present in the modern TeX 
+%% distributions.  If not they can also be obtained at www.ctan.org.
+
+%% The first piece of markup in an AASTeX v6.x document is the \documentclass
+%% command. LaTeX will ignore any data that comes before this command. The 
+%% documentclass can take an optional argument to modify the output style.
+%% The command below calls the preprint style  which will produce a tightly 
+%% typeset, one-column, single-spaced document.  It is the default and thus
+%% does not need to be explicitly stated.
+%%
+%%
+%% using aastex version 6.1
+\documentclass{aastex61}
+
+%% The default is a single spaced, 10 point font, single spaced article.
+%% There are 5 other style options available via an optional argument. They
+%% can be envoked like this:
+%%
+%% \documentclass[argument]{aastex61}
+%% 
+%% where the arguement options are:
+%%
+%%  twocolumn   : two text columns, 10 point font, single spaced article.
+%%                This is the most compact and represent the final published
+%%                derived PDF copy of the accepted manuscript from the publisher
+%%  manuscript  : one text column, 12 point font, double spaced article.
+%%  preprint    : one text column, 12 point font, single spaced article.  
+%%  preprint2   : two text columns, 12 point font, single spaced article.
+%%  modern      : a stylish, single text column, 12 point font, article with
+%% 		  wider left and right margins. This uses the Daniel
+%% 		  Foreman-Mackey and David Hogg design.
+%%
+%% Note that you can submit to the AAS Journals in any of these 6 styles.
+%%
+%% There are other optional arguments one can envoke to allow other stylistic
+%% actions. The available options are:
+%%
+%%  astrosymb    : Loads Astrosymb font and define \astrocommands. 
+%%  tighten      : Makes baselineskip slightly smaller, only works with 
+%%                 the twocolumn substyle.
+%%  times        : uses times font instead of the default
+%%  linenumbers  : turn on lineno package.
+%%  trackchanges : required to see the revision mark up and print its output
+%%  longauthor   : Do not use the more compressed footnote style (default) for 
+%%                 the author/collaboration/affiliations. Instead print all
+%%                 affiliation information after each name. Creates a much
+%%                 long author list but may be desirable for short author papers
+%%
+%% these can be used in any combination, e.g.
+%%
+%% \documentclass[twocolumn,linenumbers,trackchanges]{aastex61}
+
+%% AASTeX v6.* now includes \hyperref support. While we have built in specific
+%% defaults into the classfile you can manually override them with the
+%% \hypersetup command. For example,
+%%
+%%\hypersetup{linkcolor=red,citecolor=green,filecolor=cyan,urlcolor=magenta}
+%%
+%% will change the color of the internal links to red, the links to the
+%% bibliography to green, the file links to cyan, and the external links to
+%% magenta. Additional information on \hyperref options can be found here:
+%% https://www.tug.org/applications/hyperref/manual.html#x1-40003
+
+%% If you want to create your own macros, you can do so
+%% using \newcommand. Your macros should appear before
+%% the \begin{document} command.
+%%
+\newcommand{\vdag}{(v)^\dagger}
+\newcommand\aastex{AAS\TeX}
+\newcommand\latex{La\TeX}
+
+%% Reintroduced the \received and \accepted commands from AASTeX v5.2
+
+%\received{July 1, 2016}
+%\revised{September 27, 2016}
+%\accepted{\today}
+
+%% Command to document which AAS Journal the manuscript was submitted to.
+%% Adds "Submitted to " the arguement.
+\submitjournal{ApJ}
+
+%% Mark up commands to limit the number of authors on the front page.
+%% Note that in AASTeX v6.1 a \collaboration call (see below) counts as
+%% an author in this case.
+%
+%\AuthorCollaborationLimit=3
+%
+%% Will only show Schwarz, Muench and "the AAS Journals Data Scientist 
+%% collaboration" on the front page of this example manuscript.
+%%
+%% Note that all of the author will be shown in the published article.
+%% This feature is meant to be used prior to acceptance to make the
+%% front end of a long author article more manageable. Please do not use
+%% this functionality for manuscripts with less than 20 authors. Conversely,
+%% please do use this when the number of authors exceeds 40.
+%%
+%% Use \allauthors at the manuscript end to show the full author list.
+%% This command should only be used with \AuthorCollaborationLimit is used.
+
+%% The following command can be used to set the latex table counters.  It
+%% is needed in this document because it uses a mix of latex tabular and
+%% AASTeX deluxetables.  In general it should not be needed.
+%\setcounter{table}{1}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% The following section outlines numerous optional output that
+%% can be displayed in the front matter or as running meta-data.
+%%
+%% If you wish, you may supply running head information, although
+%% this information may be modified by the editorial offices.
+\shorttitle{Burst model-observation comparisons}
+\shortauthors{Galloway et al.}
+%%
+%% You can add a light gray and diagonal water-mark to the first page 
+%% with this command:
+% \watermark{text}
+%% where "text", e.g. DRAFT, is the text to appear.  If the text is 
+%% long you can control the water-mark size with:
+%  \setwatermarkfontsize{dimension}
+%% where dimension is any recognized LaTeX dimension, e.g. pt, in, etc.
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% This is the end of the preamble.  Indicate the beginning of the
+%% manuscript itself with \begin{document}.
+
+\begin{document}
+
+\title{Thermonuclear burst model-observation comparisons with {\sc concord}}
+
+%% LaTeX will automatically break titles if they run longer than
+%% one line. However, you may use \\ to force a line break if
+%% you desire. In v6.1 you can include a footnote in the title.
+
+%% A significant change from earlier AASTEX versions is in the structure for 
+%% calling author and affilations. The change was necessary to implement 
+%% autoindexing of affilations which prior was a manual process that could 
+%% easily be tedious in large author manuscripts.
+%%
+%% The \author command is the same as before except it now takes an optional
+%% arguement which is the 16 digit ORCID. The syntax is:
+%% \author[xxxx-xxxx-xxxx-xxxx]{Author Name}
+%%
+%% This will hyperlink the author name to the author's ORCID page. Note that
+%% during compilation, LaTeX will do some limited checking of the format of
+%% the ID to make sure it is valid.
+%%
+%% Use \affiliation for affiliation information. The old \affil is now aliased
+%% to \affiliation. AASTeX v6.1 will automatically index these in the header.
+%% When a duplicate is found its index will be the same as its previous entry.
+%%
+%% Note that \altaffilmark and \altaffiltext have been removed and thus 
+%% can not be used to document secondary affiliations. If they are used latex
+%% will issue a specific error message and quit. Please use multiple 
+%% \affiliation calls for to document more than one affiliation.
+%%
+%% The new \altaffiliation can be used to indicate some secondary information
+%% such as fellowships. This command produces a non-numeric footnote that is
+%% set away from the numeric \affiliation footnotes.  NOTE that if an
+%% \altaffiliation command is used it must come BEFORE the \affiliation call,
+%% right after the \author command, in order to place the footnotes in
+%% the proper location.
+%%
+%% Use \email to set provide email addresses. Each \email will appear on its
+%% own line so you can put multiple email address in one \email call. A new
+%% \correspondingauthor command is available in V6.1 to identify the
+%% corresponding author of the manuscript. It is the author's responsibility
+%% to make sure this name is also in the author list.
+%%
+%% While authors can be grouped inside the same \author and \affiliation
+%% commands it is better to have a single author for each. This allows for
+%% one to exploit all the new benefits and should make book-keeping easier.
+%%
+%% If done correctly the peer review system will be able to
+%% automatically put the author and affiliation information from the manuscript
+%% and save the corresponding author the trouble of entering it by hand.
+
+\correspondingauthor{Duncan K. Galloway}
+\email{duncan.galloway@monash.edu}
+
+\author[0000-0002-6558-5121]{Duncan K. Galloway}
+\affil{School of Physics \& Astronomy \\
+Monash University \\
+Clayton, VIC 3800, Australia}
+
+%\author{August Muench}
+%\affiliation{American Astronomical Society \\
+%2000 Florida Ave., NW, Suite 300 \\
+%Washington, DC 20009-1231, USA}
+%\collaboration{(AAS Journals Data Scientists collaboration)}
+%
+%\author{Butler Burton}
+%\affiliation{National Radio Astronomy Observatory}
+%\affiliation{AAS Journals Associate Editor-in-Chief}
+%\nocollaboration
+%
+%\author{Amy Hendrickson}
+%\altaffiliation{Creator of AASTeX v6.1}
+%\affiliation{TeXnology Inc.}
+%\collaboration{(LaTeX collaboration)}
+%
+%\author{Julie Steffen}
+%\affiliation{AAS Director of Publishing}
+%\affiliation{American Astronomical Society \\
+%2000 Florida Ave., NW, Suite 300 \\
+%Washington, DC 20009-1231, USA}
+%
+%\author{Jeff Lewandowski}
+%\affiliation{IOP Senior Publisher for the AAS Journals}
+%\affiliation{IOP Publishing, Washington, DC 20005}
+
+%% Note that the \and command from previous versions of AASTeX is now
+%% depreciated in this version as it is no longer necessary. AASTeX 
+%% automatically takes care of all commas and "and"s between authors names.
+
+%% AASTeX 6.1 has the new \collaboration and \nocollaboration commands to
+%% provide the collaboration status of a group of authors. These commands 
+%% can be used either before or after the list of corresponding authors. The
+%% argument for \collaboration is the collaboration identifier. Authors are
+%% encouraged to surround collaboration identifiers with ()s. The 
+%% \nocollaboration command takes no argument and exists to indicate that
+%% the nearby authors are not part of surrounding collaborations.
+
+%% Mark off the abstract in the ``abstract'' environment. 
+\begin{abstract}
+
+% AAS Journals, the Astrophysical Journal (ApJ), the
+%Astrophysical Journal Letters (ApJL), and Astronomical Journal (AJ), all
+%have a 250 word limit for the abstract.  If you exceed this length the
+%Editorial office will ask you to shorten it.
+
+Thermonuclear bursts arise from unstable ignition of accumulated fuel on the surface of neutron stars in low-mass X-ray binaries. Comparison of observed bursts with numerical models is a key factor in determining the properties of the host neutron star.
+%
+Here we describe some commonly-used approaches for determining system parameters, including composition of the burst fuel, and introduce a new suite of software tools, {\sc concord}, intended to make comprehensive model-observation comparisons practical.
+
+\end{abstract}
+
+%% Keywords should appear after the \end{abstract} command. 
+%% See the online documentation for the full list of available subject
+%% keywords and the rules for their use.
+\keywords{editorials, notices --- 
+miscellaneous --- catalogs --- surveys}
+
+%% From the front matter, we move on to the body of the paper.
+%% Sections are demarcated by \section and \subsection, respectively.
+%% Observe the use of the LaTeX \label
+%% command after the \subsection to give a symbolic KEY to the
+%% subsection for cross-referencing in a \ref command.
+%% You can use LaTeX's \ref and \label commands to keep track of
+%% cross-references to sections, equations, tables, and figures.
+%% That way, if you change the order of any elements, LaTeX will
+%% automatically renumber them.
+
+%% We recommend that authors also use the natbib \citep
+%% and \citet commands to identify citations.  The citations are
+%% tied to the reference list via symbolic KEYs. The KEY corresponds
+%% to the KEY in the \bibitem in the reference list below. 
+
+\section{Introduction} \label{sec:intro}
+
+%\latex\ \footnote{\url{http://www.latex-project.org/}} is a document markup
+%language that is particularly well suited for the publication of
+%mathematical and scientific articles \citep{lamport94}. \latex\ was written
+%in 1985 by Leslie Lamport who based it on the \TeX\ typesetting language
+%which itself was created by Donald E. Knuth in 1978.  In 1988 a suite of
+%\latex\ macros were developed to investigate electronic submission and
+%publication of AAS Journal articles \citep{1989BAAS...21..780H}.  Shortly
+%afterwards, Chris Biemesdefer merged these macros and more into a \latex\
+%2.08 style file called \aastex.  These early \aastex\ versions introduced
+%many common commands and practices that authors take for granted today.
+%Substantial revisions
+%were made by Lee Brotzman and Pierre Landau when the package was updated to
+%v4.0.  AASTeX v5.0, written in 1995 by Arthur Ogawa, upgraded to \latex\ 2e
+%which uses the document class in lieu of a style file.  Other improvements
+%to version 5 included hypertext support, landscape deluxetables and
+%improved figure support to facilitate electronic submission.  
+%\aastex\ v5.2 was released in 2005 and introduced additional graphics
+%support plus new mark up to identifier astronomical objects, datasets and
+%facilities.
+%
+%In 1996 Maxim Markevitch modified the AAS preprint style file, aaspp4.sty,
+%to closely emulate the very tight, two column style of a typeset
+%Astrophysical Journal article.  The result was emulateapj.sty.  A year
+%later Alexey Vikhlinin took over development and maintenance.  In 2001 he
+%converted emulateapj into a class file in \latex\ 2e and in 2003 Vikhlinin
+%completely rewrote emulateapj based on the APS Journal's RevTEX class.
+%
+%During this time emulateapj gained growing acceptance in the astronomical
+%community as it filled an author need to obtain an approximate number of
+%manuscript pages prior to submission for cost and length estimates. The
+%tighter typeset also had the added advantage of saving paper when printing
+%out hard copies.
+%
+%Even though author publication charges are no longer based on print pages
+%\footnote{see Section \ref{sec:pubcharge} in the Appendix for more details
+%about how current article costs are calculated.} the emulateapj class file
+%has proven to be extremely popular with AAS Journal authors.  An informal
+%analysis of submitted \latex\ manuscripts in 2015 revealed that $\sim$65\%
+%either called emulateapj or have a commented emulateapj classfile call
+%indicating it was used at some stage of the manuscript construction.
+%Clearly authors want to have access to a tightly typeset version of the
+%article when corresponding with co-authors and for preprint submissions.
+%
+%When planning the next \aastex\ release the popularity of emulateapj played
+%an important roll in the decision to drop the old base code and adopt and
+%modify emulateapj for \aastex\ v6.+ instead.  The change brings \aastex\
+%inline with what the majority of authors are already using while still
+%delivering new and improved features.  \aastex\ v6.0 and v6.1 were written
+%by Amy Hendrickson and released in January and October 2016, respectively.
+%Some of the new features in v6.0 included:
+%
+%\begin{enumerate}
+%\item improved citations for third party data repositories and software,
+%\item easier construction of matrix figures consisting of multiple 
+%encapsulated postscript (EPS) or portable document format (PDF) files,
+%\item figure set mark up for large collections of similar figures,
+%\item color mark up to easily enable/disable revised text highlighting,
+%\item improved url support, and
+%\item numerous table options such as the ability to hide columns, column 
+%decimal alignment, automatic column math mode and numbering, plus splitting of
+%wide tables.
+%\end{enumerate}
+%
+%The new features in v6.1 are:
+%
+%\begin{enumerate}
+%\item ORCID support for preprints,
+%\item improved author, affiliation and collaboration mark up,
+%\item reintroduced the old AASTeX v5.2 {\tt\string\received}, 
+%      {\tt\string\revised}, {\tt\string\accepted}, and
+%      {\tt\string\published} commands plus
+%      added the new {\tt\string\submitjournal} command to document
+%      which AAS Journal the manuscript was submitted to, plus
+%\item new typeset style options.
+%\end{enumerate}
+%
+%The rest of this article provides information and examples on how to create
+%your own AAS Journal manuscript with v6.1.  Special emphasis is placed on
+%how to use the full potential of \aastex\ v6+.  The next section describes
+%the different manuscript styles available and how they differ from past
+%releases.  Section \ref{sec:floats} describes how tables and figures are
+%placed in a \latex\ document. Specific examples of tables, Section
+%\ref{subsec:tables}, and figures, Section \ref{subsec:figures}, are also
+%provided.  Section \ref{sec:displaymath} discusses how to display math and
+%incorporate equations in a manuscript while Section \ref{sec:highlight}
+%discuss how to use the new revision mark up.  The last section,
+%\ref{sec:cite}, shows how recognize software and external data as first
+%class references in the manuscript bibliography.  An appendix is included
+%to show how to construct one and provide some information on how article
+%charges are calculated.  Additional information is available both embedded
+%in the comments of this \latex\ file and in the online documentation at
+%\url{http://journals.aas.org/authors/aastex.html}.
+
+\section{Observations and modelling} 
+\label{sec:data}
+
+\subsection{Burst observations}
+\label{subsec:data}
+
+The fundamental observables that we measure include the recurrence time $\Delta t$; the persistent flux $F_{\rm per}$, a measure of the accretion rate; and the burst bolometric flux lightcurve, $(t_i,F_{i})$. From the burst lightcurve we may integrate to estimate the burst fluence, $E_b$, which may be used to estimate the $\alpha$-value, the ratio of the burst to persistent flux: 
+\begin{equation}
+\alpha = \frac{\Delta t F_{\rm per} c_{\rm bol}}{E_B}
+\end{equation}
+where $c_{\rm bol}$ is the bolometric correction giving the inverse fraction of total persistent flux emitted in the instrumental band.
+
+\subsection{Burst models}
+\label{subsec:models}
+
+Thermonuclear burst simulations \cite[e.g. with {\sc kepler};][]{woos04} are usually carried out in a plane-parallel grid with constant gravity, $g$. The principal input parameters include the accretion rate (per unit area), $\dot{m}$; the composition of the accreted fuel, usually quantified as $(X_0, Z_{\rm CNO})$ where $X_0$ is the mass fraction of hydrogen, and $Z_{\rm CNO}$ the mass fraction of CNO nuclei, which drive the hot-CNO cycle burning between bursts; and a parameter describing the degree of heating from below the model domain, usually labeled as ``base flux'' $Q_b$.
+
+The model predictions include a recurrence time $\Delta t_{\rm pred}$, burst energy $E_{\rm pred}$ and lightcurve $(t_i,L_{{\rm pred},i})$ covering the extent of the burst.
+%
+The accretion rate $\dot{m}$ may also be converted to a persistent flux level for comparison with observations.
+
+
+%The default style in \aastex\ v6.1 is a tight single column style, e.g.  10
+%point font, single spaced.  The single column style is very useful for
+%article with wide equations. It is also the easiest to style to work with
+%since figures and tables, see Section \ref{sec:floats}, will span the
+%entire page, reducing the need for address float sizing.
+%
+%To invoke a two column style similar to the what is produced in
+%the published PDF copy use \\
+%
+%\noindent {\tt\string\documentclass[twocolumn]\{aastex61\}}. \\
+%
+%\noindent Note that in the two column style figures and tables will only
+%span one column unless specifically ordered across both with the ``*'' flag,
+%e.g. \\
+%
+%\noindent{\tt\string\begin\{figure*\}} ... {\tt\string\end\{figure*\}}, \\
+%\noindent{\tt\string\begin\{table*\}} ... {\tt\string\end\{table*\}}, and \\
+%\noindent{\tt\string\begin\{deluxetable*\}} ... {\tt\string\end\{deluxetable*\}}. \\
+%
+%\noindent This option is ignored in the onecolumn style.
+%
+%Some other style options are outlined in the commented sections of this 
+%article.  Any combination of style options can be used.
+%
+%Two style options that are needed to fully use the new revision tracking
+%feature, see Section \ref{sec:highlight}, are {\tt\string linenumbers} which 
+%uses the lineno style file to number each article line in the left margin and 
+%{\tt\string trackchanges} which controls the revision and commenting highlight
+%output.
+%
+%There is also a new {\tt\string modern} option that uses a Daniel
+%Foreman-Mackey and David Hogg design to produce stylish, single column
+%output that has wider left and right margins. It is designed to have fewer
+%words per line to improve reader retention. It also looks better on devices
+%with smaller displays such as smart phones.
+
+\section{Analysis} 
+\label{sec:analysis}
+
+Here we describe a few different approaches that have been used to deduce system parameters from observations of thermonuclear bursts.
+
+\subsection{Inferring fuel composition} 
+\label{subsec:fuelcomp}
+
+\subsection{Observation-model comparisons} 
+\label{subsec:lccompare}
+
+The model-predicted quantities must then be converted to what a distant observer would see, by taking into account the effects of general relativistic time dilation and redshift.
+
+Following \cite{lampe16}, we write the corrections as follows \cite[see also][]{keek11}. For self-consistency, we need to identify a mass and radius for the neutron star for which the Newtonian potential equals the GR potentials, i.e.
+\begin{equation}
+\frac{GM}{r^2} = \frac{GM_{\rm GR}}{R^2_{\rm GR}\sqrt{1-2GM_{\rm GR}/(c^2R_{\rm GR})}} = \frac{GM_{\rm GR}}{R^2_{\rm GR}}(1+z)
+\end{equation}
+where $1+z$ is the gravitational redshift:
+\begin{equation}
+1+z = \frac{1}{\sqrt{1-2GM_{\rm GR}/(c^2R_{\rm GR})}}
+\end{equation}
+This equality is generally achieved by assuming that $M=M_{\rm GR}$, and solving for $R_{\rm GR}$. 
+We define $\xi$ such that $R_{\rm GR}=\xi R$. 
+One advantage of this choice is that the mass accretion rate is identical in the Newtonian and observer frames, and also that $\xi = \sqrt{1 + z}$. 
+
+An additional correction that must be applied is the effect of the anisotropic emission of the burst, based on the system inclination $i$. This effect has been simulated for a range of disk geometries \cite[e.g.][]{he16}. Because the emission region on the surface of the star is thought to be different for the burst and persistent emission, we define separate anisotropy parameters $\xi_b$ and $\xi_p$, with the sense that
+\begin{equation}
+L_{b,p} = 4\pi d^2\xi_{b,p}F_{b,p}
+\end{equation}
+where $L_b$, $L_p$ are the burst and persistent luminosity, $F_b$, $F_p$ are the corresponding (observed) fluxes, and $d$ is the source distance. With this sense it can be seen that values of $\xi_{b,p}<1$ correspond to emission preferentially beamed towards us, so that --- without the anisotropy corrections --- the isotropic luminosity inferred from the observed flux would overestimate the actual luminosity.
+
+Of the model input parameters, we can also infer the persistent flux level expected given the model-assumed accretion rate $\dot{m}$, as follows: % gal03d, equation 2
+\begin{equation}
+F_{p,{\rm inf}} = \frac{L_p}{4\pi d^2} = 
+% \frac{\dot{M} Q_{\rm grav}}{1+z} \left(\frac{R_{\rm NS}}{d}\right)^2 \xi_p^{-1}
+% expression used in code
+\frac{\dot{m} Q_{\rm grav}}{4\pi d^2 (1+z)\xi_p}% c_{\rm bol}}
+\end{equation}
+where $Q_{\rm grav} = c^2z/(1+z) \approx GM_{\rm NS}/R_{\rm NS}$ is the gravitational energy release per gram. % gal03d 
+
+The predicted quantities can then be converted to values suitable for comparison to observations, as follows
+\begin{eqnarray}
+\Delta t_{{\rm pred},\infty} & = & (1+z)\Delta t_{\rm pred} \\
+% E_{{\rm pred},\infty} & = & \xi^2E_{\rm pred}/(1+z)^2 \\ % CHECK
+% add in the F_per (derived from the mdot) here; see Lampe et al. (2016), eq 8
+t_{i,\infty} & = & (1+z)t_i \\
+F_{{\rm pred},i,\infty} & = & \xi^2\frac{L_{{\rm pred},i}}{4\pi d^2\xi_b(1+z)^2}
+\end{eqnarray}
+
+For a given pair of observed and model lightcurves, the only parameters that affect the comparison are the source distance $d$, the anistotropy parameters $\xi_b$, $\xi_p$ (each a function of the inclination $i$), and the gravitational redshift $1+z$ (which also determines the parameter $\xi$).
+%
+We also introduce a ``nuisance'' parameter, $t_{\rm off}$, which is required to align the observed and predicted model lightcurve so as to minimise any residual differences. This parameter and the (time dilated) model timestamps $t_{i,\infty}$ are used to overlay the model predicted lightcurve onto the observed one.
+
+Our approach is then to explore the parameter space of $(d, i, 1+z, t_{\rm off})$ to find the best set of parameters for which the comparison likelihood is maximised:
+\begin{eqnarray}
+\mathcal{L} & = & -f_F\left[\left( \frac{F_p-F_{p,\rm{inf}}}{\sigma_{p}}\right)^2 
+    + \log\left(\frac{2\pi}{\sigma_p}\right)\right] \\
+ & & -f_t\left[ \left( \frac{\Delta t-\Delta t_{{\rm pred},\infty}}{\sigma_t}\right)^2
+    + \log\left(\frac{2\pi}{\sigma_t}\right)\right] + ...\\
+\end{eqnarray}
+where $f_F$...
+
+Varying the redshift $1+z$ will allow us to obtain the best match between the model and observed lightcurve.
+%this parameter cannot be varied arbitrarily, 
+As each model run has been performed with a particular value of the surface gravity $g$, a particular value of $1+z$ implies in turn specific values of $M_{\rm NS}$ and $R_{\rm NS}$. 
+%We take the approach of keeping $R_{\rm NS}$ fixed and allowing $M_{\rm NS}$ to vary to give the required change in $1+z$, since many equations of state have roughly constant radii over a range of masses \cite[e.g.][]{lp07}.
+
+ 
+%\startlongtable
+%\begin{deluxetable}{c|cc}
+%\tablecaption{ApJ costs from 1991 to 2013\tablenotemark{a} \label{tab:table}}
+%\tablehead{
+%\colhead{Year} & \colhead{Subscription} & \colhead{Publication} \\
+%\colhead{} & \colhead{cost} & \colhead{charges\tablenotemark{b}}\\
+%\colhead{} & \colhead{(\$)} & \colhead{(\$/page)}
+%}
+%\colnumbers
+%\startdata
+%1991 & 600 & 100 \\
+%1992 & 650 & 105 \\
+%1993 & 550 & 103 \\
+%1994 & 450 & 110 \\
+%1995 & 410 & 112 \\
+%1996 & 400 & 114 \\
+%1997 & 525 & 115 \\
+%1998 & 590 & 116 \\
+%1999 & 575 & 115 \\
+%2000 & 450 & 103 \\
+%2001 & 490 &  90 \\
+%2002 & 500 &  88 \\
+%2003 & 450 &  90 \\
+%2004 & 460 &  88 \\
+%2005 & 440 &  79 \\
+%2006 & 350 &  77 \\
+%2007 & 325 &  70 \\
+%2008 & 320 &  65 \\
+%2009 & 190 &  68 \\
+%2010 & 280 &  70 \\
+%2011 & 275 &  68 \\
+%2012 & 150 &  56 \\
+%2013 & 140 &  55 \\
+%\enddata
+%\tablenotetext{a}{Adjusted for inflation}
+%\tablenotetext{b}{Accounts for the change from page charges to digital quanta in April, 2011}
+%\tablecomments{Note that {\tt \string \colnumbers} does not work with the 
+%vertical line alignment token. If you want vertical lines in the headers you
+%can not use this command at this time.}
+%\end{deluxetable}
+
+
+%\begin{deluxetable*}{ccCrlc}[b!]
+%\tablecaption{Column math mode in an observation log \label{tab:mathmode}}
+%\tablecolumns{6}
+%\tablenum{2}
+%\tablewidth{0pt}
+%\tablehead{
+%\colhead{UT start time\tablenotemark{a}} &
+%\colhead{MJD start time\tablenotemark{a}} &
+%\colhead{Seeing} & \colhead{Filter} & \colhead{Inst.} \\
+%\colhead{(YYYY-mm-dd)} & \colhead{(d)} &
+%\colhead{(arcsec)} & \colhead{} & \colhead{}
+%}
+%\startdata
+%2012-03-26 & 56012.997 & \sim 0.\arcsec5 & H$\alpha$ & NOT \\
+%2012-03-27 & 56013.944 & 1.\arcsec5 & grism & SMARTS \\
+%2012-03-28 & 56014.984 & \nodata & F814M & HST \\
+%2012-03-30 & 56016.978 & 1.\arcsec5\pm0.25 & B\&C & Bok \\
+%\enddata
+%\tablenotetext{a}{At exposure start.}
+%\tablecomments{The ``C'' command column identifier in the 3 column turns on
+%math mode for that specific column. One could do the same for the next
+%column so that dollar signs would not be needed for H$\alpha$
+%but then all the other text would also be in math mode and thus typeset
+%in Latin Modern math and you will need to put it back to Roman by hand.
+%Note that if you do change this column to math mode the dollar signs already
+%present will not cause a problem. Table \ref{tab:mathmode} is published 
+%in its entirety in the machine readable format.  A portion is
+%shown here for guidance regarding its form and content.}
+%\end{deluxetable*}
+
+
+%%% Note that the \setcounter and \renewcommand are needed here because
+%%% this example is using a mix of deluxetable and tabular.  Here the
+%%% deluxetable counters are set with \tablenum but the situation is a bit
+%%% more complex for tabular.  Use the first command to set the Table number
+%%% to ONE LESS than it should be.  The next command will auto increment it
+%%% to the desired number.
+%\setcounter{table}{2}
+%\begin{table}[h!]
+%\renewcommand{\thetable}{\arabic{table}}
+%\centering
+%\caption{Decimal alignment made easy} \label{tab:decimal}
+%\begin{tabular}{cD@{$\pm$}D}
+%\tablewidth{0pt}
+%\hline
+%\hline
+%Column & \multicolumn2c{Value} & \multicolumn2c{Uncertainty}\\
+%\hline
+%\decimals
+%A & 1234     & 100.0     \\
+%B &  123.4   &  10.1     \\
+%C &  12.34   &   1.01    \\
+%D &   1.234  &   0.101   \\
+%E &    .1234 &   0.01001 \\
+%F &   1.0    &    .      \\
+%\hline
+%\multicolumn{5}{c}{NOTE. - Two decimal aligned columns}
+%\end{tabular}
+%\end{table}
+
+%%% The "ht!" tells LaTeX to put the figure "here" first, at the "top" next
+%%% and to override the normal way of calculating a float position
+%\begin{figure}[ht!]
+%\plotone{cost.eps}
+%\caption{The subscription and author publication costs from 1991 to 2013.
+%The data comes from Table \ref{tab:table}.\label{fig:general}}
+%\end{figure}
+
+%\begin{equation}
+%\bar v(p_2,\sigma_2)P_{-\tau}\hat a_1\hat a_2\cdots
+%\hat a_nu(p_1,\sigma_1) ,
+%\end{equation}
+
+%\begin{eqnarray}
+%\gamma^\mu  & = &
+% \left(
+%\begin{array}{cc}
+%0 & \sigma^\mu_+ \\
+%\sigma^\mu_- & 0
+%\end{array}     \right) ,
+% \gamma^5= \left(
+%\begin{array}{cc}
+%-1 &   0\\
+%0 &   1
+%\end{array}     \right)  , \\
+%\sigma^\mu_{\pm}  & = &   ({\bf 1} ,\pm \sigma) , 
+%\end{eqnarray}
+
+%\begin{eqnarray}
+%\hat a & = & \left(
+%\begin{array}{cc}
+%0 & (\hat a)_+\\
+%(\hat a)_- & 0
+%\end{array}\right), \nonumber \\
+%(\hat a)_\pm & = & a_\mu\sigma^\mu_\pm 
+%\end{eqnarray}
+
+%% If you wish to include an acknowledgments section in your paper,
+%% separate it off from the body of the text using the \acknowledgments
+%% command.
+\acknowledgments
+
+To be added
+
+%% To help institutions obtain information on the effectiveness of their 
+%% telescopes the AAS Journals has created a group of keywords for telescope 
+%% facilities.
+%
+%% Following the acknowledgments section, use the following syntax and the
+%% \facility{} or \facilities{} macros to list the keywords of facilities used 
+%% in the research for the paper.  Each keyword is check against the master 
+%% list during copy editing.  Individual instruments can be provided in 
+%% parentheses, after the keyword, but they are not verified.
+
+\vspace{5mm}
+\facilities{HST(STIS), Swift(XRT and UVOT), AAVSO, CTIO:1.3m,
+CTIO:1.5m,CXO}
+
+%% Similar to \facility{}, there is the optional \software command to allow 
+%% authors a place to specify which programs were used during the creation of 
+%% the manusscript. Authors should list each code and include either a
+%% citation or url to the code inside ()s when available.
+
+\software{astropy \citep{astropy13}  
+%          Cloudy \citep{2013RMxAA..49..137F}, 
+%          SExtractor \citep{1996A&AS..117..393B}
+          }
+
+%% Appendix material should be preceded with a single \appendix command.
+%% There should be a \section command for each appendix. Mark appendix
+%% subsections with the same markup you use in the main body of the paper.
+
+%% Each Appendix (indicated with \section) will be lettered A, B, C, etc.
+%% The equation counter will reset when it encounters the \appendix
+%% command and will number appendix equations (A1), (A2), etc. The
+%% Figure and Table counter will not reset.
+
+%\appendix
+%
+%\section{Appendix information}
+
+%% The reference list follows the main body and any appendices.
+%% Use LaTeX's thebibliography environment to mark up your reference list.
+%% Note \begin{thebibliography} is followed by an empty set of
+%% curly braces.  If you forget this, LaTeX will generate the error
+%% "Perhaps a missing \item?".
+%%
+%% thebibliography produces citations in the text using \bibitem-\cite
+%% cross-referencing. Each reference is preceded by a
+%% \bibitem command that defines in curly braces the KEY that corresponds
+%% to the KEY in the \cite commands (see the first section above).
+%% Make sure that you provide a unique KEY for every \bibitem or else the
+%% paper will not LaTeX. The square brackets should contain
+%% the citation text that LaTeX will insert in
+%% place of the \cite commands.
+
+%% We have used macros to produce journal name abbreviations.
+%% \aastex provides a number of these for the more frequently-cited journals.
+%% See the Author Guide for a list of them.
+
+%% Note that the style of the \bibitem labels (in []) is slightly
+%% different from previous examples.  The natbib system solves a host
+%% of citation expression problems, but it is necessary to clearly
+%% delimit the year from the author name used in the citation.
+%% See the natbib documentation for more details and options.
+
+\bibliography{all}
+\bibliographystyle{apj}
+
+%% This command is needed to show the entire author+affilation list when
+%% the collaboration and author truncation commands are used.  It has to
+%% go at the end of the manuscript.
+%\allauthors
+
+%% Include this line if you are using the \added, \replaced, \deleted
+%% commands to see a summary list of all changes at the end of the article.
+%\listofchanges
+
+\end{document}
+
+% End of file `sample61.tex'.

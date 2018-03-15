@@ -2,3 +2,4 @@ syntax: glob
 .DS_Store
 *.swp
 __pycache__
+kepler_grids/*
