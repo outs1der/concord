@@ -40,7 +40,10 @@ from chainconsumer import ChainConsumer
 
 from anisotropy import *
 
+# Get the path for the concord files from the environment variable
+
 CONCORD_PATH = os.environ['CONCORD_PATH']
+
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 def g(M,R,Newt=False,units='cm/s^2'):
@@ -133,20 +136,42 @@ def modelFunc(p,obs,model, disc_model):
     return ( (model.xi/opz)**2 * fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*model.lumin.unit
             / (4.*pi*dist.to('cm')**2) / xi_b )
 
-# ------- --------- --------- --------- --------- --------- --------- ---------
-
-# The basic object, which has attributes like time (array),
-# flux/luminosity etc. and methods including plot
+# ======= ========= ========= ========= ========= ========= ========= =========
 
 class Lightcurve(object):
-    """Test class for a burst lightcurve"""
+    """
+    The fundamental burst object, which has attributes like time (array),
+    flux/luminosity etc. and methods including plot. Minimal attributes
+    are:
+
+    time, dt - array of times and time bin duration
+    timepixr - set to 0.0 (default) if time is the start of the bin, 0.5 for
+               midpoint
+    flux, flux_err - flux and error (no units assumed)
+    lumin, lumin_err - luminosity and error
+
+    Normally only one of flux or luminosity would be supplied
+
+    Example: simulated burst (giving time and luminosity)
+
+    Lightcurve.__init__(self, time=d['time']*u.s,
+        lumin=d['luminosity']*u.erg/u.s, lumin_err=d['u_luminosity']*u.erg/u.s)
+
+    Example: observed burst giving flux
+
+    Lightcurve.__init__(self, time=d['col1']*u.s, dt=d['col2']*u.s,
+        flux=d['col3']*1e-9*u.erg/u.cm**2/u.s,
+        flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
+    """
 
     def __init__(self, *args, **kwargs):
         """initialise the object by assigning named entities from the kwargs"""
 
 # Initialise the various attributes, where present. We expect to have at
 # least one of flux or lumin (and the related uncertainty)
-# Units are handled by the parent classes ObservedBurst and KeplerBurst
+# Units are handled by the parent classes (e.g. ObservedBurst and KeplerBurst)
+
+        self.filename = kwargs.get('filename',None)
 
         self.time = kwargs.get('time',None)
         self.timepixr = kwargs.get('timepixr',0.0)
@@ -161,16 +186,56 @@ class Lightcurve(object):
 # Later we can make this plot method more elaborate
 # where argument for step is appropriate for timepixr=0.0
 
-    def plot(self):
-        assert self.timepixr == 0.0
-        plt.step(self.time,self.flux,where='post',
-		label=self.filename)
-        plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
-            self.flux.value, yerr=self.flux_err.value,fmt='b.')
-        plt.xlabel("Time ({0.unit:latex_inline})".format(self.time))
-        plt.ylabel("Flux ({0.unit:latex_inline})".format(self.flux))
+    def plot(self,yerror=True):
+        """Plot the lightcurve, accommodating both flux and luminosities"""
 
-# ------- --------- --------- --------- --------- --------- --------- ---------
+        assert self.timepixr == 0.0
+
+        if hasattr(self,'flux'):
+            y = self.flux
+            yerr = self.flux_err
+            ylabel = "Flux ({0.unit:latex_inline})".format(self.flux)
+        elif hasattr(self,'lumin'):
+            y = self.lumin
+            yerr = self.lumin_err
+            ylabel = "Luminosity ({0.unit:latex_inline})".format(self.lumin)
+        
+        plt.step(self.time,y,where='post',label=self.filename)
+        if (yerror & (self.dt != None) & (yerr != None)):
+            plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
+                y.value, yerr=yerr.value,fmt='b.')
+#            plt.plot(self.time,y,label=self.filename)
+
+        plt.xlabel("Time ({0.unit:latex_inline})".format(self.time))
+        plt.ylabel(ylabel)
+
+    def observe(self, param = [6.1*u.kpc,60.*u.degree,1.26,-10.*u.s], obs=None,
+        disc_model='he16_a'):
+        """Convert a luminosity profile to a simulated observation"""
+
+        if not hasattr(self,'lumin'):
+            print ("** ERROR ** need luminosity to simulate observation")
+            return None
+
+        dist, inclination, opz, t_off = param
+        xi_b, xi_p = anisotropy(inclination, model=disc_model)
+
+        if (obs == None):
+
+# No observation is provided, so we have to make up a burst lightcurve
+# with some dummy values for the time bins
+
+            dt = 0.25*u.s
+            npts = ceil((max(self.time)-min(self.time))*opz/dt)
+            obs = Lightcurve(time=np.arange(npts)*dt+t_off, 
+                             dt=np.full(npts,dt)*u.s)
+
+        model = modelFunc(param, obs, self, disc_model)
+
+        return Lightcurve(time=obs.time,dt=obs.dt,flux=model, 
+                          filename="{} @ {}".format(self.filename,dist))
+
+# ======= ========= ========= ========= ========= ========= ========= =========
 
 # This class is for observed bursts; we define a compare method to match
 # with models
@@ -220,7 +285,8 @@ class ObservedBurst(Lightcurve):
 
 # Now we define a Lightcurve instance, using the columns from the file
 
-        Lightcurve.__init__(self, time=d['col1']*u.s, dt=d['col2']*u.s,
+        Lightcurve.__init__(self, filename = filename, 
+                            time=d['col1']*u.s, dt=d['col2']*u.s,
                             flux=d['col3']*1e-9*u.erg/u.cm**2/u.s,
                             flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
 
@@ -320,8 +386,8 @@ class ObservedBurst(Lightcurve):
 # observations with the models rescaled by the appropriate parameters, and
 # also returns a likelihood value
 
-    #======================================================
-    #======================================================
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
     def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s],
         		breakdown = False, plot = False, subplot = True,
                 weights={'fluxwt':1.0, 'tdelwt':2.5e3},
@@ -338,7 +404,6 @@ class ObservedBurst(Lightcurve):
 # before the prior, enabling an out-of-domain error in anisotropy
         if not 0. < inclination.value < 90.:
             return -np.inf
-
 
         xi_b, xi_p = anisotropy(inclination, model=disc_model)
 
@@ -501,10 +566,8 @@ class ObservedBurst(Lightcurve):
 # Finally we return the sum of the likelihoods
 
         return lhood_cpt.sum()
-    #======================================================
-    #======================================================
 
-# ------- --------- --------- --------- --------- --------- --------- ---------
+# ======= ========= ========= ========= ========= ========= ========= =========
 
 # Here's an example of a simulated model class
 
@@ -556,10 +619,12 @@ class KeplerBurst(Lightcurve):
         d=ascii.read(path+'/'+self.filename)
 
         if ('time' in d.columns):
-            Lightcurve.__init__(self, time=d['time']*u.s,
+            Lightcurve.__init__(self, filename=self.filename, 
+                            time=d['time']*u.s,
                             lumin=d['luminosity']*u.erg/u.s, lumin_err=d['u_luminosity']*u.erg/u.s)
         else:
-            Lightcurve.__init__(self, time=d['col1']*u.s,
+            Lightcurve.__init__(self, filename=self.filename, 
+                            time=d['col1']*u.s,
                             lumin=d['col2']*u.erg/u.s, lumin_err=d['col3']*u.erg/u.s)
 
         if ('comments' in d.meta):
@@ -711,14 +776,15 @@ class KeplerBurst(Lightcurve):
 # - end of __init__ method -- --------- --------- --------- --------- ---------
 
 # The flux method is supposed to calculate the flux at a particular distance
+# Not used (and doesn't work)
 
-    def flux(self,dist):
-        if not hasattr(self,'dist'):
-            self.dist = dist
+#    def flux(self,dist):
+#        if not hasattr(self,'dist'):
+#            self.dist = dist
+#
+#        return self.lumin/(4.*pi*self.dist.to('cm')**2)
 
-        return self.lumin/(4.*pi*self.dist.to('cm')**2)
-
-# ------- --------- --------- --------- --------- --------- --------- ---------
+# ======= ========= ========= ========= ========= ========= ========= =========
 
 # Now define a new likelihood function, based on the old one, but which
 # can handle multiple pairs of observed bursts
