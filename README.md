@@ -13,7 +13,8 @@ A work in progress
 
 ### How do I get set up? ###
 
-* Clone the repository and import burst class.py
+* Clone the repository and set the environment variable CONCORD_PATH to point to the local copy
+* import burstclass.py
 * Check the Burst matching tutorial notebook for demonstrations of usage
 * See burstclass.py for dependencies
 * You'll also need to download some reference bursts from http://burst.sci.monash.edu/reference, and some model bursts from http://burst.sci.monash.edu/kepler. Or, you can define routines to read in your own data
