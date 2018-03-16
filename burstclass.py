@@ -112,18 +112,24 @@ def modelFunc(p,obs,model, disc_model):
     ( distance, inclination, redshift, time offset )
     '''
 
-    dist, inclination, opz, t_off = p
+    dist, inclination, _opz, t_off = p
 
 # Use the anisotropy function to calculate the anisotropy factors given
 # the inclination
 
     xi_b, xi_p = anisotropy(inclination)
 
+# Here we calculate the value of xi (ratio of GR to Newtonian radii),
+# appropriate for the adopted value of (1+z). This is used instead of the
+# value attached to the model, because that's for a different redshift
+
+    xi = sqrt(_opz)
+
 # First interpolate the model values onto the observed grid
 # This step defines the interpolation function, using a shifted and rescaled
 # model time to account for time dilation in the NS surface frame
 
-    fInterp = interp1d(opz*(model.time-t_off),model.lumin,bounds_error=False,
+    fInterp = interp1d(_opz*(model.time-t_off),model.lumin,bounds_error=False,
                       fill_value = min(model.lumin))
 
 # Then we return the predicted model flux, interpolated onto the observed
@@ -133,7 +139,9 @@ def modelFunc(p,obs,model, disc_model):
 # convention of Fujimoto et al. 1988, i.e.
 #   L_b = 4\pi d^2 \xi_b F_b
 
-    return ( (model.xi/opz)**2 * fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*model.lumin.unit
+#    return ( (model.xi/opz)**2 
+    return ( (xi/_opz)**2 
+            * fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*model.lumin.unit
             / (4.*pi*dist.to('cm')**2) / xi_b )
 
 # ======= ========= ========= ========= ========= ========= ========= =========
@@ -217,7 +225,7 @@ class Lightcurve(object):
             print ("** ERROR ** need luminosity to simulate observation")
             return None
 
-        dist, inclination, opz, t_off = param
+        dist, inclination, _opz, t_off = param
         xi_b, xi_p = anisotropy(inclination, model=disc_model)
 
         if (obs == None):
@@ -226,11 +234,13 @@ class Lightcurve(object):
 # with some dummy values for the time bins
 
             dt = 0.25*u.s
-            npts = ceil((max(self.time)-min(self.time))*opz/dt)
+            npts = ceil((max(self.time)-min(self.time))*_opz/dt)
             obs = Lightcurve(time=np.arange(npts)*dt+t_off, 
                              dt=np.full(npts,dt)*u.s)
 
         model = modelFunc(param, obs, self, disc_model)
+
+# And return a Lightcurve object with appropriate label
 
         return Lightcurve(time=obs.time,dt=obs.dt,flux=model, 
                           filename="{} @ {}".format(self.filename,dist))
@@ -398,7 +408,7 @@ class ObservedBurst(Lightcurve):
 # lightcurve, you may want to weight these greater than one so that the
 # MCMC code will try to match those preferentially
 
-        dist, inclination, opz, t_off = param
+        dist, inclination, _opz, t_off = param
 
 # Even though this is already in the prior, lhoodClass calls compare()
 # before the prior, enabling an out-of-domain error in anisotropy
@@ -408,11 +418,10 @@ class ObservedBurst(Lightcurve):
         xi_b, xi_p = anisotropy(inclination, model=disc_model)
 
 # Here we calculate the equivalent mass and radius given the redshift and
-# radius. Since we allow the redshift to vary, but the model is calculated
-# at a fixed surface gravity, we need to adjust one (or both) of M_NS and
-# R_NS to obtain a self-consistent set of parameters.
-# Because many equations of state have roughly constant radius over a
-# range of masses, we choose to keep R_NS constant and to vary M_NS
+# surface gravity. Since we allow the redshift to vary, but the model is
+# calculated at a fixed surface gravity, this implies a particular pair
+# of values of M_NS and R_NS. Think of moving back and forth along a track
+# of constant g in M-R phase space.
 # This replaces (temporarily) the value of M_NS supplied for the model 
 # BUT because we're not using the approximate expression for Q_grav below,
 # this is not even used
@@ -420,7 +429,16 @@ class ObservedBurst(Lightcurve):
 #        _t = (mburst.g.to(u.cm/u.s**2)*mburst.R_NS.to(u.cm)
 #		/const.c.to(u.cm/u.s)**2)
 #        M_NS = (mburst.g*mburst.R_NS**2/const.G * (-_t + sqrt(_t+1)))
-        M_NS = (mburst.g*mburst.R_NS**2/(const.G*opz)).to(u.g)
+#        M_NS = (mburst.g*mburst.R_NS**2/(const.G*opz)).to(u.g)
+
+        R_NS = (const.c**2*(_opz**2-1)/(2.*mburst.g*_opz)).to(u.cm)
+        M_NS = (mburst.g*R_NS**2/(const.G*_opz)).to(u.g)
+
+# Check here:
+
+        assert abs(mburst.g-g(M_NS,R_NS))/mburst.g < 1e-6
+        assert abs(_opz-opz(M_NS,R_NS))/_opz < 1e-6
+
         if debug:
             print ('Inferred mass = {:.4f} M_sun'.format(M_NS/const.M_sun))
 
@@ -433,7 +451,7 @@ class ObservedBurst(Lightcurve):
 # not the value that is associated with the model burst
 
 #        Q_grav = const.G*M_NS/mburst.R_NS # approximate
-        Q_grav = const.c**2*(opz-1)/opz
+        Q_grav = const.c**2*(_opz-1)/_opz
 
 # These parameters give the relative weight to the tdel and persistent
 # flux for the likelihood. Since you have many more points in the
@@ -445,6 +463,9 @@ class ObservedBurst(Lightcurve):
         fluxwt=1.0
         
 # Calculate the rescaled model flux with the passed parameters
+# This is equivlent to simulating an observation of the burst with the
+# chosen parameters, so we should use instead the observe method of the
+# Lightcurve class
 
         model = modelFunc(param, self, mburst, disc_model)
         assert model.unit == self.flux.unit == self.flux_err.unit
@@ -465,7 +486,7 @@ class ObservedBurst(Lightcurve):
 # over the neutron star surface):
 
         fper_pred = ( mburst.mdot*Q_grav/
-               (4.*pi*opz*dist**2*xi_p*self.cbol) )
+               (4.*pi*_opz*dist**2*xi_p*self.cbol) )
         fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
 
         fper_sig2 = 1.0/(self.fper_err.value**2)
@@ -475,9 +496,9 @@ class ObservedBurst(Lightcurve):
 
 # recurrence time
 
-        tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*opz)**2)
+        tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*_opz)**2)
         lhood_cpt = np.append(lhood_cpt, -weights['tdelwt']*(
-               (self.tdel.value-mburst.tdel.value*opz)**2*tdel_sig2
+               (self.tdel.value-mburst.tdel.value*_opz)**2*tdel_sig2
                +np.log(2.*pi/tdel_sig2) ) )
 
 # lightcurve
@@ -536,8 +557,8 @@ class ObservedBurst(Lightcurve):
 #                print (self.tdel,self.tdel_err)
                 a.errorbar([0.95], self.tdel.value, 
                        yerr=self.tdel_err.value, fmt='o')
-                a.errorbar([1.05], mburst.tdel.value*opz, 
-                       yerr=mburst.tdel_err.value*opz, fmt='ro')
+                a.errorbar([1.05], mburst.tdel.value*_opz, 
+                       yerr=mburst.tdel_err.value*_opz, fmt='ro')
                 plt.ylabel('$\Delta t$ (hr)')
 
 #            plt.plot(self.time,model,'.')
@@ -792,13 +813,13 @@ class KeplerBurst(Lightcurve):
 # First define the prior
 
 def lnprior(theta):
-    dist, inclination, opz, t_off = theta
+    dist, inclination, _opz, t_off = theta
 
 # We have currently flat priors for everything but the inclination, which
 # has a probability distribution proportional to cos(i)
 
     if (dist.value > 0.0 and 0.0 < inclination.value < 90.
-        and 1. < opz < 2):
+        and 1. < _opz < 2):
         return np.log(np.cos(inclination))
     else:
         return -np.inf
