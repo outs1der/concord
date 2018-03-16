@@ -453,15 +453,6 @@ class ObservedBurst(Lightcurve):
 #        Q_grav = const.G*M_NS/mburst.R_NS # approximate
         Q_grav = const.c**2*(_opz-1)/_opz
 
-# These parameters give the relative weight to the tdel and persistent
-# flux for the likelihood. Since you have many more points in the
-# lightcurve, you may want to weight these greater than one so that the 
-# MCMC code will try to match those preferentially
-
-#        tdelwt=2.5e3
-        tdelwt=1.0
-        fluxwt=1.0
-        
 # Calculate the rescaled model flux with the passed parameters
 # This is equivlent to simulating an observation of the burst with the
 # chosen parameters, so we should use instead the observe method of the
@@ -490,7 +481,7 @@ class ObservedBurst(Lightcurve):
         fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
 
         fper_sig2 = 1.0/(self.fper_err.value**2)
-        lhood_cpt = np.append(lhood_cpt, -fluxwt*( 
+        lhood_cpt = np.append(lhood_cpt, -weights['fluxwt']*( 
                (self.fper.value-fper_pred.value)**2*fper_sig2 
                +np.log(2.*pi/fper_sig2) ) )
 
