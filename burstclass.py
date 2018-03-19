@@ -20,7 +20,7 @@
 # def modelFunc(p,obs,model):
 # def lnprior(theta):
 # def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
-# def lhoodClass(params,obs,model):
+# def lhoodClass(params, obs, model, weights, disc_model):
 # def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 
 import numpy as np
@@ -68,6 +68,31 @@ def opz(M,R):
     '''
 
     return 1./sqrt(1.-2.*const.G*M/(const.c**2*R))
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def calc_mr(g,opz):
+    ''''
+    this function calculates neutron star mass and radius given a surface
+    gravity and redshift
+    '''
+
+# First some checks
+
+    if hasattr(opz,'unit'):
+        assert (opz.unit == '')
+    try:
+        test = g.to('cm / s2')
+    except ValueError:
+        print ("Incorrect units for surface gravity")
+        return -1, -1
+
+# Now calculate the mass and radius and convert to cgs units
+
+    R_NS = (const.c**2*(opz**2-1)/(2.*g*opz)).to(u.cm)
+    M_NS = (g*R_NS**2/(const.G*opz)).to(u.g)
+
+    return M_NS, R_NS
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -431,8 +456,7 @@ class ObservedBurst(Lightcurve):
 #        M_NS = (mburst.g*mburst.R_NS**2/const.G * (-_t + sqrt(_t+1)))
 #        M_NS = (mburst.g*mburst.R_NS**2/(const.G*opz)).to(u.g)
 
-        R_NS = (const.c**2*(_opz**2-1)/(2.*mburst.g*_opz)).to(u.cm)
-        M_NS = (mburst.g*R_NS**2/(const.G*_opz)).to(u.g)
+        M_NS, R_NS = calc_mr(mburst.g,_opz)
 
 # Check here:
 
@@ -932,13 +956,13 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 # to compare
 
     n = len(obs)
-    # assert (n == 3)
+    assert (n == 3)
     #
-    # b1, b2, b3 = obs
-    # m1, m2, m3 = models
+    b1, b2, b3 = obs
+    m1, m2, m3 = models
 
-    b1, b2 = obs
-    m1, m2 = models
+#    b1, b2 = obs
+#    m1, m2 = models
 
 # Can't use the gridspec anymore, as this is used for the individual plots
 
@@ -957,9 +981,9 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
     _param_best.append(param_best[4])
     b2.compare(m2,_param_best,plot=True,subplot=False)
 
-    # _param_best = param_best[0:3]
-    # _param_best.append(param_best[5])
-    # b3.compare(m3,_param_best,plot=True,subplot=False)
+    _param_best = param_best[0:3]
+    _param_best.append(param_best[5])
+    b3.compare(m3,_param_best,plot=True,subplot=False)
 
 # Now assemlbe the tdel values for plotting. This is a bit clumsy
 
@@ -992,8 +1016,8 @@ def plot_contours(sampler,parameters=[r"$d$",r"$i$",r"$1+z$"],
 
     nwalkers, nsteps, ndim = np.shape(sampler.chain)
 
-    #samples = sampler.chain[:, ignore:, :].reshape((-1, ndim))
-    samples = np.load('temp/chain_200.npy').reshape((-1,ndim))
+    samples = sampler.chain[:, ignore:, :].reshape((-1, ndim))
+#    samples = np.load('temp/chain_200.npy').reshape((-1,ndim))
 #    print (np.shape(samples))
 
 # This to produce a much more beautiful plot
@@ -1001,9 +1025,11 @@ def plot_contours(sampler,parameters=[r"$d$",r"$i$",r"$1+z$"],
     c = ChainConsumer()
     c.add_chain(samples, parameters = parameters)#,r"$\Delta t$"])
 
+# reports,
+# "This method is deprecated. Please use chainConsumer.plotter.plot instead"
 
     fig = c.plot()
-    fig.set_size_inches(6,6)
+    fig.set_size_inches(8,8)
 
     return c
 
