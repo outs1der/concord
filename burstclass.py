@@ -96,6 +96,22 @@ def calc_mr(g,opz):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
+def solve_radius(M,R_Newt,eta=1e-6):
+    '''
+    This routine determines the GR radius given the NS mass and Newtonian
+    radius, assuming the GR and Newtonian masses are identical
+
+    Solving is tricky so we just use an iterative approach
+    '''
+
+    R_NS = R_Newt	# trial
+    while (abs(g(M,R_NS)-g(M,R_Newt,Newt=True))/g(M,R_NS) > eta):
+        R_NS = R_Newt*sqrt(opz(M,R_NS))
+
+    return R_NS
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
 def decode_LaTeX(string):
     '''
     This function converts a LaTeX numerical value (with error) to one
@@ -689,14 +705,24 @@ class KeplerBurst(Lightcurve):
 
             if ((batch != None) & (run != None)):
 
-# For the newer models, read data from the summary table
+# For the newer models, read data from the summary table (and the
+# companion parameter table)
 
                 self.data = ascii.read(self.path+"/../../summ_{}.txt".format(source))
+                self.param = ascii.read(self.path+"/../../params_{}.txt".format(source))
 
                 self.row = np.where(np.logical_and(self.data['batch'] == batch,self.data['run'] == run))[0]
+                self.row_p = np.where(np.logical_and(self.param['batch'] == batch,self.param['run'] == run))[0]
+
+# Set some special parameters here (others are set with the kwargs later
+# on)
 
                 self.tdel = self.data['tDel'][self.row]/3600.*u.hr
                 self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
+
+# Set the gravity and NS mass
+
+                self.M_NS = self.param['mass'][self.row_p]*u.Msun
 
             else:
 
@@ -739,23 +765,30 @@ class KeplerBurst(Lightcurve):
                     self.tdel = self.data['tDel'][self.row]/3600.*u.hr
                     self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
 
+# Set the parameters for the old Kepler models
+
 # Additional parameter here gives the radius conversion between the assumed
 # (Newtonian) value of 10 km and the GR equivalent for a neutron star of
 # mass 1.4 M_sun, to achieve the same surface gravity.
 # This is only true for the KEPLER models of Lampe et al. (2016);
 # otherwise we calculate this parameter from the other inputs
 
-            self.xi = 1.12
+                self.xi = 1.12
 
 # Define the neutron star mass, radius, and surface gravity
 
-            self.M_NS = 1.4*const.M_sun
+                self.M_NS = 1.4*const.M_sun
+
+# Parameters that are common to both generations of Kepler models
+
             self.R_Newt = 10.*u.km
-            self.R_NS = self.R_Newt*self.xi
-#            self.opz = 1./sqrt(1.-2.*const.G*self.M_NS/(const.c**2*self.R_NS))
 #            self.g = const.G*self.M_NS/(self.R_NS**2/self.opz)
+#            self.g = g(self.M_NS,self.R_NS)
+            self.g = g(self.M_NS,self.R_Newt,Newt=True)
+#            self.R_NS = self.R_Newt*self.xi
+            self.R_NS = solve_radius(self.M_NS,self.R_Newt)
+#            self.opz = 1./sqrt(1.-2.*const.G*self.M_NS/(const.c**2*self.R_NS))
             self.opz = opz(self.M_NS,self.R_NS)
-            self.g = g(self.M_NS,self.R_NS)
         
 # Set all the remaining attributes
 # exclude the tDel, to avoid confusion with tdel (set earlier)
