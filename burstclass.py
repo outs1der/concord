@@ -316,7 +316,7 @@ class ObservedBurst(Lightcurve):
         self.path = path
         self.filename = filename
 
-        d=ascii.read(path+'/'+self.filename)
+        d=ascii.read(self.path+'/'+self.filename)
 
 # Now we define a Lightcurve instance, using the columns from the file
 
@@ -626,22 +626,23 @@ class KeplerBurst(Lightcurve):
                   tdel=4.06/opz,tdel_err=0.17/opz,
                   g = 1.858e+14*u.cm/u.s**2, R_NS=11.2*u.km)
 
-    If you provide a run_id value, like so:
+    If you provide a batch and run value, like so:
+
+    c = KeplerBurst(batch=2,run=9)
+
+    or (for the older results) a run_id value, like so:
 
     c = KeplerBurst(run_id='a028',path='../../burst/reference')
 
-    most of these parameters will be populated from the table
+    the appropriate model lightcurve will be read in, and the model parameters
+    will be populated from the table
     '''
 
-    def __init__(self, filename=None, run_id=None, path=None, **kwargs):
+    def __init__(self, filename=None, run_id=None, path=None, 
+                 source='gs1826', batch=None, run=None, 
+                 **kwargs):
 
         eta = 1e-6	# tolerance level for derived parameters
-
-        if run_id != None:
-            # For a KEPLER run, we use the convention for filename as follows:
-            self.filename = 'kepler_'+run_id+'_mean.txt'
-        elif filename!= None:
-            self.filename = filename
 
 # Don't add the path to the filename, because we want to use the latter as
 # a plot label (for example)
@@ -650,9 +651,23 @@ class KeplerBurst(Lightcurve):
             path = '.'
         self.path = path
 
+# Different file specifications here
+
+        if run_id != None:
+            # For a KEPLER run, we use the convention for filename as follows:
+            self.filename = 'kepler_'+run_id+'_mean.txt'
+        elif ((batch != None) & (run != None)):
+            self.filename = source+"_{}_xrb{}_mean.data".format(batch,run)
+            self.path = self.path+"/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
+        elif filename!= None:
+            self.filename = filename
+        else:
+            print ("** ERROR ** no valid model specification")
+            return
+
 # Read in the file, and initialise the lightcurve
 
-        d=ascii.read(path+'/'+self.filename)
+        d=ascii.read(self.path+'/'+self.filename)
 
         if ('time' in d.columns):
             Lightcurve.__init__(self, filename=self.filename, 
@@ -666,44 +681,63 @@ class KeplerBurst(Lightcurve):
         if ('comments' in d.meta):
             self.comments = d.meta['comments']
 
-        if run_id != None:
+        if ((batch != None) & (run != None)) | (run_id != None):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 # For KEPLER models, read information from the burst table
+# Which table we use depends on the specification
+
+            if ((batch != None) & (run != None)):
+
+# For the newer models, read data from the summary table
+
+                self.data = ascii.read(self.path+"/../../summ_{}.txt".format(source))
+
+                self.row = np.where(np.logical_and(self.data['batch'] == batch,self.data['run'] == run))[0]
+
+                self.tdel = self.data['tDel'][self.row]/3600.*u.hr
+                self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
+
+            else:
+
 # Lately we go directly to the online version of the table
 
-            try:
-                Vizier.columns = ['all']
-                model_table = Vizier.get_catalogs('J/ApJ/819/46')
-                self.data = model_table[0]
+                try:
+                    Vizier.columns = ['all']
+                    model_table = Vizier.get_catalogs('J/ApJ/819/46')
+                    self.data = model_table[0]
 
 # Table columns are: 'model','N','Z','H','Lacc','bstLgth','e_bstLgth','pkLum','e_pkLum',
 # 'psLum','e_psLum','Fluence','e_Fluence','tau','e_tau','tDel','e_tDel','conv','e_conv',
 # 'r1090','e_r1090','r2590','e_r2590','alpha1','e_alpha1','tau1','e_tau1','alpha','e_alpha',
 # 'Flag'
 
-                self.row = np.flatnonzero(self.data['model'] == run_id.encode('ascii'))[0]
+                    self.row = np.flatnonzero(self.data['model'] == run_id.encode('ascii'))[0]
 #            print (self.row, self.data['model'][self.row], self.data['e_tDel'][self.row])
-                self.tdel = self.data['tDel'][self.row]*u.hr
+                    self.tdel = self.data['tDel'][self.row]*u.hr
 #            print (self.tdel.units)
-                self.tdel_err = self.data['e_tDel'][self.row]*u.hr
+                    self.tdel_err = self.data['e_tDel'][self.row]*u.hr
 
-            except:
-                print ("** WARNING ** can't get Vizier table, using local file")
-                self.table_file='/Users/duncan/Documents/2015/Nat new catalog/summ.csv'
-                self.data = ascii.read(self.table_file)
+                except:
+
+# But if that fails, we use the local version, which has a few differences
+# (unfortunately)
+
+                    print ("** WARNING ** can't get Vizier table, using local file")
+                    self.table_file='/Users/duncan/Documents/2015/Nat new catalog/summ.csv'
+                    self.data = ascii.read(self.table_file)
 
 # Local file columns are slightly different: 'model','num','acc','z','h','lAcc','pul','cyc','
 # burstLength','uBurstLength','peakLum','uPeakLum','persLum','uPersLum','fluence','uFluence',
 # 'tau','uTau','tDel','uTDel','conv','uConv','r1090','uR1090','r2590','uR2590','singAlpha',
 # 'uSingAlpha','singDecay','uSingDecay','alpha','uAlpha','flag'
 
-                self.row = np.flatnonzero(self.data['model'] == "'xrb"+run_id+"'")[0]
+                    self.row = np.flatnonzero(self.data['model'] == "'xrb"+run_id+"'")[0]
 
 # Set the legacy tdel attribute, as well as the correct units for tdel_err
 
-                self.tdel = self.data['tDel'][self.row]/3600.*u.hr
-                self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
+                    self.tdel = self.data['tDel'][self.row]/3600.*u.hr
+                    self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
 
 # Additional parameter here gives the radius conversion between the assumed
 # (Newtonian) value of 10 km and the GR equivalent for a neutron star of
@@ -724,9 +758,11 @@ class KeplerBurst(Lightcurve):
             self.g = g(self.M_NS,self.R_NS)
         
 # Set all the remaining attributes
+# exclude the tDel, to avoid confusion with tdel (set earlier)
 
             for attr in self.data.columns:
-                setattr(self,attr,self.data[attr][self.row])
+                if ((attr != 'tDel') & (attr != 'utDel')):
+                    setattr(self,attr,self.data[attr][self.row])
             
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
