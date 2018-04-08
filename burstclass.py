@@ -30,6 +30,7 @@ import os
 import astropy.units as u
 import astropy.constants as const
 import astropy.io.ascii as ascii
+import csv
 from astropy.table import Table
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
@@ -37,6 +38,7 @@ import re
 from scipy.interpolate import interp1d
 from astroquery.vizier import Vizier
 from chainconsumer import ChainConsumer
+from datetime import datetime
 
 from anisotropy import *
 
@@ -109,6 +111,28 @@ def solve_radius(M,R_Newt,eta=1e-6):
         R_NS = R_Newt*sqrt(opz(M,R_NS))
 
     return R_NS
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def fper(mdot,opz,dist,xi_p,c_bol=1.0):
+    '''
+    Calculates the persistent flux, based on the inferred mdot, redshift
+    etc.
+    '''
+
+# First we calculate Q_grav, to calculate the inferred persistent flux that
+# we should see (based on the accretion rate); that is not given in Lampe
+# et al.  2016, but is given in gal03d
+# Note that (as for the M_NS) we're using the passed parameter opz here,
+# not the value that is associated with the model burst
+
+#        Q_grav = const.G*M_NS/mburst.R_NS # approximate
+    Q_grav = const.c**2*(opz-1)/opz
+
+# persistent flux (see lampe16, eq. 8, noting that our mdot is averaged
+# over the neutron star surface):
+
+    return ( mdot*Q_grav/ (4.*pi*opz*dist**2*xi_p*c_bol) ).to(u.erg/u.cm**2/u.s)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -213,6 +237,8 @@ class Lightcurve(object):
         flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
     """
 
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
     def __init__(self, *args, **kwargs):
         """initialise the object by assigning named entities from the kwargs"""
 
@@ -231,6 +257,48 @@ class Lightcurve(object):
 
         self.lumin = kwargs.get('lumin',None)
         self.lumin_err = kwargs.get('lumin_err',None)
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+    def write(self,filename='lightcurve.csv',addhdr=None):
+        '''
+        Write the lightcurve to a file
+        '''
+
+        if not hasattr(self,'flux'):
+            print ("Luminosity writing not yet implemented. Sorry")
+            return
+
+# this doesn't work:
+#        print ("Test of inheriting attributes from parent: {}".format(self.tdel))
+
+        flux_unit = 1e-9*self.flux.unit
+        with open (filename,'w') as f:
+
+# print header information
+
+            f.write("# file {}\n".format(filename))
+            f.write("# created {}\n".format(str(datetime.now())))
+            f.write("#\n")
+            f.write("# Lightcurve object written to file via write method\n")
+            f.write("#\n")
+            f.write("# timepixr = {}\n".format(self.timepixr))
+            if addhdr != None:
+                f.write("#\n")
+                if type(addhdr) == str:
+                    f.write("# {}\n".format(addhdr))
+                else:
+                    for line in addhdr:
+                        f.write("# {}\n".format(line))
+            f.write("#\n")
+            f.write("# Columns:\n")
+            f.write("# time ({}), dt ({}), flux ({}), flux_err\n".format(self.time.unit,self.dt.unit,flux_unit))
+
+            writer = csv.writer(f, delimiter=',')
+            writer.writerows(zip(self.time.value,self.dt.value,
+                                 self.flux/flux_unit,self.flux_err/flux_unit))
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
 
 # Later we can make this plot method more elaborate
 # where argument for step is appropriate for timepixr=0.0
@@ -258,8 +326,10 @@ class Lightcurve(object):
         plt.xlabel("Time ({0.unit:latex_inline})".format(self.time))
         plt.ylabel(ylabel)
 
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
     def observe(self, param = [6.1*u.kpc,60.*u.degree,1.26,-10.*u.s], obs=None,
-        disc_model='he16_a'):
+        disc_model='he16_a',c_bol=1.0):
         """Convert a luminosity profile to a simulated observation"""
 
         if not hasattr(self,'lumin'):
@@ -272,18 +342,22 @@ class Lightcurve(object):
         if (obs == None):
 
 # No observation is provided, so we have to make up a burst lightcurve
-# with some dummy values for the time bins
+# with some dummy values for the time bins and fluxes
 
             dt = 0.25*u.s
             npts = ceil((max(self.time)-min(self.time))*_opz/dt)
             obs = Lightcurve(time=np.arange(npts)*dt+t_off, 
-                             dt=np.full(npts,dt)*u.s)
+                             dt=np.full(npts,dt)*u.s,
+                             flux=np.zeros(npts),flux_err=np.zeros(npts))
 
         model = modelFunc(param, obs, self, disc_model)
 
 # And return a Lightcurve object with appropriate label
 
-        return Lightcurve(time=obs.time,dt=obs.dt,flux=model, 
+        return Lightcurve(time=obs.time,dt=obs.dt,
+                          flux=model,flux_err=obs.flux_err, 
+#                          tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
+#                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
                           filename="{} @ {}".format(self.filename,dist))
 
 # ======= ========= ========= ========= ========= ========= ========= =========
@@ -430,6 +504,8 @@ class ObservedBurst(Lightcurve):
 #                print (key, kwargs[key])
                 if (key == 'tdel') | (key == 'tdel_err'):
                     setattr(self,key,float(kwargs[key])*u.hr)
+                elif (key == 'fper') | (key == 'fper_err'):
+                    setattr(self,key,float(kwargs[key])*u.erg/u.cm**2/u.s)
                 else:
                     setattr(self,key,kwargs[key])
 
@@ -484,15 +560,6 @@ class ObservedBurst(Lightcurve):
 
 # TODO should also make sure to store the inferred mass value here
 
-# Here we calculate Q_grav, to calculate the inferred persistent flux that
-# we should see (based on the accretion rate); that is not given in Lampe
-# et al.  2016, but is given in gal03d
-# Note that (as for the M_NS) we're using the passed parameter opz here,
-# not the value that is associated with the model burst
-
-#        Q_grav = const.G*M_NS/mburst.R_NS # approximate
-        Q_grav = const.c**2*(_opz-1)/_opz
-
 # Calculate the rescaled model flux with the passed parameters
 # This is equivlent to simulating an observation of the burst with the
 # chosen parameters, so we should use instead the observe method of the
@@ -513,13 +580,8 @@ class ObservedBurst(Lightcurve):
 
         lhood_cpt = np.array([])
 
-# persistent flux (see lampe16, eq. 8, noting that our mdot is averaged
-# over the neutron star surface):
-
-        fper_pred = ( mburst.mdot*Q_grav/
-               (4.*pi*_opz*dist**2*xi_p*self.cbol) )
-        fper_pred = fper_pred.to(u.erg/u.cm**2/u.s)
-
+        fper_pred = fper(mburst.mdot,_opz,dist,xi_p,c_bol=self.cbol)
+               
         fper_sig2 = 1.0/(self.fper_err.value**2)
         lhood_cpt = np.append(lhood_cpt, -weights['fluxwt']*( 
                (self.fper.value-fper_pred.value)**2*fper_sig2 
