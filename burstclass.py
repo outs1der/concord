@@ -251,7 +251,8 @@ class Lightcurve(object):
         self.time = kwargs.get('time',None)
         self.timepixr = kwargs.get('timepixr',0.0)
         self.dt = kwargs.get('dt',None)
-        if kwargs.get('flux',None):
+#        if kwargs.get('flux',None):
+        if 'flux' in kwargs:
             self.flux = kwargs.get('flux',None)
             self.flux_err = kwargs.get('flux_err',None)
 
@@ -318,10 +319,17 @@ class Lightcurve(object):
             ylabel = "Luminosity ({0.unit:latex_inline})".format(self.lumin)
         
         plt.step(self.time,y,where='post',label=self.filename)
-        if (yerror & (self.dt != None) & (yerr != None)):
-            plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
-                y.value, yerr=yerr.value,fmt='b.')
+#        print (type(self.dt), type(yerr))
+#        print (yerror & (self.dt != None) & (yerr != None))
+#        if (yerror & (self.dt != None) & (yerr != None)):
+        if yerror:
+            try:
+                plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
+                    y.value, yerr=yerr.value,fmt='b.')
 #            plt.plot(self.time,y,label=self.filename)
+            except:
+                pass
+#            print ("** WARNING ** errors not present, can't plot errorbars")
 
         plt.xlabel("Time ({0.unit:latex_inline})".format(self.time))
         plt.ylabel(ylabel)
@@ -330,7 +338,10 @@ class Lightcurve(object):
 
     def observe(self, param = [6.1*u.kpc,60.*u.degree,1.26,-10.*u.s], obs=None,
         disc_model='he16_a',c_bol=1.0):
-        """Convert a luminosity profile to a simulated observation"""
+        """
+        Convert a luminosity profile to a simulated observation, with
+        plausible errors
+        """
 
         if not hasattr(self,'lumin'):
             print ("** ERROR ** need luminosity to simulate observation")
@@ -349,8 +360,19 @@ class Lightcurve(object):
             obs = Lightcurve(time=np.arange(npts)*dt+t_off, 
                              dt=np.full(npts,dt)*u.s,
                              flux=np.zeros(npts),flux_err=np.zeros(npts))
+#            print (obs.flux_err)
+
+        else:
+            npts = len(obs.time)
 
         model = modelFunc(param, obs, self, disc_model)
+
+# Add some errors based on the flux_err
+
+        if hasattr(obs,'flux_err'):
+            model += np.random.normal(size=npts)*obs.flux_err
+        else:
+            print ("** WARNING ** can't add scatter without flux errors")
 
 # And return a Lightcurve object with appropriate label
 
