@@ -396,6 +396,116 @@ The model predictions include a recurrence time $\Delta t_{\rm pred}$, burst ene
 %
 The accretion rate $\dot{m}$ may also be converted to a persistent flux level for comparison with observations.
 
+\subsection{Simulated observations}
+\label{subsec:simobs}
+
+In order to test the analysis approaches described in this paper, we generated sets of simulated data based on the {\sc kepler} models described in \S\ref{subsec:models}. 
+%
+This procedure is identical to that used to convert model predictions to data for direct comparison to observations, as described in \S\ref{subsec:lccompare}.
+%
+The process can be summarised as follows.
+\begin{enumerate}
+\item Multiply the time bins for the predicted burst lightcurve by the gravitational redshift $1+z$, thereby ``stretching'' the profile to account for the general relativistic time dilation at the neutron-star surface
+% \item Shift the predicted burst lightcurve by $t_{\rm off}$
+\item Apply the same correction to the model-predicted recurrence time $\Delta t_{\rm pred}$.
+\item Interpolate the model-predicted lightcurve onto a set of observational time bins, corresponding (for example) to the typical resolution for time-resolved spectroscopy (0.25~s)
+\item Translate the model-predicted luminosity to the corresponding quantity measured by a distant observer, by 
+% multiplying by $[\xi/(1+z)]^2$
+dividing by $1+z$
+\item Convert the luminosity to (isotropic) flux by dividing by the distance factor, $4\pi d^2$ \label{distfac}
+\item Take into account the expected anisotropy effects due to the system inclination, by dividing the luminosity by the anisotropy factor $\xi_b$ \label{anisofac}
+\item Calculate the persistent flux expected for the model-assumed accretion rate $\dot{m}$, and apply the same corrections as for the burst flux in steps \ref{distfac} and \ref{anisofac} (adopting a separate anisotropy factor $\xi_p$ appropriate for the persistent flux). We also divide by a bolometric correction factor $c_{\rm bol}$ accounting for the limited instrumental passband.
+\end{enumerate}
+% Below we describe each of these steps in more detail
+
+We determine the general relativistic (GR) corrections within the constraints of the numerical models, which are typically calculated assuming a Newtonian potential with gravity $g=GM/R^2$, where $M$ and $R$ are the equivalent Newtonian mass and radius.
+%
+However, we are free to vary the surface redshift $1+z$, for example to achieve improved agreement with an observed profile. 
+
+The model time bins  $t_i$ and the predicted burst recurrence time $\Delta t_{\rm pred}$ are converted to values as would be measured by a distant observer as follows:
+\begin{eqnarray}
+t_{i,\infty} & = & (1+z)t_i \\
+\Delta t_{{\rm pred},\infty} & = & (1+z)\Delta t_{\rm pred}
+\end{eqnarray}
+
+Care must be taken to ensure the Newtonian model predictions can be correctly translated to include the GR corrections expected for quantities at the neutron star surface.
+%
+Following \cite{lampe16}, 
+% we write the corrections as follows \cite[see also][]{keek11}. For self-consistency, 
+we identify a mass and radius for the neutron star for which the Newtonian potential equals the GR potentials, i.e.
+\begin{equation}
+\frac{GM}{R^2} = \frac{GM_{\rm GR}}{R^2_{\rm GR}\sqrt{1-2GM_{\rm GR}/(c^2R_{\rm GR})}} = \frac{GM_{\rm GR}}{R^2_{\rm GR}}(1+z)
+\end{equation}
+where $1+z$ is the gravitational redshift:
+\begin{equation}
+1+z = \frac{1}{\sqrt{1-2GM_{\rm GR}/(c^2R_{\rm GR})}}
+\end{equation}
+This equality is generally achieved by assuming that $M=M_{\rm GR}$, and solving for $R_{\rm GR}$. 
+We define $\xi$ such that $R_{\rm GR}=\xi R$. 
+One advantage of this choice is that the mass accretion rate is identical in the Newtonian and observer frames, and also that $\xi = \sqrt{1 + z}$. In that case, the model-predicted luminosity is related to the luminosity measured by a distant observer, by 
+\begin{eqnarray}
+L_\infty & = & \xi^2L/(1+z)^2 \nonumber \\
+& = & L/(1+z)
+\end{eqnarray}
+
+We note that the combination of surface gravity $g$ (assumed for the model) and adopted $1+z$  uniquely specifies the neutron star mass $M_{\rm NS}$ and radius $R_{\rm NS}$:
+\begin{eqnarray}
+% as used in function calc_mr in burstclass.py
+R_{\rm NS} &=& c^2\frac{(1+z)^2-1}{2g(1+z)}\\
+M_{\rm NS} &=& \frac{gR_{\rm NS}^2}{G(1+z)}
+\end{eqnarray}
+Thus, by identifying the optimal value of $1+z$ for comparison to a particular observation, we can constrain the mass and radius, at a fixed $g$.
+
+An additional correction that must be applied is the effect of the anisotropic emission of the burst, based on the system inclination $i$. This effect has been simulated for a range of disk geometries \cite[e.g.][]{he16}. Because the emission region on the surface of the star is thought to be different for the burst and persistent emission, we define separate anisotropy parameters $\xi_b$ and $\xi_p$, with the sense that
+\begin{equation}
+L_{b,p} = 4\pi d^2\xi_{b,p}F_{b,p}
+\end{equation}
+where $L_b$, $L_p$ are the burst and persistent luminosity, $F_b$, $F_p$ are the corresponding (observed) fluxes, and $d$ is the source distance. With this sense it can be seen that values of $\xi_{b,p}<1$ correspond to emission preferentially beamed towards us, so that --- without the anisotropy corrections --- the isotropic luminosity inferred from the observed flux would overestimate the actual luminosity.
+
+Of the model input parameters, we can also infer the persistent flux level expected given the model-assumed accretion rate $\dot{m}$, as follows: % gal03d, equation 2
+\begin{equation}
+% function fper in burstclass.py
+F_{p,\infty} = \frac{L_p}{4\pi d^2} = 
+% \frac{\dot{M} Q_{\rm grav}}{1+z} \left(\frac{R_{\rm NS}}{d}\right)^2 \xi_p^{-1}
+% expression used in code
+\frac{\dot{m} Q_{\rm grav}}{4\pi d^2 (1+z)\xi_p c_{\rm bol}}
+\end{equation}
+% Q_grav already defined in the previous section
+% where $Q_{\rm grav} = c^2z/(1+z) \approx GM_{\rm NS}/R_{\rm NS}$ is the gravitational energy release per gram. % gal03d 
+%
+The bolometric correction $c_{\rm bol}$ accounts for the expermental limitation that the persistent flux can only be measured over a limited instrumental passband. The bolometric correction is the ratio of the estimated bolometric flux to the band-limited value.
+
+We performed simulations based on {\sc kepler} simulations drawn from our range of in-hand simulations. The range of input values are listed in Table \ref{tab:simparams}.
+
+\begin{deluxetable}{lccc}
+\tablecaption{Parameter ranges for simulated data \label{tab:simparams}}
+\tablehead{
+\colhead{Parameter} & \colhead{Symbol} & \colhead{Units} & \colhead{Range} }
+\startdata
+Surface gravity & $g$ & $10^{14}\ {\rm g\,cm^{-2}}$ & \\
+Accreted hydrogen mass fraction & $X_0$ & \nodata & \\
+Metallicity & $Z_{\rm CNO}$ & \nodata & \\
+Base flux & $Q_b$ & MeV/nucleon & \\
+%
+% samples are drawn randomly over the ranges below, which might be tightened for the 
+% final production versions. In particular I don't know if such high redshifts are 
+% physical
+Distance & $d$ & kpc & 4--12\\
+System inclination\tablenotemark{a} & $i$ & degrees & 0--75\\
+Surface redshift & $1+z$ & \nodata & 1--2\\
+\enddata
+\tablenotetext{a}{Drawn from a random distribution uniform in $\cos i$}
+% \tablecomments{Note that {\tt \string \colnumbers} does not work with the 
+% vertical line alignment token. If you want vertical lines in the headers you
+% can not use this command at this time.}
+\end{deluxetable}
+
+
+%The predicted quantities can then be converted to values suitable for comparison to observations, as follows
+%\begin{equation}
+%F_{{\rm pred},i,\infty}  =  \xi^2\frac{L_{{\rm pred},i}}{4\pi d^2\xi_b(1+z)^2}
+%\end{equation}
+
 
 %The default style in \aastex\ v6.1 is a tight single column style, e.g.  10
 %point font, single spaced.  The single column style is very useful for
@@ -441,46 +551,97 @@ Here we describe a few different approaches that have been used to deduce system
 \subsection{Inferring fuel composition} 
 \label{subsec:fuelcomp}
 
+Given a set of burst observations as described in \S\ref{subsec:data}, a common approach \cite[e.g][]{falanga11} is to estimate the fuel composition at ignition, and hence the accreted fuel composition, based on simple analytic estimates of the burst energy production $Q_{\rm nuc}$.
+
+One issue with this approach is that the effects of anisotropy are frequently neglected.
+%
+A second issue which has emerged recently is that the commonly used estimates for the nuclear energy generation rate $Q_{\rm nuc}$ are not supported by recent {\sc kepler} models. 
+%
+We describe the general approach below including the effects of these two issues.
+
+Given the measured $\alpha$-value, the nuclear energy generation rate $Q_{\rm nuc}$ can be estimated, as follows:
+\begin{eqnarray}
+\alpha & = & \frac{\Delta t F_{\rm per} c_{\rm bol}}{E_B} \\
+& = & \frac{Q_{\rm grav}}{Q_{\rm nuc}}\frac{\xi_b}{\xi_p}(1+z)
+\end{eqnarray}
+where $Q_{\rm grav} = c^2z/(1+z) \approx GM_{\rm NS}/R_{\rm NS}$ is the gravitational energy release per gram. Note the dependence of the observational $\alpha$-value on both the surface redshift and the anisotropy parameters. The nuclear energy generation rate is thus
+\begin{equation}
+Q_{\rm nuc} = \frac{c^2 z}{\alpha}\frac{\xi_b}{\xi_p} \label{qnuc}
+\end{equation}
+Thus, given an estimate of $z$ and the inclination, the burst measurements can be used to infer $Q_{\rm nuc}$. 
+
+% describe plausible assumptions for ration of $\xi_b/\xi_p$.
+The system inclination for LMXBs is notoriously difficult to measure. For non-dipping sources, the likely range is up to $72^\circ$, while dipping sources are likely $i\gtrsim79.3^\circ$ \cite[]{gal16a}.
+% 
+% 5, 16, 50, 68, 95 th percentiles:
+% [ 0.58815149  0.72522467  1.12987208  1.49149624  1.59287602]
+% min, max
+% 0.525409532417 1.63715782279
+For an isotropically-distributed population of non-dipping sources, the ratio $\xi_b/\xi_p$ is roughly uniformly-distributed between 0.53--1.64, rising a little towards the high end. The median value is 1.13, while the 95\% confidence interval is 0.73--1.49.
+
+\begin{itemize}
+\item describe plausible assumptions for $z$, e.g. based on recent analysis of bursts
+\end{itemize}
+
+Given an estimate of $Q_{\rm nuc}$, the average hydrogen fraction $\langle X\rangle$ in the fuel layer at ignition has been estimated to date using the relation $Q_{\rm nuc}=1.6 + 4\langle X\rangle$~MeV/nucleon \cite[e.g.][and references therein]{gal03d}. This expression includes $\approx35$\% losses
+attributed to neutrino emission \cite[]{fuji87}. However, the 35\% value applies only to $\beta$-decays in the much more extensive {\it rp}-process burning chain, and recent {\sc kepler} simulations indicate instead an approximation of $Q{\rm nuc}=0.96+6.6\langle X\rangle$ (Goodwin et al. 2018, in preparation). [{\it comment on improved quadratic expression}]
+%
+Thus, by substituting in equation \ref{qnuc} we can estimate 
+\begin{equation}
+\langle X\rangle 
+% In [42]: c.c**2/(1.*u.MeV/c.m_p).to("m**2/s**2")/6.6
+% Out[42]: <Quantity 142.16243658783114>
+% = \frac{c^2z/\alpha}{6.6\ {\rm Mev/nucleon}}\frac{\xi_b}{\xi_p} - 0.145
+= z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145 \label{xbar}
+\end{equation}
+[{\it comment on the degree of error introduced by ignoring anisotropy etc.}] 
+%
+Clearly this expression is only applicable for $\alpha$-values up to some limit, which we calculate as
+\begin{equation}
+%In [43]: c.c**2/(1.*u.MeV/c.m_p).to("m**2/s**2")/6.6/0.145
+%Out[43]: <Quantity 980.4305971574562>
+\alpha \leq 980\, z \frac{\xi_b}{\xi_p}
+\end{equation}
+Interestingly, this limit is $\approx70$\% larger than the equivalent value derived for the old expression for $Q_{\rm nuc}$. This result suggests that larger observed values of $\alpha$ may be accommodated without resorting to explanations including incomplete burning of burst fuel \cite[e.g.][]{bcatalog}.
+
+The hydrogen fraction at ignition $\langle X\rangle$ and the burst recurrence time may then be used to estimate the hydrogen fraction in the fuel, $X_0$. The H-fraction at the base of the fuel layer is reduced steadily by $\beta$-limited hot CNO burning, and will completely exhaust the accreted hydrogen in a time \cite[]{lampe16}:
+\begin{equation}
+t_{\rm CNO} =9.8\left(\frac{X_0}{0.7}\right) \left(\frac{Z_{\rm CNO}}{0.02}\right)^{-1}
+\end{equation}
+The hydrogen fraction at the base will thus be $X_0(1-\Delta t/t_{\rm CNO})$, [{\it should this expression include time dilation?}] so that the average H-fraction in the layer will be $\langle X \rangle = X_0(1-0.5\Delta t/t_{\rm CNO})$. We can combine this expression with equation \ref{xbar} to give
+\begin{eqnarray}
+X_0 & = & \langle X\rangle +0.35\left(\frac{\Delta t}{9.8\ {\rm hr}}\right)
+                            \left(\frac{Z_{\rm CNO}}{0.02}\right) \nonumber \\
+    & = & z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145 
+                           +\left(\frac{\Delta t}{28\ {\rm hr}}\right)
+                            \left(\frac{Z_{\rm CNO}}{0.02}\right)
+\end{eqnarray}
+Clearly this estimate of $X_0$ will incorporate systematic errors arising from the assumed values of $z$, the inclination, and $Z_{\rm CNO}$. We explore the typical range of these errors in 
+% the next section.
+\S\ref{sec:simulations}
+
+% comment on the inability to measure distance/mass/radius? Or can we actually do that?
+% I think you can get distance by comparing the ignition column with the fluence
+
+\subsection{Inferring distance} 
+\label{subsec:distance}
+
+The observed burst energy permits estimation of the ignition depth, assuming complete fuel consumption. For a burst fluence $E_b$, the total burst energy release (taking into account the anisotropy effect) is
+\begin{equation}
+E_{\rm burst} = 4\pi d^2 \xi_b E_b 
+\end{equation}
+The ignition depth is given by 
+\begin{eqnarray}
+y_{\rm ign} & = & E_{\rm burst}\frac{1 + z}{4\pi R_{\rm NS}^2 Q_{\rm nuc}} \\
+  & = & E_b \frac{\xi_b (1 + z)}{ Q_{\rm nuc}} \left(\frac{d}{R_{\rm NS}}\right)^2 
+\end{eqnarray}
+Independently, we can estimate the accreted mass as simply $\Delta M = ...$ and thus estimate the distance...?
+
 \subsection{Observation-model comparisons} 
 \label{subsec:lccompare}
 
-The model-predicted quantities must then be converted to what a distant observer would see, by taking into account the effects of general relativistic time dilation and redshift.
+The model-predicted quantities must then be converted to what a distant observer would see, by taking into account the effects of source distance, emission anisotropy, general relativistic time dilation and redshift. For the purposes of comparison, we convert the model lightcurves to what a distant observer would see, following the approach described in \S\ref{subsec:simobs}.
 
-Following \cite{lampe16}, we write the corrections as follows \cite[see also][]{keek11}. For self-consistency, we need to identify a mass and radius for the neutron star for which the Newtonian potential equals the GR potentials, i.e.
-\begin{equation}
-\frac{GM}{r^2} = \frac{GM_{\rm GR}}{R^2_{\rm GR}\sqrt{1-2GM_{\rm GR}/(c^2R_{\rm GR})}} = \frac{GM_{\rm GR}}{R^2_{\rm GR}}(1+z)
-\end{equation}
-where $1+z$ is the gravitational redshift:
-\begin{equation}
-1+z = \frac{1}{\sqrt{1-2GM_{\rm GR}/(c^2R_{\rm GR})}}
-\end{equation}
-This equality is generally achieved by assuming that $M=M_{\rm GR}$, and solving for $R_{\rm GR}$. 
-We define $\xi$ such that $R_{\rm GR}=\xi R$. 
-One advantage of this choice is that the mass accretion rate is identical in the Newtonian and observer frames, and also that $\xi = \sqrt{1 + z}$. 
-
-An additional correction that must be applied is the effect of the anisotropic emission of the burst, based on the system inclination $i$. This effect has been simulated for a range of disk geometries \cite[e.g.][]{he16}. Because the emission region on the surface of the star is thought to be different for the burst and persistent emission, we define separate anisotropy parameters $\xi_b$ and $\xi_p$, with the sense that
-\begin{equation}
-L_{b,p} = 4\pi d^2\xi_{b,p}F_{b,p}
-\end{equation}
-where $L_b$, $L_p$ are the burst and persistent luminosity, $F_b$, $F_p$ are the corresponding (observed) fluxes, and $d$ is the source distance. With this sense it can be seen that values of $\xi_{b,p}<1$ correspond to emission preferentially beamed towards us, so that --- without the anisotropy corrections --- the isotropic luminosity inferred from the observed flux would overestimate the actual luminosity.
-
-Of the model input parameters, we can also infer the persistent flux level expected given the model-assumed accretion rate $\dot{m}$, as follows: % gal03d, equation 2
-\begin{equation}
-F_{p,{\rm inf}} = \frac{L_p}{4\pi d^2} = 
-% \frac{\dot{M} Q_{\rm grav}}{1+z} \left(\frac{R_{\rm NS}}{d}\right)^2 \xi_p^{-1}
-% expression used in code
-\frac{\dot{m} Q_{\rm grav}}{4\pi d^2 (1+z)\xi_p}% c_{\rm bol}}
-\end{equation}
-where $Q_{\rm grav} = c^2z/(1+z) \approx GM_{\rm NS}/R_{\rm NS}$ is the gravitational energy release per gram. % gal03d 
-
-The predicted quantities can then be converted to values suitable for comparison to observations, as follows
-\begin{eqnarray}
-\Delta t_{{\rm pred},\infty} & = & (1+z)\Delta t_{\rm pred} \\
-% E_{{\rm pred},\infty} & = & \xi^2E_{\rm pred}/(1+z)^2 \\ % CHECK
-% add in the F_per (derived from the mdot) here; see Lampe et al. (2016), eq 8
-t_{i,\infty} & = & (1+z)t_i \\
-F_{{\rm pred},i,\infty} & = & \xi^2\frac{L_{{\rm pred},i}}{4\pi d^2\xi_b(1+z)^2}
-\end{eqnarray}
 
 For a given pair of observed and model lightcurves, the only parameters that affect the comparison are the source distance $d$, the anistotropy parameters $\xi_b$, $\xi_p$ (each a function of the inclination $i$), and the gravitational redshift $1+z$ (which also determines the parameter $\xi$).
 %

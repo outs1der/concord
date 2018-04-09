@@ -187,6 +187,8 @@ def modelFunc(p,obs,model, disc_model):
 # Here we calculate the value of xi (ratio of GR to Newtonian radii),
 # appropriate for the adopted value of (1+z). This is used instead of the
 # value attached to the model, because that's for a different redshift
+#
+# Note that this isn't actually used below
 
     xi = sqrt(_opz)
 
@@ -205,7 +207,9 @@ def modelFunc(p,obs,model, disc_model):
 #   L_b = 4\pi d^2 \xi_b F_b
 
 #    return ( (model.xi/opz)**2 
-    return ( (xi/_opz)**2 
+# since xi = sqrt(_opz) (see above), this first term just becomes 1/_opz
+#    return ( (xi/_opz)**2 
+    return ( (1/_opz)
             * fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*model.lumin.unit
             / (4.*pi*dist.to('cm')**2) / xi_b )
 

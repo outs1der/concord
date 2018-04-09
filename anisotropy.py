@@ -50,7 +50,8 @@ def anisotropy(inclination, model='he16_a', test=False):
         plt.ylabel(r"$\xi_p/\xi_b$")
 
         s='-'
-        for m in ['fuji88' ,'he16']:
+#        for m in ['fuji88' ,'he16']:
+        for m in ['fuji88' ,'he16_a']:
             xi_p = np.zeros(len(_theta))
             xi_b = np.zeros(len(_theta))
             for i, _th in enumerate(_theta):
