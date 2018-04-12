@@ -16,12 +16,18 @@
 # class ObservedBurst(Lightcurve):
 # class KeplerBurst(Lightcurve):
 #
+# def g(M,R,Newt=False,units='cm/s^2'):
+# def opz(M,R):
+# def calc_mr(g,opz):
+# def solve_radius(M,R_Newt,eta=1e-6):
+# def fper(mdot,opz,dist,xi_p,c_bol=1.0):
 # def decode_LaTeX(string):
-# def modelFunc(p,obs,model):
+# def modelFunc(p,obs,model, disc_model):
 # def lnprior(theta):
 # def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
 # def lhoodClass(params, obs, model, weights, disc_model):
 # def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
+# def plot_contours(sampler,parameters,ignore,plot_size):
 
 import numpy as np
 from math import *
@@ -379,6 +385,7 @@ class Lightcurve(object):
             print ("** WARNING ** can't add scatter without flux errors")
 
 # And return a Lightcurve object with appropriate label
+# Really this should be an ObservedBurst
 
         return Lightcurve(time=obs.time,dt=obs.dt,
                           flux=model,flux_err=obs.flux_err, 
@@ -414,10 +421,11 @@ class ObservedBurst(Lightcurve):
     objects
     '''
 
-    def __init__(self, filename, path=None, **kwargs):
+    def __init__(self, filename, lc=None, path=None, **kwargs):
 
-# For now, this is restricted to the "reference" bursts, which have a
-# format like this:
+# This routine will read in any ascii lightcurve file which matches the
+# format of the "reference" bursts:
+# 
 # 'Time [s]' 'dt [s]' 'flux [10^-9 erg/cm^2/s]' 'flux error [10^-9
 # erg/cm^2/s]' 'blackbody temperature kT [keV]' 'kT error [keV]'
 # 'blackbody normalisation K_bb [(km/d_10kpc)^2]' 'K_bb error
@@ -430,20 +438,33 @@ class ObservedBurst(Lightcurve):
         if path == None:
             path = '.'
         self.path = path
-        self.filename = filename
 
-        d=ascii.read(self.path+'/'+self.filename)
+        if filename != None:
+            self.filename = filename
+
+            d=ascii.read(self.path+'/'+self.filename)
 
 # Now we define a Lightcurve instance, using the columns from the file
 
-        Lightcurve.__init__(self, filename = filename, 
-                            time=d['col1']*u.s, dt=d['col2']*u.s,
-                            flux=d['col3']*1e-9*u.erg/u.cm**2/u.s,
-                            flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
+            Lightcurve.__init__(self, filename = filename, 
+                                time=d['col1']*u.s, dt=d['col2']*u.s,
+                                flux=d['col3']*1e-9*u.erg/u.cm**2/u.s,
+                                flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
 
 # In principle we can parse a bunch of additional information from the headers
 
-        self.comments = d.meta['comments']
+            self.comments = d.meta['comments']
+
+        elif lc != None:
+
+# An alternative way to initialise is to pass a lightcurve object
+# (but this doesn't work)
+
+            self.lightcurve = lc
+            self.filename=''
+            if hasattr(lightcurve,'filename'):
+                if lightcurve.filename:
+                    self.filename = lightcurve.filename
 
 # Here the recurrence time; looking for a string like
 #   Average recurrence time is 3.350 +/- 0.04 hr
@@ -988,11 +1009,11 @@ def lnprior(theta):
     dist, inclination, _opz, t_off = theta
 
 # We have currently flat priors for everything but the inclination, which
-# has a probability distribution proportional to cos(i)
+# has a probability distribution proportional to sin(i)
 
     if (dist.value > 0.0 and 0.0 < inclination.value < 90.
         and 1. < _opz < 2):
-        return np.log(np.cos(inclination))
+        return np.log(np.sin(inclination))
     else:
         return -np.inf
 

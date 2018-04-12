@@ -38,7 +38,7 @@ def mnPrior(cube, ndim, nparams):
     cube[0] = 1. + cube[0]*15.
     
 # inclination in the range 0-90; could be more restrictive for a non-dipper
-    cube[1] = np.arccos(cube[1])*180./pi
+    cube[1] = np.arcsin(cube[1])*180./pi
 
 # redshift is in the range 1-2
     cube[2] = 1. + cube[2]
