@@ -15,6 +15,10 @@ import burstclass
 import manipulation
 import con_versions
 import define_sources
+
+# kepler_grids
+from pygrids.physics import gparams
+
 #============================================
 # Tools for using X-ray burst matcher Concord
 # Author: Zac Johnston (2017)
@@ -114,14 +118,18 @@ def load_models(runs, batches, source, basename='xrb',
         # NOTE: Assumes that models in ptable exactly match those in mtable
 
         # ====== Extract model parameters/properties ======
-        xi = 1.16             # currently constant, could change in future
-        R_NS = 11.6 * u.km    # add this as colum to parameter file (or g)?
-        M_NS = ptable['mass'][idx] * const.M_sun
+        r_reference = 10  # reference radius (km)
+        mass = ptable['mass'][idx]
+        M_NS = mass * const.M_sun
+        xi, opz = gparams.gr_corrections(r_reference, mass)
+
+        R_NS = xi * r_reference * u.km    # add this as colum to parameter file (or g)?
+        g = gparams.get_acceleration_newtonian(r_reference, mass)
+
         X = ptable['x'][idx]
         Z = ptable['z'][idx]
         lAcc = ptable['accrate'][idx] * ptable['xi'][idx]    # includes xi_p multiplier
-        opz = 1./sqrt(1.-2.*const.G*M_NS/(const.c**2*R_NS))
-        g = const.G*M_NS/(R_NS**2/opz)
+
         tdel = mtable['tDel'][idx]/3600
         tdel_err = mtable['uTDel'][idx]/3600
 
