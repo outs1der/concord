@@ -438,8 +438,8 @@ def plot_lightcurves(run, batches, source, con_ver, step=2000, **kwargs):
 
     # ===== read in mcmc table =====
     batch_str = manipulation.full_string(batches=batches, source=source, step=step, con_ver=con_ver)
-    mcmc_filename = 'mcmc_' + batch_str + '.txt'
-    mcmc_filepath = os.path.join(source_path, 'mcmc', mcmc_filename)
+    mcmc_filename = f'concord_summ_{batch_str}.txt'
+    mcmc_filepath = os.path.join(source_path, 'concord_summ', mcmc_filename)
     mcmc_table = pd.read_table(mcmc_filepath, delim_whitespace=True)
 
     run_idx = np.argwhere(mcmc_table['run'] == run)[0][0]
@@ -453,7 +453,7 @@ def plot_lightcurves(run, batches, source, con_ver, step=2000, **kwargs):
             print(p, params[p])
 
     # ===== plot each epoch =====
-    for i in range(n):
+    for i in range(3):
         t = 't' + str(i+1)
         base_input_params = [params['d']*u.kpc, params['i']*u.degree, params['1+z']]
         input_params = base_input_params + [params[t]*u.s] # append relevant time only

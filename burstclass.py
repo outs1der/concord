@@ -130,13 +130,16 @@ class Lightcurve(object):
 # where argument for step is appropriate for timepixr=0.0
 
     def plot(self):
+        yscale = 1e-8
         assert self.timepixr == 0.0
-        plt.step(self.time,self.flux,where='post',
+        plt.step(self.time,self.flux/yscale,where='post',
 		label=self.filename)
         plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
-            self.flux.value, yerr=self.flux_err.value,fmt='b.')
+            self.flux.value/yscale, yerr=self.flux_err.value/yscale,
+                     ls='none', c='C0', fmt='.', markersize=1)
         plt.xlabel("Time ({0.unit:latex_inline})".format(self.time))
-        plt.ylabel("Flux ({0.unit:latex_inline})".format(self.flux))
+        plt.ylabel(r"Flux ($10^{-8}$ erg s$^{-1}$ cm$^{-2}$)",# + "{0.unit:latex_inline})".format(self.flux),
+                   fontsize=11)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -331,7 +334,7 @@ class ObservedBurst(Lightcurve):
 
 # Now do a more complex plot with a subplot
 # See http://matplotlib.org/users/gridspec.html for documentation
-
+            yscale = 1e-8
             fig = plt.figure()
             gs = gridspec.GridSpec(4, 3)
             ax1 = fig.add_subplot(gs[0:3,:])
@@ -348,8 +351,8 @@ class ObservedBurst(Lightcurve):
 ##		label=mburst.filename.replace('_',r'\_'))
 #		label=mburst.filename)
 
-            ax1.plot(self.time+(0.5-self.timepixr)*self.dt, model,'r-',
-		label=mburst.filename)
+            ax1.plot(self.time+(0.5-self.timepixr)*self.dt, model/yscale,'-', c='C3',
+		label=mburst.filename, zorder=120)
 
             if subplot:
 
@@ -361,10 +364,11 @@ class ObservedBurst(Lightcurve):
                 a = plt.axes([.55, .5, .3, .3]) # yellow is kinda ugly
 
 #                print (self.tdel,self.tdel_err)
+                a.set_title('Recurrence time')
                 a.errorbar([0.95], self.tdel.value,
-                       yerr=self.tdel_err.value, fmt='o')
+                       yerr=self.tdel_err.value, fmt='o', c='C0', capsize=3)
                 a.errorbar([1.05], mburst.tdel.value*opz,
-                       yerr=mburst.tdel_err.value*opz, fmt='ro')
+                       yerr=mburst.tdel_err.value*opz, fmt='o', c='C3', capsize=3)
                 plt.ylabel('$\Delta t$ (hr)')
 
 #            plt.plot(self.time,model,'.')
@@ -381,13 +385,13 @@ class ObservedBurst(Lightcurve):
 #                print (mburst.filename)
 
 # Residual panel
-
             ax2 = fig.add_subplot(gs[3,:])
 #            ax2.plot(self.time+(0.5-self.timepixr)*self.dt, model-self.flux)
             plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
-		self.flux.value-model.value,
-		yerr=self.flux_err.value,fmt='b.')
-            ax2.axhline(0.0, linestyle='--', color='k')
+                         (self.flux.value-model.value)/yscale,
+		yerr=self.flux_err.value/yscale, fmt='.', c='C0')
+            ax2.axhline(0.0, linestyle='--', color='C3')
+            plt.xlabel('Time (s)', fontsize=11)
             gs.update(hspace=0.0)
         #======================================================
 
