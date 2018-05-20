@@ -15,6 +15,10 @@ import burstclass
 import manipulation
 import con_versions
 import define_sources
+
+# kepler_grids
+from pygrids.physics import gparams
+
 #============================================
 # Tools for using X-ray burst matcher Concord
 # Author: Zac Johnston (2017)
@@ -114,14 +118,18 @@ def load_models(runs, batches, source, basename='xrb',
         # NOTE: Assumes that models in ptable exactly match those in mtable
 
         # ====== Extract model parameters/properties ======
-        xi = 1.16             # currently constant, could change in future
-        R_NS = 11.6 * u.km    # add this as colum to parameter file (or g)?
-        M_NS = ptable['mass'][idx] * const.M_sun
+        r_reference = 10  # reference radius (km)
+        mass = ptable['mass'][idx]
+        M_NS = mass * const.M_sun
+        xi, opz = gparams.gr_corrections(r_reference, mass)
+
+        R_NS = xi * r_reference * u.km    # add this as colum to parameter file (or g)?
+        g = gparams.get_acceleration_newtonian(r_reference, mass)
+
         X = ptable['x'][idx]
         Z = ptable['z'][idx]
         lAcc = ptable['accrate'][idx] * ptable['xi'][idx]    # includes xi_p multiplier
-        opz = 1./sqrt(1.-2.*const.G*M_NS/(const.c**2*R_NS))
-        g = const.G*M_NS/(R_NS**2/opz)
+
         tdel = mtable['tDel'][idx]/3600
         tdel_err = mtable['uTDel'][idx]/3600
 
@@ -430,8 +438,8 @@ def plot_lightcurves(run, batches, source, con_ver, step=2000, **kwargs):
 
     # ===== read in mcmc table =====
     batch_str = manipulation.full_string(batches=batches, source=source, step=step, con_ver=con_ver)
-    mcmc_filename = 'mcmc_' + batch_str + '.txt'
-    mcmc_filepath = os.path.join(source_path, 'mcmc', mcmc_filename)
+    mcmc_filename = f'concord_summ_{batch_str}.txt'
+    mcmc_filepath = os.path.join(source_path, 'concord_summ', mcmc_filename)
     mcmc_table = pd.read_table(mcmc_filepath, delim_whitespace=True)
 
     run_idx = np.argwhere(mcmc_table['run'] == run)[0][0]
@@ -445,7 +453,7 @@ def plot_lightcurves(run, batches, source, con_ver, step=2000, **kwargs):
             print(p, params[p])
 
     # ===== plot each epoch =====
-    for i in range(n):
+    for i in range(3):
         t = 't' + str(i+1)
         base_input_params = [params['d']*u.kpc, params['i']*u.degree, params['1+z']]
         input_params = base_input_params + [params[t]*u.s] # append relevant time only

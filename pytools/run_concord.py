@@ -33,13 +33,18 @@ con_ver = int(sys.argv[4])
 threads = int(sys.argv[5])
 restart = sys.argv[6]
 
-batches = manipulation.expand_batches(batches=batch0, source=source)
-runs = np.full_like(batches, run)
+# batches = manipulation.expand_batches(batches=batch0, source=source)
+# runs = np.full_like(batches, run)
+
+# !!! Temporary Hack !!!
+batches = [19, 1, 1]
+runs = [10, 20, 12]
+# !!!!!!!!!!!!!!!!!!!!
 
 print(f"""Loading observed and model data:
         Run {run} from batches {batches}""")
 
-obs = ctools.load_obs(source=source)
+obs = ctools.load_obs(source='gs1826')  #!!!
 models = ctools.load_models(runs=runs, batches=batches, source=source)
 nwalkers = 200
 
@@ -47,8 +52,8 @@ nwalkers = 200
 weights = con_versions.get_weights(con_ver)
 disc_model = con_versions.get_disc_model(con_ver)
 
-pos = ctools.setup_positions(source=source, nwalkers=nwalkers)
-sampler = ctools.setup_sampler(obs=obs, source=source, models=models,
+pos = ctools.setup_positions(source='gs1826', nwalkers=nwalkers)
+sampler = ctools.setup_sampler(obs=obs, source='gs1826', models=models,
                     nwalkers=nwalkers, threads=threads, weights=weights,
                     disc_model=disc_model)
 
@@ -68,9 +73,9 @@ chain_path = os.path.join(GRIDS_PATH, 'sources', source, 'concord')
 restart = False
 start=0
 
-total_steps = 2000
+total_steps = 2
 net_steps = total_steps - start
-nsteps = 2000      # No. of steps to do between savedumps
+nsteps = 2      # No. of steps to do between savedumps
 iters = round(net_steps/nsteps)
 n0 = round(start/nsteps)
 
