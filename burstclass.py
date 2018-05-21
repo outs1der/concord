@@ -28,6 +28,11 @@
 # def lhoodClass(params, obs, model, weights, disc_model):
 # def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 # def plot_contours(sampler,parameters,ignore,plot_size):
+#
+# As well as standard modules, you'll need to install the following:
+#
+# linfit https://github.com/djpine/linfit.git
+#          (the version available via pip is different, and doesn't work)
 
 import numpy as np
 from math import *
@@ -42,6 +47,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import re
 from scipy.interpolate import interp1d
+from linfit import linfit
 from astroquery.vizier import Vizier
 from chainconsumer import ChainConsumer
 from datetime import datetime
@@ -262,12 +268,24 @@ class Lightcurve(object):
         self.timepixr = kwargs.get('timepixr',0.0)
         self.dt = kwargs.get('dt',None)
 #        if kwargs.get('flux',None):
+
+        self.lumin = kwargs.get('lumin',None)
+        self.lumin_err = kwargs.get('lumin_err',None)
+
+# Here we define the dt_nogap and good attributes, which are used in the
+# fluence calculation (and elsewhere)
+
+        self.dt_nogap = self.dt
         if 'flux' in kwargs:
             self.flux = kwargs.get('flux',None)
             self.flux_err = kwargs.get('flux_err',None)
 
-        self.lumin = kwargs.get('lumin',None)
-        self.lumin_err = kwargs.get('lumin_err',None)
+            self.good = np.where(self.flux_err < self.flux)[0]
+            for i in range(len(self.good)-1):
+                self.dt_nogap[self.good[i]] = max(
+    [self.dt[self.good[i]],self.time[self.good[i+1]]-self.time[self.good[i]]] )
+        else:
+            self.good = np.arange(len(self.lumin))
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -392,6 +410,109 @@ class Lightcurve(object):
 #                          tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
 #                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
                           filename="{} @ {}".format(self.filename,dist))
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+    def fluence(self,plot=False):
+        """
+        Calculate the fluence for a lightcurve, following the approach
+        from get_burst_data
+        This code relies on the presence of dt_nogap and good attributes,
+        which should be calculated when the Lightcurve object is defined
+        """
+
+        minpts=4	# Fit to a minimum of this number of points in the tail
+        fitfrac=0.1	# Fit to points over this fraction span in the flux
+        fdiffmax=0.1	# Threshold difference for exponential decay constant
+			#   between different fit instances, to gauge the
+			#   convergence/reliability of the fit procedure
+
+        if hasattr(self,'flux'):
+            y = self.flux
+            yerr = self.flux_err
+        elif hasattr(self,'lumin'):
+            y = self.lumin
+            yerr = self.lumin_err
+
+        imax = np.argmax(y[self.good])
+        pflux = y[self.good[imax]]
+#        self.pflux = y[self.good[imax]]
+#        self.pfluxe = self.flux_err[self.good[imax]]
+
+        if max(self.dt_nogap/self.dt) > 2.:
+            print ('** WARNING ** excessive gap filling not yet implemented')
+
+        fluen = sum(y[self.good]*self.dt_nogap[self.good])
+        fluene_stat = np.sqrt(sum( (yerr[self.good]*self.dt_nogap[self.good])**2 ))
+
+# Now extrapolate the flux beyond the extent of the data, if possible
+
+        rchisq=0.0
+        ng = len(self.good)
+        ntail=ng-imax-1	# Number of points in the tail
+        if ntail >= minpts:
+            tail=np.where(self.time[self.good] > self.time[self.good[imax]])[0]
+
+# Determine the minimum flux reached in the tail. This might be bigger than
+# fitfrac*pflux, so we need to count from there as a zero point
+
+        minflux=0.
+        if len(tail) > 0:
+            minflux=min(y[self.good[tail]])
+
+# Now determine the points in the tail which are *excluded* from the fit;
+# for the fit selection, we then calculate from the end of this interval
+
+        tailexcl=np.where((self.time[self.good] > self.time[self.good[imax]])
+                       & (y[self.good] > minflux+fitfrac*pflux))[0]
+
+        if len(tailexcl) > 0:
+            sel=self.good[min([ng-4,max(tailexcl)]):ng]
+				# Last three points, at least
+        else:
+            sel=self.good[min([imax+1,ng-4]):ng]
+				# ...or, if all the tail points are excluded,
+				#   just take the last three
+
+# Now actually do the fitting (to the log of the flux)
+
+        result, cvm, fit_info = linfit(
+          self.time[sel]-self.time[sel[0]]+self.dt_nogap[sel]/2.,
+          np.log(y[sel].value),
+          sigmay=0.5*(np.log((y[sel]+yerr[sel]).value)
+                     -np.log((y[sel]-yerr[sel]).value)), 
+          return_all=True) 
+
+        print (fit_info)
+
+# Result is a 2-element array, slope and intercept (opposite order to IDL)
+
+        f_int=0.
+        if result[0] > 0.0:
+            print ('** WARNING ** fit is rising, result is not trustworthy')
+        else:
+            tmax=max(self.time[sel]+self.dt_nogap[sel]-self.time[sel[0]])
+            f_int=-fluen.unit/result[0]*exp(result[1])*exp(tmax.value*result[0])
+
+        fluen+=f_int
+
+# Show the integrated part against the lightcurve, if required
+# This could be improved
+
+        if plot:
+            self.plot()
+            xx=np.arange(20)/19.*(max(self.time[sel]+self.dt_nogap[sel])-self.time[sel[0]])*4
+#            print ("xx: ",xx)#+self.time[sel[0]])
+#            print ("yy:",np.exp(xx.value*result[0]))
+            plt.plot(xx+self.time[sel[0]],
+                np.exp(result[1])*np.exp(xx.value*result[0]))
+
+        if f_int > fluene_stat:
+#            if verbose eq 1 then $
+            print ('** WARNING ** extrapolated fluence > stat_error, replacing')
+            return fluen, f_int
+
+        return fluen, fluen_stat
 
 # ======= ========= ========= ========= ========= ========= ========= =========
 
