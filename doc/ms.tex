@@ -142,7 +142,8 @@
 
 \begin{document}
 
-\title{Thermonuclear burst model-observation comparisons with {\sc concord}}
+% \title{Thermonuclear burst model-observation comparisons with {\sc concord}}
+\title{Robust inference of neutron-star parameters from thermonuclear burst lightcurves}
 
 %% LaTeX will automatically break titles if they run longer than
 %% one line. However, you may use \\ to force a line break if
@@ -195,6 +196,10 @@
 \email{duncan.galloway@monash.edu}
 
 \author[0000-0002-6558-5121]{Duncan K. Galloway}
+
+\author{Zac Johnston}
+\author{Adelle Goodwin}
+
 \affil{School of Physics \& Astronomy \\
 Monash University \\
 Clayton, VIC 3800, Australia}
@@ -546,7 +551,7 @@ Surface redshift & $1+z$ & \nodata & 1--2\\
 \section{Analysis} 
 \label{sec:analysis}
 
-Here we describe a few different approaches that have been used to deduce system parameters from observations of thermonuclear bursts.
+Here we describe three different approaches that have been used to deduce system parameters from observations of thermonuclear bursts.
 
 \subsection{Inferring fuel composition} 
 \label{subsec:fuelcomp}
@@ -589,7 +594,7 @@ attributed to neutrino emission \cite[]{fuji87}. However, the 35\% value applies
 Thus, by substituting in equation \ref{qnuc} we can estimate 
 \begin{equation}
 \langle X\rangle 
-% In [42]: c.c**2/(1.*u.MeV/c.m_p).to("m**2/s**2")/6.6
+% In [42]: c.c**2/(6.6*u.MeV/c.m_p).to("m**2/s**2")
 % Out[42]: <Quantity 142.16243658783114>
 % = \frac{c^2z/\alpha}{6.6\ {\rm Mev/nucleon}}\frac{\xi_b}{\xi_p} - 0.145
 = z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145 \label{xbar}
@@ -604,21 +609,31 @@ Clearly this expression is only applicable for $\alpha$-values up to some limit,
 \end{equation}
 Interestingly, this limit is $\approx70$\% larger than the equivalent value derived for the old expression for $Q_{\rm nuc}$. This result suggests that larger observed values of $\alpha$ may be accommodated without resorting to explanations including incomplete burning of burst fuel \cite[e.g.][]{bcatalog}.
 
+% upper limit on xbar
+Conversely, for low values of $\alpha$, we may apply the constraint that $\langle X\rangle \lesssim 0.77$, corresponding to the expected maximum possible for accreted fuel with primordial abundances.
+
 The hydrogen fraction at ignition $\langle X\rangle$ and the burst recurrence time may then be used to estimate the hydrogen fraction in the fuel, $X_0$. The H-fraction at the base of the fuel layer is reduced steadily by $\beta$-limited hot CNO burning, and will completely exhaust the accreted hydrogen in a time \cite[]{lampe16}:
 \begin{equation}
 t_{\rm CNO} =9.8\left(\frac{X_0}{0.7}\right) \left(\frac{Z_{\rm CNO}}{0.02}\right)^{-1}
 \end{equation}
-The hydrogen fraction at the base will thus be $X_0(1-\Delta t/t_{\rm CNO})$, [{\it should this expression include time dilation?}] so that the average H-fraction in the layer will be $\langle X \rangle = X_0(1-0.5\Delta t/t_{\rm CNO})$. We can combine this expression with equation \ref{xbar} to give
+measured in the neutron star frame.
+The hydrogen fraction at the base will thus be $X_0[1-\Delta t/(1+z)t_{\rm CNO}]$, 
+% [{\it should this expression include time dilation?}] -- yes
+so that the average H-fraction in the layer will be $\langle X \rangle = X_0[1-0.5\Delta t/(1+z)t_{\rm CNO}]$. We can combine this expression with equation \ref{xbar} to give
 \begin{eqnarray}
-X_0 & = & \langle X\rangle +0.35\left(\frac{\Delta t}{9.8\ {\rm hr}}\right)
+X_0 & = & \langle X\rangle +0.35\left[\frac{\Delta t}{(1+z)9.8\ {\rm hr}}\right]
                             \left(\frac{Z_{\rm CNO}}{0.02}\right) \nonumber \\
     & = & z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145 
-                           +\left(\frac{\Delta t}{28\ {\rm hr}}\right)
+                           +\left[\frac{\Delta t}{(1+z)28\ {\rm hr}}\right]
                             \left(\frac{Z_{\rm CNO}}{0.02}\right)
 \end{eqnarray}
 Clearly this estimate of $X_0$ will incorporate systematic errors arising from the assumed values of $z$, the inclination, and $Z_{\rm CNO}$. We explore the typical range of these errors in 
 % the next section.
 \S\ref{sec:simulations}
+
+\begin{itemize}
+\item Apply the method to the reference bursts
+\end{itemize}
 
 % comment on the inability to measure distance/mass/radius? Or can we actually do that?
 % I think you can get distance by comparing the ignition column with the fluence
@@ -661,7 +676,11 @@ Varying the redshift $1+z$ will allow us to obtain the best match between the mo
 As each model run has been performed with a particular value of the surface gravity $g$, a particular value of $1+z$ implies in turn specific values of $M_{\rm NS}$ and $R_{\rm NS}$. 
 %We take the approach of keeping $R_{\rm NS}$ fixed and allowing $M_{\rm NS}$ to vary to give the required change in $1+z$, since many equations of state have roughly constant radii over a range of masses \cite[e.g.][]{lp07}.
 
- 
+\begin{itemize}
+\item Describe Zac's method
+\item Describe my method (via multinest)
+\end{itemize}
+
 %\startlongtable
 %\begin{deluxetable}{c|cc}
 %\tablecaption{ApJ costs from 1991 to 2013\tablenotemark{a} \label{tab:table}}

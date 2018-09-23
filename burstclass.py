@@ -512,7 +512,7 @@ class Lightcurve(object):
             print ('** WARNING ** extrapolated fluence > stat_error, replacing')
             return fluen, f_int
 
-        return fluen, fluen_stat
+        return fluen, fluene_stat
 
 # ======= ========= ========= ========= ========= ========= ========= =========
 
@@ -1128,6 +1128,11 @@ class KeplerBurst(Lightcurve):
 
 def lnprior(theta):
     dist, inclination, _opz, t_off = theta
+
+# Have to enforce this here or the prior will come out wrong
+
+    assert hasattr(inclination,'unit')
+    assert inclination.unit == 'deg'
 
 # We have currently flat priors for everything but the inclination, which
 # has a probability distribution proportional to sin(i)
