@@ -6,7 +6,10 @@ from scipy.interpolate import interp1d
 import astropy.units as u
 import os
 
-CONCORD_PATH = os.environ['CONCORD_PATH']
+import pkg_resources
+
+# CONCORD_PATH = os.environ['CONCORD_PATH']
+CONCORD_PATH = pkg_resources.resource_filename('concord','data')
 he16_models = ['he16_a', 'he16_b', 'he16_c', 'he16_c_short', 'he16_d']
 
 
@@ -64,6 +67,8 @@ def anisotropy(inclination, model='he16_a', test=False):
             s=':'
 
         plt.legend()
+
+        plt.show()
 
 # Calculate the values for the passed quantity, and return
 # numpy cos will correctly treat the units, so no need to do a conversion

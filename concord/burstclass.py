@@ -52,11 +52,14 @@ from astroquery.vizier import Vizier
 from chainconsumer import ChainConsumer
 from datetime import datetime
 
-from anisotropy import *
+from concord import diskmodel as dm
 
 # Get the path for the concord files from the environment variable
 
-CONCORD_PATH = os.environ['CONCORD_PATH']
+import pkg_resources
+
+CONCORD_PATH = pkg_resources.resource_filename('concord','data')
+# CONCORD_PATH = os.environ['CONCORD_PATH']
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -194,7 +197,7 @@ def modelFunc(p,obs,model, disc_model):
 # Use the anisotropy function to calculate the anisotropy factors given
 # the inclination
 
-    xi_b, xi_p = anisotropy(inclination)
+    xi_b, xi_p = dm.anisotropy(inclination)
 
 # Here we calculate the value of xi (ratio of GR to Newtonian radii),
 # appropriate for the adopted value of (1+z). This is used instead of the
@@ -376,7 +379,7 @@ class Lightcurve(object):
             return None
 
         dist, inclination, _opz, t_off = param
-        xi_b, xi_p = anisotropy(inclination, model=disc_model)
+        xi_b, xi_p = dm.anisotropy(inclination, model=disc_model)
 
         if (obs == None):
 
@@ -700,7 +703,7 @@ class ObservedBurst(Lightcurve):
         if not 0. < inclination.value < 90.:
             return -np.inf
 
-        xi_b, xi_p = anisotropy(inclination, model=disc_model)
+        xi_b, xi_p = dm.anisotropy(inclination, model=disc_model)
 
 # Here we calculate the equivalent mass and radius given the redshift and
 # surface gravity. Since we allow the redshift to vary, but the model is
@@ -1179,13 +1182,16 @@ def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def lhoodClass(params, obs, model, weights, disc_model):
+def lhoodClass(params, obs, model, **kwargs):
     '''
     Calculate the likelihood related to one or more model-observation
     comparisons The corresponding call to emcee will (necessarily) look
     something like this:
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, lhoodClass, args=[obs, models, weights])
+
+    Use the kwargs construction to pass the additional parameters weights,
+    disc_model to the compare method if required
     '''
 
     uparams = apply_units(params)
@@ -1206,14 +1212,13 @@ def lhoodClass(params, obs, model, weights, disc_model):
 
             _params = uparams[0:3]
             _params.append(uparams[3+i])
-            alh += lhoodClass(_params, obs[i], model[i], weights, disc_model)
+            alh += lhoodClass(_params, obs[i], model[i], **kwargs)
 
     else:
 
 # Or if we have just one burst, here's what we do
 
-        alh = obs.compare(mburst=model, param=uparams, weights=weights,
-                            disc_model=disc_model)
+        alh = obs.compare(mburst=model, param=uparams, **kwargs)
 
     return alh + lnprior(uparams[0:4])
 
