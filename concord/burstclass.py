@@ -16,12 +16,7 @@
 # class ObservedBurst(Lightcurve):
 # class KeplerBurst(Lightcurve):
 #
-# def g(M,R,Newt=False,units='cm/s^2'):
-# def opz(M,R):
-# def calc_mr(g,opz):
-# def solve_radius(M,R_Newt,eta=1e-6):
 # def fper(mdot,opz,dist,xi_p,c_bol=1.0):
-# def decode_LaTeX(string):
 # def modelFunc(p,obs,model, disc_model):
 # def lnprior(theta):
 # def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
@@ -34,18 +29,13 @@
 # linfit https://github.com/djpine/linfit.git
 #          (the version available via pip is different, and doesn't work)
 
-import numpy as np
-from math import *
 import os
-
-import astropy.units as u
-import astropy.constants as const
+from .utils import *
 import astropy.io.ascii as ascii
 import csv
 from astropy.table import Table
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
-import re
 from scipy.interpolate import interp1d
 from linfit import linfit
 from astroquery.vizier import Vizier
@@ -60,72 +50,6 @@ import pkg_resources
 
 CONCORD_PATH = pkg_resources.resource_filename('concord','data')
 # CONCORD_PATH = os.environ['CONCORD_PATH']
-
-# ------- --------- --------- --------- --------- --------- --------- ---------
-
-def g(M,R,Newt=False,units='cm/s^2'):
-    '''
-    This function calculates the surface gravity given a mass M and radius R,
-    using the Newtonian expression if the flag Newt is set to True
-
-    The result is returned in units of cm/s^2 by default
-    '''
-
-    if Newt:
-        return (const.G*M/R**2).to(units)
-    else:
-#        return const.G*M/(R**2*sqrt(1.-2.*const.G*M/(const.c**2*R))).to(units)
-        return opz(M,R)*g(M,R,Newt=True).to(units)
-
-# ------- --------- --------- --------- --------- --------- --------- ---------
-
-def opz(M,R):
-    '''
-    This function calculates the gravitational redshift 1+z
-    '''
-
-    return 1./sqrt(1.-2.*const.G*M/(const.c**2*R))
-
-# ------- --------- --------- --------- --------- --------- --------- ---------
-
-def calc_mr(g,opz):
-    ''''
-    this function calculates neutron star mass and radius given a surface
-    gravity and redshift
-    '''
-
-# First some checks
-
-    if hasattr(opz,'unit'):
-        assert (opz.unit == '')
-    try:
-        test = g.to('cm / s2')
-    except ValueError:
-        print ("Incorrect units for surface gravity")
-        return -1, -1
-
-# Now calculate the mass and radius and convert to cgs units
-
-    R_NS = (const.c**2*(opz**2-1)/(2.*g*opz)).to(u.cm)
-    M_NS = (g*R_NS**2/(const.G*opz)).to(u.g)
-
-    return M_NS, R_NS
-
-# ------- --------- --------- --------- --------- --------- --------- ---------
-
-def solve_radius(M,R_Newt,eta=1e-6):
-    '''
-    This routine determines the GR radius given the NS mass and Newtonian
-    radius, assuming the GR and Newtonian masses are identical
-
-    Solving is tricky so we just use an iterative approach
-    '''
-
-    R_NS = R_Newt	# trial
-    while (abs(g(M,R_NS)-g(M,R_Newt,Newt=True))/g(M,R_NS) > eta):
-        R_NS = R_Newt*sqrt(opz(M,R_NS))
-
-    return R_NS
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -148,37 +72,6 @@ def fper(mdot,opz,dist,xi_p,c_bol=1.0):
 # over the neutron star surface):
 
     return ( mdot*Q_grav/ (4.*pi*opz*dist**2*xi_p*c_bol) ).to(u.erg/u.cm**2/u.s)
-
-# ------- --------- --------- --------- --------- --------- --------- ---------
-
-def decode_LaTeX(string):
-    '''
-    This function converts a LaTeX numerical value (with error) to one
-    or more floating point values
-    '''
-
-    assert (type(string) == str) or (type(string) == np.str_)
-
-# Look for the start of a LaTeX numerical expression
-# We no longer explicitly look for the $ sign, as this pattern can match a
-# general numeric string. We also include the mantissa as optional
-
-    val_match = re.search('([0-9]+(\.[0-9]+)?)',string)
-
-# If not found, presumably you just have a numerical expression as string
-
-    if val_match == None:
-        return float(string), None
-
-# Otherwise, convert the first part to a float, and look for the error
-
-    val = float(val_match.group(1))
-    err_match = re.search('pm *([0-9]+\.[0-9]+)',string)
-
-    if err_match == None:
-        return val, None
-    else:
-        return val, float(err_match.group(1))
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -340,11 +233,13 @@ class Lightcurve(object):
 
         assert self.timepixr == 0.0
 
+        luminosity = False
         if hasattr(self,'flux'):
             y = self.flux
             yerr = self.flux_err
             ylabel = "Flux ({0.unit:latex_inline})".format(self.flux)
         elif hasattr(self,'lumin'):
+            luminosity = True
             y = self.lumin
             yerr = self.lumin_err
             ylabel = "Luminosity ({0.unit:latex_inline})".format(self.lumin)
@@ -362,6 +257,9 @@ class Lightcurve(object):
                 pass
 #            print ("** WARNING ** errors not present, can't plot errorbars")
 
+        if luminosity:
+            plt.plot(np.array([min(self.time.value),max(self.time.value)]),
+                     np.full(2,self.L_Edd),'r--')
         plt.xlabel("Time ({0.unit:latex_inline})".format(self.time))
         plt.ylabel(ylabel)
 
@@ -635,7 +533,7 @@ class ObservedBurst(Lightcurve):
 
             label = ['fper','cbol','mdot','fluen','F_pk','alpha']
             unit = [1e-9*u.erg/u.cm**2/u.s, 1.,1.75e-8*const.M_sun/u.yr,
-                    1e-6*u.erg/u.cm**2/u.s,
+                    1e-6*u.erg/u.cm**2,
                     1e-9*u.erg/u.cm**2/u.s,1.]
             for i, column in enumerate(self.table.columns[4:10]):
 #            print (i, column, label[i], self.table[column][row], type(self.table[column][row]))
@@ -893,6 +791,14 @@ class KeplerBurst(Lightcurve):
 
         eta = 1e-6	# tolerance level for derived parameters
 
+# This parameter sets the prefactor for the time to burn all H via hot-CNO
+
+        tpref = 9.8*u.hr
+
+# Setting the assumed Eddington limit here
+
+        self.L_Edd = 3.53e38*u.erg/u.s
+
 # Don't add the path to the filename, because we want to use the latter as
 # a plot label (for example)
 
@@ -907,7 +813,9 @@ class KeplerBurst(Lightcurve):
             self.filename = 'kepler_'+run_id+'_mean.txt'
         elif ((batch != None) & (run != None)):
             self.filename = source+"_{}_xrb{}_mean.data".format(batch,run)
-            self.path = self.path+"/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
+# temporarily hardwired the path
+#            self.path = self.path+"/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
+            self.path = "/Users/duncan/data/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
         elif filename!= None:
             self.filename = filename
         else:
@@ -1046,6 +954,12 @@ class KeplerBurst(Lightcurve):
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 # Should check here that you have all the required attributes
+# Here we estimate the fraction of H burned before ignition, based on the
+# expression from Lampe et al. 2016; this can be > 1.
+
+        if (hasattr(self,'tdel') & hasattr(self,'z')):
+            self.burn_frac = self.tdel/(self.opz*tpref)*(self.z/0.02)
+
 # Make sure you can calculate g, and M_NS, and then you can calculate
 # everything else from those, as well as checking for consistency with any
 # passed values
@@ -1110,6 +1024,10 @@ class KeplerBurst(Lightcurve):
 
         if hasattr(self,'Lacc'):
             self.mdot = self.Lacc*1.75e-8*const.M_sun/u.yr
+
+# Set the flag for super-Eddington bursts
+
+        self.superEdd = (max(self.lumin) > self.L_Edd)
 
 # - end of __init__ method -- --------- --------- --------- --------- ---------
 
