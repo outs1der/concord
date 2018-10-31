@@ -185,6 +185,24 @@ class Lightcurve(object):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
+    def print(self):
+        '''
+        Print the basic parameters of the lightcurve. Can be called in turn
+        by the info commands for KeplerBurst, ObservedBurst to display the
+        properties of the parent class
+        :return:
+        '''
+
+        print ('Lightcurve properties')
+        print (f'  filename = {self.filename}')
+        print ('  time range = ({:.3f},{:.3f})'.format(min(self.time),max(self.time)))
+        if hasattr(self,'lumin'):
+            print ('  luminosity range = ({:.3f},{:.3f})'.format(min(self.lumin),max(self.lumin)))
+        else:
+            print ('  flux range = ({:.3f},{:.3f})'.format(min(self.flux),max(self.flux)))
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
     def write(self,filename='lightcurve.csv',addhdr=None):
         '''
         Write the lightcurve to a file
@@ -270,6 +288,8 @@ class Lightcurve(object):
         """
         Convert a luminosity profile to a simulated observation, with
         plausible errors
+        This method might make more sense as part of the KeplerBurst class
+        (or a parent SimulatedBurst class)
         """
 
         if not hasattr(self,'lumin'):
@@ -306,11 +326,16 @@ class Lightcurve(object):
 # And return a Lightcurve object with appropriate label
 # Really this should be an ObservedBurst
 
-        return Lightcurve(time=obs.time,dt=obs.dt,
-                          flux=model,flux_err=obs.flux_err, 
-#                          tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
-#                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
+        return ObservedBurst(obs.time, obs.dt, model,obs. flux_err,
+                          tdel = self.tdel*_opz, tdel_err=self.tdel_err*_opz,
+                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
                           filename="{} @ {}".format(self.filename,dist))
+
+#         return Lightcurve(time=obs.time,dt=obs.dt,
+#                           flux=model,flux_err=obs.flux_err,
+# #                          tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
+# #                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
+#                           filename="{} @ {}".format(self.filename,dist))
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -443,126 +468,13 @@ class ObservedBurst(Lightcurve):
     objects
     '''
 
-    def __init__(self, filename, lc=None, path=None, **kwargs):
-
-# This routine will read in any ascii lightcurve file which matches the
-# format of the "reference" bursts:
-# 
-# 'Time [s]' 'dt [s]' 'flux [10^-9 erg/cm^2/s]' 'flux error [10^-9
-# erg/cm^2/s]' 'blackbody temperature kT [keV]' 'kT error [keV]'
-# 'blackbody normalisation K_bb [(km/d_10kpc)^2]' 'K_bb error
-# [(km/d_10kpc)^2]' chi-sq
-#     -1.750  0.500   1.63    0.054   1.865  0.108   13.891   4.793  0.917
-#     -1.250  0.500   2.88    1.005   1.862  0.246   22.220   4.443  1.034
-#     -0.750  0.500   4.38    1.107   1.902  0.093   30.247   2.943  1.089
-#     -0.250  0.500   6.57    0.463   1.909  0.080   46.936   6.969  0.849
-
-        if path == None:
-            path = '.'
-        self.path = path
-
-        if filename != None:
-            self.filename = filename
-
-            d=ascii.read(self.path+'/'+self.filename)
+    def __init__(self, time, dt, flux, flux_err, **kwargs):
 
 # Now we define a Lightcurve instance, using the columns from the file
 
-            Lightcurve.__init__(self, filename = filename, 
-                                time=d['col1']*u.s, dt=d['col2']*u.s,
-                                flux=d['col3']*1e-9*u.erg/u.cm**2/u.s,
-                                flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
-
-# In principle we can parse a bunch of additional information from the headers
-
-            self.comments = d.meta['comments']
-
-        elif lc != None:
-
-# An alternative way to initialise is to pass a lightcurve object
-# (but this doesn't work)
-
-            self.lightcurve = lc
-            self.filename=''
-            if hasattr(lightcurve,'filename'):
-                if lightcurve.filename:
-                    self.filename = lightcurve.filename
-
-# Here the recurrence time; looking for a string like
-#   Average recurrence time is 3.350 +/- 0.04 hr
-# (not present in all the files; only the 1826-24 ones)
-        self.table_file = os.path.join(CONCORD_PATH, 'table2.tex')
-        self.table = Table.read(self.table_file)
-
-# Below we associate each epoch with a file
-
-        file=['gs1826-24_5.14h.dat',
-              'gs1826-24_4.177h.dat',
-              'gs1826-24_3.530h.dat',
-              'saxj1808.4-3658_16.55h.dat',
-              'saxj1808.4-3658_21.10h.dat',
-              'saxj1808.4-3658_29.82h.dat',
-              '4u1820-303_2.681h.dat',
-              '4u1820-303_1.892h.dat',
-              '4u1636-536_superburst.dat']
-        self.table['file'] = file
-
-# Find which of these (if any) are the one you're reading
-
-        for i, lcfile in enumerate(self.table['file']):
-            m = re.search(lcfile,self.filename)
-            if m != None:
-                self.row=i
-#                print (i, lcfile, filename)
-
-        if hasattr(self,'row'):
-
-            tdel, tdel_err = decode_LaTeX(self.table['$\Delta t$ (hr)'][self.row])
-            self.tdel = tdel*u.hr
-            if tdel_err != None:
-                self.tdel_err = tdel_err*u.hr
-            else:
-
-# If no tdel error is supplied by the file (e.g. for the later bursts from
-# SAX J1808.4-3658), we set a nominal value corresponding to 1 s (typical
-# RXTE time resolution) here
-
-                self.tdel_err = 1./3600.*u.hr
-
-# Decode the other table parameters
-
-            label = ['fper','cbol','mdot','fluen','F_pk','alpha']
-            unit = [1e-9*u.erg/u.cm**2/u.s, 1.,1.75e-8*const.M_sun/u.yr,
-                    1e-6*u.erg/u.cm**2,
-                    1e-9*u.erg/u.cm**2/u.s,1.]
-            for i, column in enumerate(self.table.columns[4:10]):
-#            print (i, column, label[i], self.table[column][row], type(self.table[column][row]))
-                if ((type(self.table[column][self.row]) == np.str_)):
-#    or (type(self.table[column][row]) == np.str_)):
-
-# Here we convert the table entry to a value. We have a couple of options
-# here: raw value, range (separated by "--"), or LaTeX expression
-
-                    range_match = re.search('([0-9]+\.[0-9]+)--([0-9]+\.[0-9]+)',
-			    self.table[column][self.row])
-                    if range_match:
-
-                        lo = float(range_match.group(1))
-                        hi = float(range_match.group(2))
-                        val = 0.5*(lo+hi)
-                        val_err = 0.5*abs(hi-lo)
-
-                    else:
-                        val, val_err = decode_LaTeX(self.table[column][self.row])
-
-# Now set the appropriate attribute
-
-                    setattr(self,label[i],val*unit[i])
-                    if val_err != None:
-#                    print (column, label[i]+'_err',val_err)
-                        setattr(self,label[i]+'_err',val_err*unit[i])
-                else:
-                    setattr(self,label[i],self.table[column][self.row]*unit[i])
+        Lightcurve.__init__(self, time = time, dt = dt,
+                                flux = flux,
+                                flux_err= flux_err)
 
 # End block for adding attributes from the file. Below you can use the
 # additional arguments on init to set or override attributes
@@ -570,17 +482,139 @@ class ObservedBurst(Lightcurve):
         if kwargs != None:
 
             for key in kwargs:
-#                print (key, kwargs[key])
-                if (key == 'tdel') | (key == 'tdel_err'):
+                #                print (key, kwargs[key])
+                if ((key == 'tdel') | (key == 'tdel_err')) & (hasattr(kwargs[key],'unit') == False):
+                    # Force tdel, tdel_err to be in hours
                     setattr(self,key,float(kwargs[key])*u.hr)
-                elif (key == 'fper') | (key == 'fper_err'):
+                elif ((key == 'fper') | (key == 'fper_err')) & (hasattr(kwargs[key],'unit') == False):
+                    # Similarly force the units for the persistent flux
                     setattr(self,key,float(kwargs[key])*u.erg/u.cm**2/u.s)
                 else:
                     setattr(self,key,kwargs[key])
 
-# This is the key method for running the mcmc; it can be used to plot the
-# observations with the models rescaled by the appropriate parameters, and
-# also returns a likelihood value
+        if self.filename:
+
+# Here the recurrence time; looking for a string like
+#   Average recurrence time is 3.350 +/- 0.04 hr
+# (not present in all the files; only the 1826-24 ones)
+            self.table_file = os.path.join(CONCORD_PATH, 'table2.tex')
+            self.table = Table.read(self.table_file)
+
+    # Below we associate each epoch with a file
+
+            file=['gs1826-24_5.14h.dat',
+                  'gs1826-24_4.177h.dat',
+                  'gs1826-24_3.530h.dat',
+                  'saxj1808.4-3658_16.55h.dat',
+                  'saxj1808.4-3658_21.10h.dat',
+                  'saxj1808.4-3658_29.82h.dat',
+                  '4u1820-303_2.681h.dat',
+                  '4u1820-303_1.892h.dat',
+                  '4u1636-536_superburst.dat']
+            self.table['file'] = file
+
+    # Find which of these (if any) are the one you're reading
+
+            for i, lcfile in enumerate(self.table['file']):
+                m = re.search(lcfile,self.filename)
+                if m != None:
+                    self.row=i
+    #                print (i, lcfile, filename)
+
+            if hasattr(self,'row'):
+
+                tdel, tdel_err = decode_LaTeX(self.table['$\Delta t$ (hr)'][self.row])
+                self.tdel = tdel*u.hr
+                if tdel_err != None:
+                    self.tdel_err = tdel_err*u.hr
+                else:
+
+    # If no tdel error is supplied by the file (e.g. for the later bursts from
+    # SAX J1808.4-3658), we set a nominal value corresponding to 1 s (typical
+    # RXTE time resolution) here
+
+                    self.tdel_err = 1./3600.*u.hr
+
+    # Decode the other table parameters
+
+                label = ['fper','cbol','mdot','fluen','F_pk','alpha']
+                unit = [1e-9*u.erg/u.cm**2/u.s, 1.,1.75e-8*const.M_sun/u.yr,
+                        1e-6*u.erg/u.cm**2,
+                        1e-9*u.erg/u.cm**2/u.s,1.]
+                for i, column in enumerate(self.table.columns[4:10]):
+    #            print (i, column, label[i], self.table[column][row], type(self.table[column][row]))
+                    if ((type(self.table[column][self.row]) == np.str_)):
+    #    or (type(self.table[column][row]) == np.str_)):
+
+    # Here we convert the table entry to a value. We have a couple of options
+    # here: raw value, range (separated by "--"), or LaTeX expression
+
+                        range_match = re.search('([0-9]+\.[0-9]+)--([0-9]+\.[0-9]+)',
+                    self.table[column][self.row])
+                        if range_match:
+
+                            lo = float(range_match.group(1))
+                            hi = float(range_match.group(2))
+                            val = 0.5*(lo+hi)
+                            val_err = 0.5*abs(hi-lo)
+
+                        else:
+                            val, val_err = decode_LaTeX(self.table[column][self.row])
+
+    # Now set the appropriate attribute
+
+                        setattr(self,label[i],val*unit[i])
+                        if val_err != None:
+    #                    print (column, label[i]+'_err',val_err)
+                            setattr(self,label[i]+'_err',val_err*unit[i])
+                    else:
+                        setattr(self,label[i],self.table[column][self.row]*unit[i])
+
+
+    @classmethod
+    def from_file(cls, filename=None, path=None, **kwargs):
+        '''
+        This routine will read in any ascii lightcurve file which matches the
+        format of the "reference" bursts:
+
+        'Time [s]' 'dt [s]' 'flux [10^-9 erg/cm^2/s]' 'flux error [10^-9
+        erg/cm^2/s]' 'blackbody temperature kT [keV]' 'kT error [keV]'
+        'blackbody normalisation K_bb [(km/d_10kpc)^2]' 'K_bb error
+        [(km/d_10kpc)^2]' chi-sq
+            -1.750  0.500   1.63    0.054   1.865  0.108   13.891   4.793  0.917
+            -1.250  0.500   2.88    1.005   1.862  0.246   22.220   4.443  1.034
+            -0.750  0.500   4.38    1.107   1.902  0.093   30.247   2.943  1.089
+            -0.250  0.500   6.57    0.463   1.909  0.080   46.936   6.969  0.849
+
+        :param filename:
+        :param path:
+        :param kwargs:
+        :return:
+        '''
+
+        if path == None:
+            path = '.'
+
+        if filename == None:
+            raise ValueError('Filename must be specified')
+
+        try:
+            d=ascii.read(path+'/'+filename)
+            print (len(d))
+            if len(d.columns) < 4:
+                raise Exception('At least four columns are required (time, dt, flux, flux_err)')
+
+            # Need some checks here in case of unexpected column names
+
+            return cls(d['col1']*u.s, d['col2']*u.s,
+                       d['col3']*1e-9*u.erg/u.cm**2/u.s,
+                       d['col4']*1e-9*u.erg/u.cm**2/u.s,
+                       path = path,
+                       filename = filename,
+                       comments =d.meta['comments'] )
+
+        except:
+            print ('Some problem reading the file',path+'/'+filename)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -588,11 +622,15 @@ class ObservedBurst(Lightcurve):
         		breakdown = False, plot = False, subplot = True,
                 weights={'fluxwt':1.0, 'tdelwt':2.5e3},
                 disc_model='he16_a', debug = False):
+        '''
+        This is the key method for running the mcmc; it can be used to plot the
+        observations with the models rescaled by the appropriate parameters, and
+        also returns a likelihood value
 
-# 'weights' give the relative weight to the tdel and persistent
-# flux for the likelihood. Since you have many more points in the
-# lightcurve, you may want to weight these greater than one so that the
-# MCMC code will try to match those preferentially
+        'weights' give the relative weight to the tdel and persistent
+        flux for the likelihood. Since you have many more points in the
+        lightcurve, you may want to weight these greater than one so that the
+        MCMC code will try to match those preferentially'''
 
         dist, inclination, _opz, t_off = param
 
@@ -808,17 +846,25 @@ class KeplerBurst(Lightcurve):
 
 # Different file specifications here
 
-        if run_id != None:
+        if run_id is not None:
+
             # For a KEPLER run, we use the convention for filename as follows:
+
             self.filename = 'kepler_'+run_id+'_mean.txt'
-        elif ((batch != None) & (run != None)):
+
+        elif ((batch is not None) & (run is not None)):
+
             self.filename = source+"_{}_xrb{}_mean.data".format(batch,run)
-# temporarily hardwired the path
-#            self.path = self.path+"/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
+            # temporarily hardwired the path
+            # self.path = self.path+"/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
             self.path = "/Users/duncan/data/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
-        elif filename!= None:
+
+        elif filename is not None:
+
             self.filename = filename
+
         else:
+
             print ("** ERROR ** no valid model specification")
             return
 
@@ -838,7 +884,7 @@ class KeplerBurst(Lightcurve):
         if ('comments' in d.meta):
             self.comments = d.meta['comments']
 
-        if ((batch != None) & (run != None)) | (run_id != None):
+        if ((batch is not None) & (run is not None)) | (run_id is not None):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 # For KEPLER models, read information from the burst table
