@@ -471,115 +471,13 @@ class ObservedBurst(Lightcurve):
     objects
     '''
 
-    def __init__(self, filename, lc=None, path=None, **kwargs):
-
-# This routine will read in any ascii lightcurve file which matches the
-# format of the "reference" bursts:
-# 
-# 'Time [s]' 'dt [s]' 'flux [10^-9 erg/cm^2/s]' 'flux error [10^-9
-# erg/cm^2/s]' 'blackbody temperature kT [keV]' 'kT error [keV]'
-# 'blackbody normalisation K_bb [(km/d_10kpc)^2]' 'K_bb error
-# [(km/d_10kpc)^2]' chi-sq
-#     -1.750  0.500   1.63    0.054   1.865  0.108   13.891   4.793  0.917
-#     -1.250  0.500   2.88    1.005   1.862  0.246   22.220   4.443  1.034
-#     -0.750  0.500   4.38    1.107   1.902  0.093   30.247   2.943  1.089
-#     -0.250  0.500   6.57    0.463   1.909  0.080   46.936   6.969  0.849
-
-        if path == None:
-            path = '.'
-        self.path = path
-
-        if filename != None:
-            self.filename = filename
-
-            d=ascii.read(self.path+'/'+self.filename)
+    def __init__(self, time, dt, flux, flux_err, **kwargs):
 
 # Now we define a Lightcurve instance, using the columns from the file
 
-            Lightcurve.__init__(self, filename = filename, 
-                                time=d['col1']*u.s, dt=d['col2']*u.s,
-                                flux=d['col3']*1e-9*u.erg/u.cm**2/u.s,
-                                flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
-
-# In principle we can parse a bunch of additional information from the headers
-
-            self.comments = d.meta['comments']
-
-# Here the recurrence time; looking for a string like
-#   Average recurrence time is 3.350 +/- 0.04 hr
-# (not present in all the files; only the 1826-24 ones)
-        self.table_file = os.path.join(CONCORD_PATH, 'table2.tex')
-        self.table = Table.read(self.table_file)
-
-# Below we associate each epoch with a file
-
-        file=['gs1826-24_5.14h.dat',
-              'gs1826-24_4.177h.dat',
-              'gs1826-24_3.530h.dat',
-              'saxj1808.4-3658_16.55h.dat',
-              'saxj1808.4-3658_21.10h.dat',
-              'saxj1808.4-3658_29.82h.dat',
-              '4u1820-303_2.681h.dat',
-              '4u1820-303_1.892h.dat',
-              '4u1636-536_superburst.dat']
-        self.table['file'] = file
-
-# Find which of these (if any) are the one you're reading
-
-        for i, lcfile in enumerate(self.table['file']):
-            m = re.search(lcfile,self.filename)
-            if m != None:
-                self.row=i
-#                print (i, lcfile, filename)
-
-        if hasattr(self,'row'):
-
-            tdel, tdel_err = decode_LaTeX(self.table['$\Delta t$ (hr)'][self.row])
-            self.tdel = tdel*u.hr
-            if tdel_err != None:
-                self.tdel_err = tdel_err*u.hr
-            else:
-
-# If no tdel error is supplied by the file (e.g. for the later bursts from
-# SAX J1808.4-3658), we set a nominal value corresponding to 1 s (typical
-# RXTE time resolution) here
-
-                self.tdel_err = 1./3600.*u.hr
-
-# Decode the other table parameters
-
-            label = ['fper','cbol','mdot','fluen','F_pk','alpha']
-            unit = [1e-9*u.erg/u.cm**2/u.s, 1.,1.75e-8*const.M_sun/u.yr,
-                    1e-6*u.erg/u.cm**2,
-                    1e-9*u.erg/u.cm**2/u.s,1.]
-            for i, column in enumerate(self.table.columns[4:10]):
-#            print (i, column, label[i], self.table[column][row], type(self.table[column][row]))
-                if ((type(self.table[column][self.row]) == np.str_)):
-#    or (type(self.table[column][row]) == np.str_)):
-
-# Here we convert the table entry to a value. We have a couple of options
-# here: raw value, range (separated by "--"), or LaTeX expression
-
-                    range_match = re.search('([0-9]+\.[0-9]+)--([0-9]+\.[0-9]+)',
-			    self.table[column][self.row])
-                    if range_match:
-
-                        lo = float(range_match.group(1))
-                        hi = float(range_match.group(2))
-                        val = 0.5*(lo+hi)
-                        val_err = 0.5*abs(hi-lo)
-
-                    else:
-                        val, val_err = decode_LaTeX(self.table[column][self.row])
-
-# Now set the appropriate attribute
-
-                    setattr(self,label[i],val*unit[i])
-                    if val_err != None:
-#                    print (column, label[i]+'_err',val_err)
-                        setattr(self,label[i]+'_err',val_err*unit[i])
-                else:
-                    setattr(self,label[i],self.table[column][self.row]*unit[i])
+        Lightcurve.__init__(self, time = time, dt = dt,
+                                flux = flux,
+                                flux_err= flux_err)
 
 # End block for adding attributes from the file. Below you can use the
 # additional arguments on init to set or override attributes
