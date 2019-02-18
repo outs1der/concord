@@ -185,6 +185,24 @@ class Lightcurve(object):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
+    def print(self):
+        '''
+        Print the basic parameters of the lightcurve. Can be called in turn
+        by the info commands for KeplerBurst, ObservedBurst to display the
+        properties of the parent class
+        :return:
+        '''
+
+        print ('Lightcurve properties')
+        print (f'  filename = {self.filename}')
+        print ('  time range = ({:.3f},{:.3f})'.format(min(self.time),max(self.time)))
+        if hasattr(self,'lumin'):
+            print ('  luminosity range = ({:.3f},{:.3f})'.format(min(self.lumin),max(self.lumin)))
+        else:
+            print ('  flux range = ({:.3f},{:.3f})'.format(min(self.flux),max(self.flux)))
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
     def write(self,filename='lightcurve.csv',addhdr=None):
         '''
         Write the lightcurve to a file
@@ -228,7 +246,7 @@ class Lightcurve(object):
 # Later we can make this plot method more elaborate
 # where argument for step is appropriate for timepixr=0.0
 
-    def plot(self,yerror=True):
+    def plot(self, yerror=True):
         """Plot the lightcurve, accommodating both flux and luminosities"""
 
         assert self.timepixr == 0.0
@@ -270,6 +288,8 @@ class Lightcurve(object):
         """
         Convert a luminosity profile to a simulated observation, with
         plausible errors
+        This method might make more sense as part of the KeplerBurst class
+        (or a parent SimulatedBurst class)
         """
 
         if not hasattr(self,'lumin'):
@@ -306,11 +326,19 @@ class Lightcurve(object):
 # And return a Lightcurve object with appropriate label
 # Really this should be an ObservedBurst
 
-        return Lightcurve(time=obs.time,dt=obs.dt,
-                          flux=model,flux_err=obs.flux_err, 
-#                          tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
-#                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
+        test = ObservedBurst.from_arrays(time=obs.time,dt=obs.dt,
+                          flux=model,flux_err=obs.flux_err,
+                          tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
+                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
                           filename="{} @ {}".format(self.filename,dist))
+
+        return test
+
+#         return Lightcurve(time=obs.time,dt=obs.dt,
+#                           flux=model,flux_err=obs.flux_err,
+# #                          tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
+# #                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
+#                           filename="{} @ {}".format(self.filename,dist))
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -477,17 +505,6 @@ class ObservedBurst(Lightcurve):
 
             self.comments = d.meta['comments']
 
-        elif lc != None:
-
-# An alternative way to initialise is to pass a lightcurve object
-# (but this doesn't work)
-
-            self.lightcurve = lc
-            self.filename=''
-            if hasattr(lightcurve,'filename'):
-                if lightcurve.filename:
-                    self.filename = lightcurve.filename
-
 # Here the recurrence time; looking for a string like
 #   Average recurrence time is 3.350 +/- 0.04 hr
 # (not present in all the files; only the 1826-24 ones)
@@ -578,9 +595,29 @@ class ObservedBurst(Lightcurve):
                 else:
                     setattr(self,key,kwargs[key])
 
-# This is the key method for running the mcmc; it can be used to plot the
-# observations with the models rescaled by the appropriate parameters, and
-# also returns a likelihood value
+    @classmethod
+    def from_arrays(cls, **kwargs):
+    # def from_arrays(cls,time=_time, dt=_dt, flux=_flux,flux_err=_flux_err,
+    #                     tdel = _tdel, tdel_err=_tdel_err,
+    #                     fper = _fper, filename= _filename):
+        '''
+        This method is used when we're simulating an observed burst, and we
+        copy all the attributes from existing (calculated) arrays
+        '''
+
+        print ('input to from_arrays: ',kwargs)
+        Lightcurve.__init__(cls, **kwargs)
+        # Lightcurve.__init__(cls, filename = filename,
+        #                     time=time, dt=dt,
+        #                     flux=flux, flux_err=flux_err)
+        print (type(cls))
+
+        if hasattr(kwargs, "tdel"):
+            cls.tdel = tdel
+        # cls.tdel_err = tdel_err
+        # cls.fper = fper
+
+        return cls
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -588,11 +625,15 @@ class ObservedBurst(Lightcurve):
         		breakdown = False, plot = False, subplot = True,
                 weights={'fluxwt':1.0, 'tdelwt':2.5e3},
                 disc_model='he16_a', debug = False):
+        '''
+        This is the key method for running the mcmc; it can be used to plot the
+        observations with the models rescaled by the appropriate parameters, and
+        also returns a likelihood value
 
-# 'weights' give the relative weight to the tdel and persistent
-# flux for the likelihood. Since you have many more points in the
-# lightcurve, you may want to weight these greater than one so that the
-# MCMC code will try to match those preferentially
+        'weights' give the relative weight to the tdel and persistent
+        flux for the likelihood. Since you have many more points in the
+        lightcurve, you may want to weight these greater than one so that the
+        MCMC code will try to match those preferentially'''
 
         dist, inclination, _opz, t_off = param
 
@@ -786,7 +827,7 @@ class KeplerBurst(Lightcurve):
     '''
 
     def __init__(self, filename=None, run_id=None, path=None, 
-                 source='gs1826', batch=None, run=None, 
+                 source='gs1826', grid_table=None, batch=None, run=None,
                  **kwargs):
 
         eta = 1e-6	# tolerance level for derived parameters
@@ -808,17 +849,25 @@ class KeplerBurst(Lightcurve):
 
 # Different file specifications here
 
-        if run_id != None:
+        if run_id is not None:
+
             # For a KEPLER run, we use the convention for filename as follows:
+
             self.filename = 'kepler_'+run_id+'_mean.txt'
-        elif ((batch != None) & (run != None)):
+
+        elif ((batch is not None) & (run is not None)):
+
             self.filename = source+"_{}_xrb{}_mean.data".format(batch,run)
-# temporarily hardwired the path
-#            self.path = self.path+"/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
+            # temporarily hardwired the path
+            # self.path = self.path+"/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
             self.path = "/Users/duncan/data/kepler_grids/sources/{}/mean_lightcurves/{}_{}".format(source,source,batch)
-        elif filename!= None:
+
+        elif filename is not None:
+
             self.filename = filename
+
         else:
+
             print ("** ERROR ** no valid model specification")
             return
 
@@ -838,32 +887,54 @@ class KeplerBurst(Lightcurve):
         if ('comments' in d.meta):
             self.comments = d.meta['comments']
 
-        if ((batch != None) & (run != None)) | (run_id != None):
+        if ((batch is not None) & (run is not None)) | (run_id is not None):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 # For KEPLER models, read information from the burst table
+# Need to set the recurrence time, NS mass
+
 # Which table we use depends on the specification
 
             if ((batch != None) & (run != None)):
 
-# For the newer models, read data from the summary table (and the
-# companion parameter table)
+# For the newer models, read data only from the summary table, provided you
+# can find it. Because this has moved around from version to version, here
+# you can specify explicitly the name (assumed to be in the top-level
+# "source" directory)
 
-                self.data = ascii.read(self.path+"/../../summ_{}.txt".format(source))
-                self.param = ascii.read(self.path+"/../../params_{}.txt".format(source))
+                if grid_table is not None:
+                    self.summ_file = "../../"+grid_table
+                else:
+                    self.summ_file = "../../summ_{}.txt".format(source)
+
+                self.data = ascii.read(self.path+"/"+self.summ_file)
+
+                # Find the corresponding row
 
                 self.row = np.where(np.logical_and(self.data['batch'] == batch,self.data['run'] == run))[0]
-                self.row_p = np.where(np.logical_and(self.param['batch'] == batch,self.param['run'] == run))[0]
 
 # Set some special parameters here (others are set with the kwargs later
-# on)
+# on). A couple of conventions for column names here
 
-                self.tdel = self.data['tDel'][self.row]/3600.*u.hr
-                self.tdel_err = self.data['uTDel'][self.row]/3600.*u.hr
+                self.tdel_colname = 'tDel'
+                self.tdel_err_colname = 'utDel'
+                if not (self.tdel_colname in self.data.columns):
+                    self.tdel_colname = 'dt'
+                    self.tdel_err_colname = 'u_dt'
 
+                self.tdel = self.data[self.tdel_colname][self.row]/3600.*u.hr
+                self.tdel_err = self.data[self.tdel_err_colname][self.row]/3600.*u.hr
+
+# For older models, you also need to read the companion parameter table
 # Set the gravity and NS mass
 
-                self.M_NS = self.param['mass'][self.row_p]*u.Msun
+                if not ('mass' in self.data.columns):
+                    self.param = ascii.read(self.path+"/../../params_{}.txt".format(source))
+                    self.row_p = np.where(np.logical_and(self.param['batch'] == batch,self.param['run'] == run))[0]
+
+                    self.M_NS = self.param['mass'][self.row_p]*u.Msun
+                else:
+                    self.M_NS = self.data['mass'][self.row]*u.Msun
 
             else:
 
@@ -1014,11 +1085,15 @@ class KeplerBurst(Lightcurve):
             not (hasattr(self,'M_NS')) & hasattr(self,'R_Newt')):
             print ("** WARNING ** insufficient parameters defined to convert to observed frame")
 
-# Some ambiguity with the attribute capitalisation for the accretion rate,
-# so try to fix that here
+        # Some ambiguity with the attribute capitalisation for the accretion rate,
+        # so try to fix that here. Also make this work with the more recent versions
+        # of the tables
 
         if ((not hasattr(self,'Lacc')) & hasattr(self,'lAcc')):
             self.Lacc = self.lAcc
+        if ((not hasattr(self,'Lacc')) & hasattr(self,'accrate')
+            & hasattr(self,'acc_mult')):
+            self.Lacc = self.accrate[0]*self.acc_mult[0]
 
 # Set the mdot with the correct units
 
