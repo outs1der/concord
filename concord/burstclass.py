@@ -1,5 +1,7 @@
-# Burst class for MINBAR
-#
+# Burst class for MI
+# AR
+
+
 # This code is a preliminary attempt to develop a burst class for MINBAR,
 # including model-observation comparisons. 
 # 
@@ -196,7 +198,8 @@ class Lightcurve(object):
         print ('Lightcurve properties')
         print (f'  filename = {self.filename}')
         print ('  time range = ({:.3f},{:.3f})'.format(min(self.time),max(self.time)))
-        if hasattr(self,'lumin'):
+#        if hasattr(self,'lumin'):
+        if self.lumin is not None:
             print ('  luminosity range = ({:.3f},{:.3f})'.format(min(self.lumin),max(self.lumin)))
         else:
             print ('  flux range = ({:.3f},{:.3f})'.format(min(self.flux),max(self.flux)))
@@ -473,11 +476,12 @@ class ObservedBurst(Lightcurve):
 
     def __init__(self, time, dt, flux, flux_err, **kwargs):
 
-# Now we define a Lightcurve instance, using the columns from the file
+        # Now we define a Lightcurve instance, using the columns from the file
+        # Units are assumed to be correct!
 
-        Lightcurve.__init__(self, time = time, dt = dt,
-                                flux = flux,
-                                flux_err= flux_err)
+        Lightcurve.__init__(self, time = time*u.s, dt = dt*u.s,
+                                flux = flux*u.erg/u.cm**2/u.s,
+                                flux_err= flux_err*u.erg/u.cm**2/u.s)
 
 # End block for adding attributes from the file. Below you can use the
 # additional arguments on init to set or override attributes
@@ -494,28 +498,138 @@ class ObservedBurst(Lightcurve):
                     setattr(self,key,kwargs[key])
 
     @classmethod
-    def from_arrays(cls, **kwargs):
-    # def from_arrays(cls,time=_time, dt=_dt, flux=_flux,flux_err=_flux_err,
-    #                     tdel = _tdel, tdel_err=_tdel_err,
-    #                     fper = _fper, filename= _filename):
+    def ref(cls, source, dt):
         '''
-        This method is used when we're simulating an observed burst, and we
-        copy all the attributes from existing (calculated) arrays
+        Method to read in a reference burst and populate the relevant arrays to create
+        an ObservedBurst
+        Calling approach:
+        obs = ObservedBurst.ref('GS 1826-24', 3.5)
         '''
 
-        print ('input to from_arrays: ',kwargs)
-        Lightcurve.__init__(cls, **kwargs)
-        # Lightcurve.__init__(cls, filename = filename,
-        #                     time=time, dt=dt,
-        #                     flux=flux, flux_err=flux_err)
-        print (type(cls))
+        # First read in the table
+        # Because we apply this at the class level, it's available to all instances
+        # Other attributes have to be applied at the instance level
 
-        if hasattr(kwargs, "tdel"):
-            cls.tdel = tdel
-        # cls.tdel_err = tdel_err
-        # cls.fper = fper
+        cls.table_file = os.path.join(CONCORD_PATH, 'table2.tex')
+        cls.table = Table.read(cls.table_file)
 
-        return cls
+        # Below we associate each epoch with a file
+
+        file = ['gs1826-24_5.14h.dat',
+                'gs1826-24_4.177h.dat',
+                'gs1826-24_3.530h.dat',
+                'saxj1808.4-3658_16.55h.dat',
+                'saxj1808.4-3658_21.10h.dat',
+                'saxj1808.4-3658_29.82h.dat',
+                '4u1820-303_2.681h.dat',
+                '4u1820-303_1.892h.dat',
+                '4u1636-536_superburst.dat']
+        cls.table['file'] = file
+
+        # Now find which one you mean. Want to assemble a key that will match the filename
+
+        row = None
+        key = '{}_{}'.format(source.lower().replace(" ",""),dt)
+        # print (key)
+        for i, lcfile in enumerate(cls.table['file']):
+            if key in lcfile:
+                row = i
+        #        print (i, lcfile, cls.key)
+
+        if row is None:
+            print ('** ERROR ** no match for key {}'.format(key))
+            return
+
+        # print ('source = {}'.format(source))
+        # print ('dt = {}'.format(dt))
+
+        tdel, tdel_err = decode_LaTeX(cls.table['$\Delta t$ (hr)'][row])
+
+        if tdel_err is None:
+
+        # If no tdel error is supplied by the file (e.g. for the later bursts from
+        # SAX J1808.4-3658), we set a nominal value corresponding to 1 s (typical
+        # RXTE time resolution) here
+
+            tdel_err = 1. / 3600.
+
+        # Here is the dictionary to provide the keyword arguments
+
+        rowparam = {'key': key, 'row': row, 'tdel': tdel, 'tdel_err': tdel_err, 'source': source}
+
+        # Decode the other table parameters
+
+        label = ['fper', 'cbol', 'mdot', 'fluen', 'F_pk', 'alpha']
+        # fper units are applied at the ObservedBurst __init__ stage
+        # unit = [1e-9 * u.erg / u.cm ** 2 / u.s, 1., 1.75e-8 * const.M_sun / u.yr,
+        unit = [1., 1., 1.75e-8 * const.M_sun / u.yr,
+                            1e-6 * u.erg / u.cm ** 2,
+                            1e-9 * u.erg / u.cm ** 2 / u.s, 1.]
+
+        for i, column in enumerate(cls.table.columns[4:10]):
+            # print (i, column, label[i], self.table[column][row], type(self.table[column][row]))
+
+            if ((type(cls.table[column][row]) == np.str_)):
+            # or (type(self.table[column][row]) == np.str_)):
+
+                # Here we convert the table entry to a value. We have a couple of options
+                # here: raw value, range (separated by "--"), or LaTeX expression
+
+                range_match = re.search('([0-9]+\.[0-9]+)--([0-9]+\.[0-9]+)',
+                    cls.table[column][row])
+
+                if range_match:
+
+                    lo = float(range_match.group(1))
+                    hi = float(range_match.group(2))
+                    val = 0.5 * (lo + hi)
+                    val_err = 0.5 * abs(hi - lo)
+
+                else:
+                    val, val_err = decode_LaTeX(cls.table[column][row])
+
+                # Now set the appropriate attribute
+
+                # setattr(self, label[i], val * unit[i])
+                rowparam[label[i]] = val*unit[i]
+
+                if val_err != None:
+                # print (column, label[i]+'_err',val_err)
+                    # setattr(self, label[i] + '_err', val_err * unit[i])
+                    rowparam[label[i]+'_err'] = val_err*unit[i]
+            else:
+                # setattr(self, label[i], self.table[column][self.row] * unit[i])
+                rowparam[label[i]] = cls.table[column][row] * unit[i]
+
+        return cls.from_file(cls.table['file'][row], 'example_data', **rowparam)
+
+    @classmethod
+    def from_file(cls, filename, path='.', **kwargs):
+        '''
+        Method to read in a file and populate the relevant arrays to create
+        an ObservedBurst
+        This routine will read in any ascii lightcurve file which matches the
+        format of the "reference" bursts:
+
+        'Time [s]' 'dt [s]' 'flux [10^-9 erg/cm^2/s]' 'flux error [10^-9
+        erg/cm^2/s]' 'blackbody temperature kT [keV]' 'kT error [keV]'
+        'blackbody normalisation K_bb [(km/d_10kpc)^2]' 'K_bb error
+        [(km/d_10kpc)^2]' chi-sq
+            -1.750  0.500   1.63    0.054   1.865  0.108   13.891   4.793  0.917
+            -1.250  0.500   2.88    1.005   1.862  0.246   22.220   4.443  1.034
+            -0.750  0.500   4.38    1.107   1.902  0.093   30.247   2.943  1.089
+            -0.250  0.500   6.57    0.463   1.909  0.080   46.936   6.969  0.849
+
+        Calling approach:
+        obs = ObservedBurst.from_file(filename)
+        obs = ObservedBurst.from_file('gs1826-24_3.530h.dat','example_data')
+        '''
+
+        d = ascii.read(path+'/'+filename)
+
+        return cls(d['col1'], d['col2'], d['col3']*1e-9, d['col4']*1e-9,
+                   path=path, filename=filename, comments=d.meta['comments'],
+                   **kwargs)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
