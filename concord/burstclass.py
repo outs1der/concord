@@ -1137,7 +1137,7 @@ class KeplerBurst(Lightcurve):
             self.Lacc = self.lAcc
         if ((not hasattr(self,'Lacc')) & hasattr(self,'accrate')
             & hasattr(self,'acc_mult')):
-            self.Lacc = self.accrate[0]*self.acc_mult[0]
+            self.Lacc = self.accrate*self.acc_mult
 
 # Set the mdot with the correct units
 

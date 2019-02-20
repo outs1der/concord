@@ -1,28 +1,34 @@
-# Script to perform burst model comparisons, and run multinest
+1# Script to perform burst model comparisons, and run multines2
 # Duncan.Galloway@monash.edu, 2018 Mar
 #
 # Initialise the environment
 
-from burstclass import *
+import concord as cd
 import pymultinest
+import numpy as np
+import math
 
 # Read in an observed burst, from the reference sample of Galloway et al.
 # (2017)
 
-b = ObservedBurst('gs1826-24_4.177h.dat',path='../../burst/reference/')
+# b = ObservedBurst('gs1826-24_4.177h.dat',path='../../burst/reference/')
+b = cd.ObservedBurst.ref('GS 1826-24',4.177)
 
 # Now also define a model burst. Lampe et al. models are deprecated;
 
 ## c = ModelBurst('a005',path='../../reference')
 # c = KeplerBurst(run_id='a028',path='../../burst/reference')
 
+c = cd.KeplerBurst(source='triplets',grid_table='grid_table_triplets.txt',
+                    batch=4, run=20)
+
 # Low-metallicity run supplied by Z. Johnston, 2017 April
 # accretion rate, fuel composition and recurrence time were all provided by Zac;
 # xi, g and R_NS are guesses
 
-c=KeplerBurst(filename='mean_run930.dat',lAcc=0.108,Z=0.005,H=0.7,
-              tdel=4.5/1.259,tdel_err=0.2/1.259,
-              g = 1.86552e+14*u.cm/u.s**2, R_NS=11.2*u.km)
+# c=KeplerBurst(filename='mean_run930.dat',lAcc=0.108,Z=0.005,H=0.7,
+#               tdel=4.5/1.259,tdel_err=0.2/1.259,
+#               g = 1.86552e+14*u.cm/u.s**2, R_NS=11.2*u.km)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -38,7 +44,7 @@ def mnPrior(cube, ndim, nparams):
     cube[0] = 1. + cube[0]*15.
     
 # inclination in the range 0-90; could be more restrictive for a non-dipper
-    cube[1] = np.arcsin(cube[1])*180./pi
+    cube[1] = np.arcsin(cube[1])*180./np.pi
 
 # redshift is in the range 1-2
     cube[2] = 1. + cube[2]
@@ -63,8 +69,8 @@ def Loglike(cube, ndim, nparams):
     
     param = np.array([cube[0],cube[1],cube[2],cube[3]])
 #    print (param)
-    loglikelihood = lhoodClass(param, 
-                        ll_obs, ll_model, ll_weights, ll_disk)
+    loglikelihood = cd.lhoodClass(param, ll_obs, ll_model,
+        weights = ll_weights, disc_model = ll_disk)
 
     return loglikelihood
 
