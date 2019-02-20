@@ -164,7 +164,15 @@ class Lightcurve(object):
 
         self.time = kwargs.get('time',None)
         self.timepixr = kwargs.get('timepixr',0.0)
-        self.dt = kwargs.get('dt',None)
+
+        # Not good enough to not have a dt column
+#        self.dt = kwargs.get('dt',None)
+        if 'dt' in kwargs:
+            self.dt = kwargs.get('dt')
+        else:
+            dt = self.time[1:]-self.time[:-1]
+            self.dt = np.append(dt.value,dt[-1].value)*dt.unit
+
 #        if kwargs.get('flux',None):
 
         self.lumin = kwargs.get('lumin',None)
@@ -191,7 +199,7 @@ class Lightcurve(object):
         '''
         Print the basic parameters of the lightcurve. Can be called in turn
         by the info commands for KeplerBurst, ObservedBurst to display the
-        properties of the parent class
+        properties of the parent class... once those are written
         :return:
         '''
 
@@ -200,9 +208,9 @@ class Lightcurve(object):
         print ('  time range = ({:.3f},{:.3f})'.format(min(self.time),max(self.time)))
 #        if hasattr(self,'lumin'):
         if self.lumin is not None:
-            print ('  luminosity range = ({:.3f},{:.3f})'.format(min(self.lumin),max(self.lumin)))
+            print ('  luminosity range = ({:.3e},{:.3e})'.format(min(self.lumin),max(self.lumin)))
         else:
-            print ('  flux range = ({:.3f},{:.3f})'.format(min(self.flux),max(self.flux)))
+            print ('  flux range = ({:.3e},{:.3e})'.format(min(self.flux),max(self.flux)))
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -345,7 +353,7 @@ class Lightcurve(object):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-    def fluence(self,plot=False):
+    def fluence(self, plot=False, warnings=True):
         """
         Calculate the fluence for a lightcurve, following the approach
         from get_burst_data
@@ -371,7 +379,7 @@ class Lightcurve(object):
 #        self.pflux = y[self.good[imax]]
 #        self.pfluxe = self.flux_err[self.good[imax]]
 
-        if max(self.dt_nogap/self.dt) > 2.:
+        if (max(self.dt_nogap/self.dt) > 2.) & warnings:
             print ('** WARNING ** excessive gap filling not yet implemented')
 
         fluen = sum(y[self.good]*self.dt_nogap[self.good])
@@ -415,12 +423,12 @@ class Lightcurve(object):
                      -np.log((y[sel]-yerr[sel]).value)), 
           return_all=True) 
 
-        print (fit_info)
+        # print (fit_info)
 
 # Result is a 2-element array, slope and intercept (opposite order to IDL)
 
         f_int=0.
-        if result[0] > 0.0:
+        if (result[0] > 0.0) & warnings:
             print ('** WARNING ** fit is rising, result is not trustworthy')
         else:
             tmax=max(self.time[sel]+self.dt_nogap[sel]-self.time[sel[0]])
@@ -440,8 +448,8 @@ class Lightcurve(object):
                 np.exp(result[1])*np.exp(xx.value*result[0]))
 
         if f_int > fluene_stat:
-#            if verbose eq 1 then $
-            print ('** WARNING ** extrapolated fluence > stat_error, replacing')
+            if warnings:
+                print ('** WARNING ** extrapolated fluence > stat_error, replacing')
             return fluen, f_int
 
         return fluen, fluene_stat
@@ -466,7 +474,7 @@ class ObservedBurst(Lightcurve):
     fper, fper_err - persistent flux level (1e-9 erg/cm^2/s)
     cbol - bolometric correction
     mdot - accretion rate (total, not per unit area)
-    fluen - burst fluence
+    fluen_table - burst fluence
     F_pk - burst peak flux
     alpha - alpha value
 
@@ -559,10 +567,10 @@ class ObservedBurst(Lightcurve):
 
         # Decode the other table parameters
 
-        label = ['fper', 'cbol', 'mdot', 'fluen', 'F_pk', 'alpha']
+        label = ['fper', 'cbol', 'mdot', 'fluen_table', 'F_pk', 'alpha']
         # fper units are applied at the ObservedBurst __init__ stage
         # unit = [1e-9 * u.erg / u.cm ** 2 / u.s, 1., 1.75e-8 * const.M_sun / u.yr,
-        unit = [1., 1., 1.75e-8 * const.M_sun / u.yr,
+        unit = [1e-9, 1., 1.75e-8 * const.M_sun / u.yr,
                             1e-6 * u.erg / u.cm ** 2,
                             1e-9 * u.erg / u.cm ** 2 / u.s, 1.]
 
@@ -601,7 +609,7 @@ class ObservedBurst(Lightcurve):
                 # setattr(self, label[i], self.table[column][self.row] * unit[i])
                 rowparam[label[i]] = cls.table[column][row] * unit[i]
 
-        return cls.from_file(cls.table['file'][row], 'example_data', **rowparam)
+        return cls.from_file(cls.table['file'][row], CONCORD_PATH, **rowparam)
 
     @classmethod
     def from_file(cls, filename, path='.', **kwargs):
@@ -630,6 +638,26 @@ class ObservedBurst(Lightcurve):
         return cls(d['col1'], d['col2'], d['col3']*1e-9, d['col4']*1e-9,
                    path=path, filename=filename, comments=d.meta['comments'],
                    **kwargs)
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+    def info(self):
+        '''
+        Display information about the ObservedBurst
+        :return:
+        '''
+
+        print("\nObservedBurst parameters:")
+        if hasattr(self,'tdel'):
+            print ("  tdel = {}".format(self.tdel))
+        fluen, fluen_err = self.fluence(warnings=False)
+        print ("  Fluence = {:.3e} +/- {:.3e}".format(fluen.value, fluen_err))
+        if hasattr(self,'fper'):
+            print ("  F_per = {} +/- {}".format(self.fper,self.fper_err))
+        if hasattr(self,'cbol'):
+            print ("  Bolometric correction = {}".format(self.cbol))
+
+        self.print()
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -929,13 +957,13 @@ class KeplerBurst(Lightcurve):
 # on). A couple of conventions for column names here
 
                 self.tdel_colname = 'tDel'
-                self.tdel_err_colname = 'utDel'
+                self.tdel_err_colname = 'uTDel'
                 if not (self.tdel_colname in self.data.columns):
                     self.tdel_colname = 'dt'
                     self.tdel_err_colname = 'u_dt'
 
-                self.tdel = self.data[self.tdel_colname][self.row]/3600.*u.hr
-                self.tdel_err = self.data[self.tdel_err_colname][self.row]/3600.*u.hr
+                self.tdel = self.data[self.tdel_colname][self.row][0]/3600.*u.hr
+                self.tdel_err = self.data[self.tdel_err_colname][self.row][0]/3600.*u.hr
 
 # For older models, you also need to read the companion parameter table
 # Set the gravity and NS mass
@@ -944,9 +972,9 @@ class KeplerBurst(Lightcurve):
                     self.param = ascii.read(self.path+"/../../params_{}.txt".format(source))
                     self.row_p = np.where(np.logical_and(self.param['batch'] == batch,self.param['run'] == run))[0]
 
-                    self.M_NS = self.param['mass'][self.row_p]*u.Msun
+                    self.M_NS = self.param['mass'][self.row_p][0]*u.Msun
                 else:
-                    self.M_NS = self.data['mass'][self.row]*u.Msun
+                    self.M_NS = self.data['mass'][self.row][0]*u.Msun
 
             else:
 
@@ -1014,12 +1042,16 @@ class KeplerBurst(Lightcurve):
 #            self.opz = 1./sqrt(1.-2.*const.G*self.M_NS/(const.c**2*self.R_NS))
             self.opz = opz(self.M_NS,self.R_NS)
         
-# Set all the remaining attributes
-# exclude the tDel, to avoid confusion with tdel (set earlier)
+            # Set all the remaining attributes, with a few exceptions:
+            # exclude the tDel, to avoid confusion with tdel (set earlier)
+            # rename fluence here for consistency with ObservedBurst, and to avoid
+            #   conflict with fluence method
 
             for attr in self.data.columns:
-                if ((attr != 'tDel') & (attr != 'utDel')):
-                    setattr(self,attr,self.data[attr][self.row])
+                if (attr == 'fluence'):
+                    setattr(self,'fluen_table',self.data[attr][self.row][0])
+                elif ((attr != 'tDel') & (attr != 'utDel')):
+                    setattr(self,attr,self.data[attr][self.row][0])
             
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -1117,6 +1149,29 @@ class KeplerBurst(Lightcurve):
         self.superEdd = (max(self.lumin) > self.L_Edd)
 
 # - end of __init__ method -- --------- --------- --------- --------- ---------
+
+    def info(self):
+        '''
+        Display information about the KeplerBurst
+        :return:
+        '''
+
+        print("\nKeplerBurst parameters:")
+        if hasattr(self,'tdel'):
+            print ("  tdel = {:.3f}".format(self.tdel))
+        if hasattr(self,'g'):
+            print ("  g = {:.4e}".format(self.g))
+        if hasattr(self,'R_Newt'):
+            print ("  R_Newt = {:.3f}".format(self.R_Newt))
+        if hasattr(self,'R_NS'):
+            print ("  R_NS = {:.3f}".format(self.R_NS))
+        # This doesn't quite work yet
+        # fluen, fluen_err = self.fluence(warnings=False)
+        # print ("  Fluence = {:.3e} +/- {:.3e}".format(fluen.value, fluen_err))
+        if hasattr(self,'fluen_table'):
+            print ("  Fluence = {:.3e}".format(self.fluen_table))
+
+        self.print()
 
 # The flux method is supposed to calculate the flux at a particular distance
 # Not used (and doesn't work)
