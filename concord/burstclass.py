@@ -1,5 +1,4 @@
-# Burst class for MI
-# AR
+# Burst class for MINBAR
 
 
 # This code is a preliminary attempt to develop a burst class for MINBAR,
