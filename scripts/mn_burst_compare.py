@@ -1,4 +1,4 @@
-1# Script to perform burst model comparisons, and run multines2
+# Script to perform burst model comparisons, and run multinest
 # Duncan.Galloway@monash.edu, 2018 Mar
 #
 # Initialise the environment
@@ -85,7 +85,7 @@ ll_weights = {'fluxwt':1.0, 'tdelwt':2.5e3}
 ll_disk = 'he16_a'
 
 # Here we initialise the parameter starting point and get going
-# I don't think this is actually necessary for MultiNest
+# I don't think this is actually necessary for MultiNest (it's not used)
 
 params = [6.9,60.,1.25,-7.]
 # args=(b,c,weights,'he16_a')

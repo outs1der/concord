@@ -1255,6 +1255,7 @@ def lhoodClass(params, obs, model, **kwargs):
     '''
 
     uparams = apply_units(params)
+    # print ('uparams = {}'.format(uparams))
 
 # We can pass multiple bursts, in which case we just loop over the function
 
@@ -1270,7 +1271,8 @@ def lhoodClass(params, obs, model, **kwargs):
 # Need to create a reduced parameter array here, keeping only the offset
 # value appropriate for this burst
 
-            _params = uparams[0:3]
+            _params = uparams[:3]
+            # print (i,uparams,_params)
             _params.append(uparams[3+i])
             alh += lhoodClass(_params, obs[i], model[i], **kwargs)
 
