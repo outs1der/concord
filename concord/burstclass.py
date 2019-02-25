@@ -1,6 +1,5 @@
 # Burst class for MINBAR
-
-
+#
 # This code is a preliminary attempt to develop a burst class for MINBAR,
 # including model-observation comparisons. 
 # 
@@ -140,12 +139,12 @@ class Lightcurve(object):
 
     Example: simulated burst (giving time and luminosity)
 
-    Lightcurve.__init__(self, time=d['time']*u.s,
+    Lightcurve(self, time=d['time']*u.s,
         lumin=d['luminosity']*u.erg/u.s, lumin_err=d['u_luminosity']*u.erg/u.s)
 
     Example: observed burst giving flux
 
-    Lightcurve.__init__(self, time=d['col1']*u.s, dt=d['col2']*u.s,
+    Lightcurve(self, time=d['col1']*u.s, dt=d['col2']*u.s,
         flux=d['col3']*1e-9*u.erg/u.cm**2/u.s,
         flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
     """
@@ -184,10 +183,13 @@ class Lightcurve(object):
         if 'flux' in kwargs:
             self.flux = kwargs.get('flux',None)
             self.flux_err = kwargs.get('flux_err',None)
+            # print ('flux',self.flux)
+            # print ('flux_err',self.flux_err)
 
             self.good = np.where(self.flux_err < self.flux)[0]
-            for i in range(len(self.good)-1):
-                self.dt_nogap[self.good[i]] = max(
+            if len(self.good) > 0:
+                for i in range(len(self.good)-1):
+                    self.dt_nogap[self.good[i]] = max(
     [self.dt[self.good[i]],self.time[self.good[i+1]]-self.time[self.good[i]]] )
         else:
             self.good = np.arange(len(self.lumin))
@@ -297,9 +299,11 @@ class Lightcurve(object):
         disc_model='he16_a',c_bol=1.0):
         """
         Convert a luminosity profile to a simulated observation, with
-        plausible errors
+        plausible errors.
         This method might make more sense as part of the KeplerBurst class
-        (or a parent SimulatedBurst class)
+        (or a parent SimulatedBurst class), but for now we include this method
+        as part of the lightcurve class, so that future classes of model
+        bursts can access it
         """
 
         if not hasattr(self,'lumin'):
@@ -311,14 +315,16 @@ class Lightcurve(object):
 
         if (obs == None):
 
-# No observation is provided, so we have to make up a burst lightcurve
-# with some dummy values for the time bins and fluxes
+            # No observation is provided, so we have to make up a burst lightcurve
+            # with some dummy values for the time bins and fluxes
+            # For consistency, we need to include the units also
 
             dt = 0.25*u.s
             npts = ceil((max(self.time)-min(self.time))*_opz/dt)
-            obs = Lightcurve(time=np.arange(npts)*dt+t_off, 
+            obs = Lightcurve(time=np.arange(npts)*dt+t_off,
                              dt=np.full(npts,dt)*u.s,
-                             flux=np.zeros(npts),flux_err=np.zeros(npts))
+                             flux=np.zeros(npts)*u.erg/u.cm**2/u.s,
+                             flux_err=np.zeros(npts)*u.erg/u.cm**2/u.s)
 #            print (obs.flux_err)
 
         else:
@@ -333,16 +339,21 @@ class Lightcurve(object):
         else:
             print ("** WARNING ** can't add scatter without flux errors")
 
-# And return a Lightcurve object with appropriate label
-# Really this should be an ObservedBurst
+        # And return an ObservedBurst object with appropriate label
+        # Have a problem here with the doubling up of units, as the ObservedBurst.__init__
+        # method will apply it's own
 
-        test = ObservedBurst.from_arrays(time=obs.time,dt=obs.dt,
-                          flux=model,flux_err=obs.flux_err,
+        # print ('obs.time:',obs.time)
+        # print ('obs.dt:',obs.dt)
+        # print ('flux:',model)
+        # print ('flux_err:',obs.flux_err)
+        sim = ObservedBurst(time=obs.time.value,dt=obs.dt.value,
+                          flux=model.value,flux_err=obs.flux_err.value,
                           tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
                           fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
                           filename="{} @ {}".format(self.filename,dist))
 
-        return test
+        return sim
 
 #         return Lightcurve(time=obs.time,dt=obs.dt,
 #                           flux=model,flux_err=obs.flux_err,
@@ -482,9 +493,15 @@ class ObservedBurst(Lightcurve):
     '''
 
     def __init__(self, time, dt, flux, flux_err, **kwargs):
-
-        # Now we define a Lightcurve instance, using the columns from the file
-        # Units are assumed to be correct!
+        '''
+        Now we define a Lightcurve instance, using the columns from the file
+        Units are applied to the input arrays (and assumed to be correct!)
+        :param time:
+        :param dt:
+        :param flux:
+        :param flux_err:
+        :param kwargs:
+        '''
 
         Lightcurve.__init__(self, time = time*u.s, dt = dt*u.s,
                                 flux = flux*u.erg/u.cm**2/u.s,
@@ -497,9 +514,11 @@ class ObservedBurst(Lightcurve):
 
             for key in kwargs:
 #                print (key, kwargs[key])
-                if (key == 'tdel') | (key == 'tdel_err'):
+                # I think these special cases below were for instances where the parameters might
+                # be passed as strings, e.g. from the LaTeX table
+                if ((key == 'tdel') | (key == 'tdel_err')) & (not hasattr(kwargs[key],'unit')):
                     setattr(self,key,float(kwargs[key])*u.hr)
-                elif (key == 'fper') | (key == 'fper_err'):
+                elif ((key == 'fper') | (key == 'fper_err')) & (not hasattr(kwargs[key],'unit')):
                     setattr(self,key,float(kwargs[key])*u.erg/u.cm**2/u.s)
                 else:
                     setattr(self,key,kwargs[key])
@@ -910,7 +929,7 @@ class KeplerBurst(Lightcurve):
             print ("** ERROR ** no valid model specification")
             return
 
-# Read in the file, and initialise the lightcurve
+        # Read in the file, and initialise the lightcurve
 
         d=ascii.read(self.path+'/'+self.filename)
 
