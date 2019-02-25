@@ -408,15 +408,15 @@ In order to test the analysis approaches described in this paper, we generated s
 %
 This procedure is identical to that used to convert model predictions to data for direct comparison to observations, as described in \S\ref{subsec:lccompare}.
 %
-The process can be summarised as follows.
+We seek to calculate the burst lightcurve that would be observed given a model lightcurve and neutron star parameters including distance $d$; inclination $i$; and surface redshift $(1+z)_{\rm fit}$ (so labeled to distinguish from the corresponding value implict to the model). The process can be summarised as follows. [{\bf note doesn't include any steps to deal with the redshift inconsistency, see below}]
 \begin{enumerate}
-\item Multiply the time bins for the predicted burst lightcurve by the gravitational redshift $1+z$, thereby ``stretching'' the profile to account for the general relativistic time dilation at the neutron-star surface
+\item Multiply the time bins for the predicted burst lightcurve by the trial gravitational redshift $(1+z)_{\rm fit}$, thereby ``stretching'' the profile to account for the general relativistic time dilation at the neutron-star surface
 % \item Shift the predicted burst lightcurve by $t_{\rm off}$
 \item Apply the same correction to the model-predicted recurrence time $\Delta t_{\rm pred}$.
 \item Interpolate the model-predicted lightcurve onto a set of observational time bins, corresponding (for example) to the typical resolution for time-resolved spectroscopy (0.25~s)
 \item Translate the model-predicted luminosity to the corresponding quantity measured by a distant observer, by 
 % multiplying by $[\xi/(1+z)]^2$
-dividing by $1+z$
+dividing by $(1+z)_{\rm fit}$
 \item Convert the luminosity to (isotropic) flux by dividing by the distance factor, $4\pi d^2$ \label{distfac}
 \item Take into account the expected anisotropy effects due to the system inclination, by dividing the luminosity by the anisotropy factor $\xi_b$ \label{anisofac}
 \item Calculate the persistent flux expected for the model-assumed accretion rate $\dot{m}$, and apply the same corrections as for the burst flux in steps \ref{distfac} and \ref{anisofac} (adopting a separate anisotropy factor $\xi_p$ appropriate for the persistent flux). We also divide by a bolometric correction factor $c_{\rm bol}$ accounting for the limited instrumental passband.
@@ -425,7 +425,7 @@ dividing by $1+z$
 
 We determine the general relativistic (GR) corrections within the constraints of the numerical models, which are typically calculated assuming a Newtonian potential with gravity $g=GM/R^2$, where $M$ and $R$ are the equivalent Newtonian mass and radius.
 %
-However, we are free to vary the surface redshift $1+z$, for example to achieve improved agreement with an observed profile. 
+We are free (in principle) to vary the surface redshift $1+z$, for example to achieve improved agreement with an observed profile (although see below). 
 
 The model time bins  $t_i$ and the predicted burst recurrence time $\Delta t_{\rm pred}$ are converted to values as would be measured by a distant observer as follows:
 \begin{eqnarray}
@@ -453,13 +453,18 @@ L_\infty & = & \xi^2L/(1+z)^2 \nonumber \\
 & = & L/(1+z)
 \end{eqnarray}
 
-We note that the combination of surface gravity $g$ (assumed for the model) and adopted $1+z$  uniquely specifies the neutron star mass $M_{\rm NS}$ and radius $R_{\rm NS}$:
+% The corrections described below
+However, since the model is to be transformed by a different value of $(1+z)_{\rm fit}$, we must take care to consistently transform the model parameters in accordance with this choice.
+%
+We can achieve this objective as follows. The surface gravity $g$ adopted for the model, and the trial redshift $(1+z)_{\rm fit}$ imply a different neutron star mass and radius than adopted for the model: 
+%
+% We note that the combination of surface gravity $g$ (assumed for the model) and adopted $1+z$  uniquely specifies the neutron star mass $M_{\rm NS}$ and radius $R_{\rm NS}$:
 \begin{eqnarray}
 % as used in function calc_mr in burstclass.py
-R_{\rm NS} &=& c^2\frac{(1+z)^2-1}{2g(1+z)}\\
-M_{\rm NS} &=& \frac{gR_{\rm NS}^2}{G(1+z)}
+R_{\rm NS,fit} &=& c^2\frac{(1+z)_{\rm fit}^2-1}{2g(1+z)_{\rm fit}}\\
+M_{\rm NS,fit} &=& \frac{gR_{\rm NS}^2}{G(1+z)_{\rm fit}}
 \end{eqnarray}
-Thus, by identifying the optimal value of $1+z$ for comparison to a particular observation, we can constrain the mass and radius, at a fixed $g$.
+Thus, by identifying the optimal value of $(1+z)_{\rm fit}$ for comparison to a particular observation, we can constrain the mass and radius, at a fixed $g$. [{\bf so which one should I use? and should I make any other changes to the recipe?}]
 
 An additional correction that must be applied is the effect of the anisotropic emission of the burst, based on the system inclination $i$. This effect has been simulated for a range of disk geometries \cite[e.g.][]{he16}. Because the emission region on the surface of the star is thought to be different for the burst and persistent emission, we define separate anisotropy parameters $\xi_b$ and $\xi_p$, with the sense that
 \begin{equation}

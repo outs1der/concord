@@ -50,6 +50,7 @@ import pkg_resources
 
 CONCORD_PATH = pkg_resources.resource_filename('concord','data')
 # CONCORD_PATH = os.environ['CONCORD_PATH']
+ETA = 1.e-6
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -343,6 +344,11 @@ class Lightcurve(object):
         # Have a problem here with the doubling up of units, as the ObservedBurst.__init__
         # method will apply it's own
 
+        if hasattr(self,'opz'):
+            if abs(self.opz-_opz) > ETA:
+                print ('observe: ** WARNING ** inconsistent simulation redshift for model value')
+                print ('         model value: {:.4f}, simulation value: {:.4f}\n'.format(self.opz,_opz))
+
         # print ('obs.time:',obs.time)
         # print ('obs.dt:',obs.dt)
         # print ('flux:',model)
@@ -351,7 +357,12 @@ class Lightcurve(object):
                           flux=model.value,flux_err=obs.flux_err.value,
                           tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
                           fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
-                          filename="{} @ {}".format(self.filename,dist))
+                          filename="{} @ {}".format(self.filename,dist),
+        # Include the simulation parameters in the burst description
+                          sim_dist=dist, sim_inclination=inclination, sim_opz=_opz,
+                          sim_t_off=t_off, sim_xi_b=xi_b, sim_xi_p=xi_p, sim_disc_model=disc_model
+        # Should potentially also include the model burst parameters, where available
+                            )
 
         return sim
 
@@ -667,13 +678,28 @@ class ObservedBurst(Lightcurve):
 
         print("\nObservedBurst parameters:")
         if hasattr(self,'tdel'):
-            print ("  tdel = {}".format(self.tdel))
+            print ("  tdel = {:.4f}".format(self.tdel))
         fluen, fluen_err = self.fluence(warnings=False)
         print ("  Fluence = {:.3e} +/- {:.3e}".format(fluen.value, fluen_err))
-        if hasattr(self,'fper'):
-            print ("  F_per = {} +/- {}".format(self.fper,self.fper_err))
+        if hasattr(self,'fper') & hasattr(self,'fper_err'):
+            print ("  F_per = {:.4e} +/- {:.4e}".format(self.fper,self.fper_err))
+        # Simulated observed bursts won't have an fper_err attribute
+        elif hasattr(self,'fper'):
+            print ("  F_per = {:.4e} ".format(self.fper))
         if hasattr(self,'cbol'):
             print ("  Bolometric correction = {}".format(self.cbol))
+
+        # Check if this is a simulated burst, and if so, list the parameters
+
+        if hasattr(self,'sim_dist'):
+          print ("this is a simulated burst, based on the following parameters:")
+          print ("  distance = {:.4f}".format(self.sim_dist))
+          print ("  inclination = {:.4f}".format(self.sim_inclination))
+          print ("  disk model = {} giving xi_b = {:.4f}, xi_p = {:.4f}".format(self.sim_disc_model,
+                 self.sim_xi_b, self.sim_xi_p))
+          print ("  redshift = {:.4f}".format(self.sim_opz))
+
+        # should also print the simulation lightcurve parameters, where available
 
         self.print()
 
@@ -1183,6 +1209,8 @@ class KeplerBurst(Lightcurve):
             print ("  R_Newt = {:.3f}".format(self.R_Newt))
         if hasattr(self,'R_NS'):
             print ("  R_NS = {:.3f}".format(self.R_NS))
+        if hasattr(self,'opz'):
+            print ("  1+z = {:.3f}".format(self.opz))
         # This doesn't quite work yet
         # fluen, fluen_err = self.fluence(warnings=False)
         # print ("  Fluence = {:.3e} +/- {:.3e}".format(fluen.value, fluen_err))
