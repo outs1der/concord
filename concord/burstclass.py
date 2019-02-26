@@ -16,7 +16,7 @@
 # class ObservedBurst(Lightcurve):
 # class KeplerBurst(Lightcurve):
 #
-# def fper(mdot,opz,dist,xi_p,c_bol=1.0):
+# def fper(mburst, param, c_bol=1.0):
 # def modelFunc(p,obs,model, disc_model):
 # def lnprior(theta):
 # def apply_units(params,units = (u.kpc, u.degree, None, u.s)):
@@ -51,28 +51,53 @@ import pkg_resources
 CONCORD_PATH = pkg_resources.resource_filename('concord','data')
 # CONCORD_PATH = os.environ['CONCORD_PATH']
 ETA = 1.e-6
+# default colours for plotting
+OBS_COLOUR = 'b'
+MODEL_COLOUR = 'b'
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def fper(mdot,opz,dist,xi_p,c_bol=1.0):
+def fper(mburst, param, c_bol=1.0):
     '''
     Calculates the persistent flux, based on the inferred mdot, redshift
-    etc.
+    etc. Earlier we passed the individual parameters, but easiest to just provide
+    the model burst
     '''
 
-# First we calculate Q_grav, to calculate the inferred persistent flux that
-# we should see (based on the accretion rate); that is not given in Lampe
-# et al.  2016, but is given in gal03d
-# Note that (as for the M_NS) we're using the passed parameter opz here,
-# not the value that is associated with the model burst
+    dist, inclination, _opz, t_off = param
+    xi_b, xi_p = dm.anisotropy(inclination)
+
+    # The combination of an input redshift an model gravity uniquely define
+    # a mass-radius combination (as for modelFunc)
+
+    _M, _R = calc_mr(mburst.g, _opz)
+
+    # Here we calculate the value of xi (ratio of GR to Newtonian radii),
+    # appropriate for the adopted value of (1+z). This is used instead of the
+    # value attached to the model, because that's for a different redshift
+
+    # xi = sqrt(_opz)
+    xi = (_R / mburst.R_Newt).decompose()
+    # print (xi)
+
+    # The mdot measured by the distant observer now depends upon the assumed
+    # redshift; see Keek & Heger (2011) eq. B16
+
+    mdot_infty = xi**2 * mburst.mdot / _opz
+
+    # Next we calculate Q_grav, to calculate the inferred persistent flux that
+    # we should see (based on the accretion rate); that is not given in Lampe
+    # et al.  2016, but is given in gal03d
+    # Note that (as for the M_NS) we're using the passed parameter opz here,
+    # not the value that is associated with the model burst
 
 #        Q_grav = const.G*M_NS/mburst.R_NS # approximate
-    Q_grav = const.c**2*(opz-1)/opz
+    Q_grav = const.c**2*(_opz-1)/_opz
 
-# persistent flux (see lampe16, eq. 8, noting that our mdot is averaged
-# over the neutron star surface):
+    # persistent flux (see Keek & Heger 2011, eq. B20, noting that our mdot is averaged
+    # over the neutron star surface):
 
-    return ( mdot*Q_grav/ (4.*pi*opz*dist**2*xi_p*c_bol) ).to(u.erg/u.cm**2/u.s)
+    return ( mdot_infty*Q_grav/ (4.*pi*_opz*dist**2*xi_p*c_bol) ).to(u.erg/u.cm**2/u.s)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -80,8 +105,8 @@ def modelFunc(p,obs,model, disc_model):
     '''
     This function performs the stretching and rescaling of the (model
     predicted) burst lightcurve based on the input parameter set
-    The calculations are based on those in Appendix B of Lampe et al.
-    2016 (ApJ 819:46)
+    The calculations are based on those in Appendix B of Keek & Heger
+    2011 (ApJ 743:189)
     Parameter array is (for now) a tuple with the appropriate units:
     ( distance, inclination, redshift, time offset )
     '''
@@ -93,32 +118,37 @@ def modelFunc(p,obs,model, disc_model):
 
     xi_b, xi_p = dm.anisotropy(inclination)
 
-# Here we calculate the value of xi (ratio of GR to Newtonian radii),
-# appropriate for the adopted value of (1+z). This is used instead of the
-# value attached to the model, because that's for a different redshift
-#
-# Note that this isn't actually used below
+    # The combination of an input redshift an model gravity uniquely define
+    # a mass-radius combination
 
-    xi = sqrt(_opz)
+    _M, _R = calc_mr(model.g, _opz)
 
-# First interpolate the model values onto the observed grid
-# This step defines the interpolation function, using a shifted and rescaled
-# model time to account for time dilation in the NS surface frame
+    # Here we calculate the value of xi (ratio of GR to Newtonian radii),
+    # appropriate for the adopted value of (1+z). This is used instead of the
+    # value attached to the model, because that's for a different redshift
+
+    # xi = sqrt(_opz)
+    xi = (_R / model.R_Newt).decompose()
+
+    # First interpolate the model values onto the observed grid
+    # This step defines the interpolation function, using a shifted and rescaled
+    # model time to account for time dilation in the NS surface frame
 
     fInterp = interp1d(_opz*(model.time-t_off),model.lumin,bounds_error=False,
                       fill_value = min(model.lumin))
 
-# Then we return the predicted model flux, interpolated onto the observed
-# burst time bins. We shift the observed times to the middle of the bin, using
-# the timepixr attribute.
-# We also account for the distance, and the anisotropy parameter, using the
-# convention of Fujimoto et al. 1988, i.e.
-#   L_b = 4\pi d^2 \xi_b F_b
+    # Then we return the predicted model flux, interpolated onto the observed
+    # burst time bins. We shift the observed times to the middle of the bin, using
+    # the timepixr attribute.
+    # We also account for the distance, and the anisotropy parameter, using the
+    # convention of Fujimoto et al. 1988, i.e.
+    #   L_b = 4\pi d^2 \xi_b F_b
 
-#    return ( (model.xi/opz)**2 
-# since xi = sqrt(_opz) (see above), this first term just becomes 1/_opz
-#    return ( (xi/_opz)**2 
-    return ( (1/_opz)
+    #    return ( (model.xi/opz)**2
+    # since xi = sqrt(_opz) (see above), this first term just becomes 1/_opz
+    #    return ( (xi/_opz)**2
+
+    return ( (xi**2 / _opz)
             * fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*model.lumin.unit
             / (4.*pi*dist.to('cm')**2) / xi_b )
 
@@ -259,10 +289,22 @@ class Lightcurve(object):
 # Later we can make this plot method more elaborate
 # where argument for step is appropriate for timepixr=0.0
 
-    def plot(self, yerror=True):
+    def plot(self, yerror=True, obs_color='b', model_color='g',**kwargs):
         """Plot the lightcurve, accommodating both flux and luminosities"""
 
         assert self.timepixr == 0.0
+
+        # Want to ensure consistent colors between the steps and points, which
+        # otherwise won't occur
+
+        kwargs_passed = kwargs
+        if not 'color' in kwargs:
+            if type(self) == ObservedBurst:
+                kwargs['color'] = OBS_COLOUR
+            elif type(self) == KeplerBurst:
+                kwargs['color'] = MODEL_COLOUR
+            else:
+                kwargs['color'] = 'r'
 
         luminosity = False
         if hasattr(self,'flux'):
@@ -275,14 +317,14 @@ class Lightcurve(object):
             yerr = self.lumin_err
             ylabel = "Luminosity ({0.unit:latex_inline})".format(self.lumin)
         
-        plt.step(self.time,y,where='post',label=self.filename)
+        plt.step(self.time,y,where='post',label=self.filename, **kwargs)
 #        print (type(self.dt), type(yerr))
 #        print (yerror & (self.dt != None) & (yerr != None))
 #        if (yerror & (self.dt != None) & (yerr != None)):
         if yerror:
             try:
                 plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
-                    y.value, yerr=yerr.value,fmt='b.')
+                    y.value, yerr=yerr.value,fmt='.', **kwargs)
 #            plt.plot(self.time,y,label=self.filename)
             except:
                 pass
@@ -290,9 +332,13 @@ class Lightcurve(object):
 
         if luminosity:
             plt.plot(np.array([min(self.time.value),max(self.time.value)]),
-                     np.full(2,self.L_Edd),'r--')
+                     np.full(2,self.L_Edd),'--', **kwargs)
         plt.xlabel("Time ({0.unit:latex_inline})".format(self.time))
         plt.ylabel(ylabel)
+
+        # Restore the original kwargs array before exiting
+
+        kwargs = kwargs_passed
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -300,7 +346,8 @@ class Lightcurve(object):
         disc_model='he16_a',c_bol=1.0):
         """
         Convert a luminosity profile to a simulated observation, with
-        plausible errors.
+        plausible errors. See Keek & Heger (2011) for the background calculations
+
         This method might make more sense as part of the KeplerBurst class
         (or a parent SimulatedBurst class), but for now we include this method
         as part of the lightcurve class, so that future classes of model
@@ -308,8 +355,13 @@ class Lightcurve(object):
         """
 
         if not hasattr(self,'lumin'):
-            print ("** ERROR ** need luminosity to simulate observation")
+            print ("concord.observe: ** ERROR ** need luminosity to simulate observation")
             return None
+
+        if not hasattr(self,'g'):
+            print ("concord.observe: ** ERROR** need model gravity to simulate observation")
+
+        # First unpack the simulation parameters
 
         dist, inclination, _opz, t_off = param
         xi_b, xi_p = dm.anisotropy(inclination, model=disc_model)
@@ -331,37 +383,49 @@ class Lightcurve(object):
         else:
             npts = len(obs.time)
 
+        # modelFunc does the actual scaling
+
         model = modelFunc(param, obs, self, disc_model)
 
-# Add some errors based on the flux_err
-
         if hasattr(obs,'flux_err'):
+
+            # Add some errors based on the flux_err
+
             model += np.random.normal(size=npts)*obs.flux_err
+
         else:
-            print ("** WARNING ** can't add scatter without flux errors")
+            print ("concord.observe: ** WARNING ** can't add scatter without flux errors")
 
-        # And return an ObservedBurst object with appropriate label
-        # Have a problem here with the doubling up of units, as the ObservedBurst.__init__
-        # method will apply it's own
+        # This is OK (modelFunc will deal with it)
 
-        if hasattr(self,'opz'):
-            if abs(self.opz-_opz) > ETA:
-                print ('observe: ** WARNING ** inconsistent simulation redshift for model value')
-                print ('         model value: {:.4f}, simulation value: {:.4f}\n'.format(self.opz,_opz))
+        # if hasattr(self,'opz'):
+        #     if abs(self.opz-_opz) > ETA:
+        #         print ('observe: ** WARNING ** inconsistent simulation redshift for model value')
+        #         print ('         model value: {:.4f}, simulation value: {:.4f}\n'.format(self.opz,_opz))
+
+        # Calculate the equivalent persistent flux
+
+        _fper = fper(self, param, c_bol=c_bol)
 
         # print ('obs.time:',obs.time)
         # print ('obs.dt:',obs.dt)
         # print ('flux:',model)
         # print ('flux_err:',obs.flux_err)
+
+        # And return an ObservedBurst object with appropriate label
+        # Have a problem here with the doubling up of units, as the ObservedBurst.__init__
+        # method will apply it's own
+
         sim = ObservedBurst(time=obs.time.value,dt=obs.dt.value,
                           flux=model.value,flux_err=obs.flux_err.value,
                           tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
-                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
-                          filename="{} @ {}".format(self.filename,dist),
+                          fper = _fper, filename="{} @ {}".format(self.filename,dist),
+                          c_bol=c_bol,
         # Include the simulation parameters in the burst description
                           sim_dist=dist, sim_inclination=inclination, sim_opz=_opz,
-                          sim_t_off=t_off, sim_xi_b=xi_b, sim_xi_p=xi_p, sim_disc_model=disc_model
+                          sim_t_off=t_off, sim_xi_b=xi_b, sim_xi_p=xi_p, sim_disc_model=disc_model,
         # Should potentially also include the model burst parameters, where available
+                          model_g = self.g
                             )
 
         return sim
@@ -441,8 +505,8 @@ class Lightcurve(object):
           self.time[sel]-self.time[sel[0]]+self.dt_nogap[sel]/2.,
           np.log(y[sel].value),
           sigmay=0.5*(np.log((y[sel]+yerr[sel]).value)
-                     -np.log((y[sel]-yerr[sel]).value)), 
-          return_all=True) 
+                     -np.log((y[sel]-yerr[sel]).value)),
+          return_all=True)
 
         # print (fit_info)
 
@@ -493,7 +557,7 @@ class ObservedBurst(Lightcurve):
     table - contents of table 2
     row - entry in the table corresponding to this burst
     fper, fper_err - persistent flux level (1e-9 erg/cm^2/s)
-    cbol - bolometric correction
+    c_bol - bolometric correction
     mdot - accretion rate (total, not per unit area)
     fluen_table - burst fluence
     F_pk - burst peak flux
@@ -595,8 +659,9 @@ class ObservedBurst(Lightcurve):
         rowparam = {'key': key, 'row': row, 'tdel': tdel, 'tdel_err': tdel_err, 'source': source}
 
         # Decode the other table parameters
+        # The label below is what each column will become as an attribute
 
-        label = ['fper', 'cbol', 'mdot', 'fluen_table', 'F_pk', 'alpha']
+        label = ['fper', 'c_bol', 'mdot', 'fluen_table', 'F_pk', 'alpha']
         # fper units are applied at the ObservedBurst __init__ stage
         # unit = [1e-9 * u.erg / u.cm ** 2 / u.s, 1., 1.75e-8 * const.M_sun / u.yr,
         unit = [1e-9, 1., 1.75e-8 * const.M_sun / u.yr,
@@ -686,8 +751,8 @@ class ObservedBurst(Lightcurve):
         # Simulated observed bursts won't have an fper_err attribute
         elif hasattr(self,'fper'):
             print ("  F_per = {:.4e} ".format(self.fper))
-        if hasattr(self,'cbol'):
-            print ("  Bolometric correction = {}".format(self.cbol))
+        if hasattr(self,'c_bol'):
+            print ("  Bolometric correction = {}".format(self.c_bol))
 
         # Check if this is a simulated burst, and if so, list the parameters
 
@@ -705,7 +770,7 @@ class ObservedBurst(Lightcurve):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-    def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.,+8.*u.s],
+    def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.26,-10.*u.s],
         		breakdown = False, plot = False, subplot = True,
                 weights={'fluxwt':1.0, 'tdelwt':2.5e3},
                 disc_model='he16_a', debug = False):
@@ -719,48 +784,17 @@ class ObservedBurst(Lightcurve):
         lightcurve, you may want to weight these greater than one so that the
         MCMC code will try to match those preferentially'''
 
-        dist, inclination, _opz, t_off = param
+        # Calculate the simulated burst using the observe method
+
+        sim_burst = mburst.observe(param, obs=self, disc_model=disc_model, c_bol=self.c_bol)
+
+        assert sim_burst.flux.unit == self.flux.unit == self.flux_err.unit
 
 # Even though this is already in the prior, lhoodClass calls compare()
 # before the prior, enabling an out-of-domain error in anisotropy
+        dist, inclination, _opz, t_off = param
         if not 0. < inclination.value < 90.:
             return -np.inf
-
-        xi_b, xi_p = dm.anisotropy(inclination, model=disc_model)
-
-# Here we calculate the equivalent mass and radius given the redshift and
-# surface gravity. Since we allow the redshift to vary, but the model is
-# calculated at a fixed surface gravity, this implies a particular pair
-# of values of M_NS and R_NS. Think of moving back and forth along a track
-# of constant g in M-R phase space.
-# This replaces (temporarily) the value of M_NS supplied for the model 
-# BUT because we're not using the approximate expression for Q_grav below,
-# this is not even used
-
-#        _t = (mburst.g.to(u.cm/u.s**2)*mburst.R_NS.to(u.cm)
-#		/const.c.to(u.cm/u.s)**2)
-#        M_NS = (mburst.g*mburst.R_NS**2/const.G * (-_t + sqrt(_t+1)))
-#        M_NS = (mburst.g*mburst.R_NS**2/(const.G*opz)).to(u.g)
-
-        M_NS, R_NS = calc_mr(mburst.g,_opz)
-
-# Check here:
-
-        assert abs(mburst.g-g(M_NS,R_NS))/mburst.g < 1e-6
-        assert abs(_opz-opz(M_NS,R_NS))/_opz < 1e-6
-
-        if debug:
-            print ('Inferred mass = {:.4f} M_sun'.format(M_NS/const.M_sun))
-
-# TODO should also make sure to store the inferred mass value here
-
-# Calculate the rescaled model flux with the passed parameters
-# This is equivlent to simulating an observation of the burst with the
-# chosen parameters, so we should use instead the observe method of the
-# Lightcurve class
-
-        model = modelFunc(param, self, mburst, disc_model)
-        assert model.unit == self.flux.unit == self.flux_err.unit
 
 # can check here if the object to compare is actually a model burst
 #        print (type(mburst))
@@ -774,35 +808,49 @@ class ObservedBurst(Lightcurve):
 
         lhood_cpt = np.array([])
 
-        fper_pred = fper(mburst.mdot,_opz,dist,xi_p,c_bol=self.cbol)
-               
-        fper_sig2 = 1.0/(self.fper_err.value**2)
+        # Persistent flux
+
+        # fper_pred = fper(mburst.mdot,_opz,dist,xi_p,c_bol=self.cbol)
+        fper_pred = sim_burst.fper
+
+        if hasattr(self,'fper_err'):
+            fper_sig2 = 1.0/(self.fper_err.value**2)
+        else:
+            print ('concord.compare: ** WARNING ** no uncertainty on F_per')
+            fper_sig2 = 1.0
         lhood_cpt = np.append(lhood_cpt, -weights['fluxwt']*( 
                (self.fper.value-fper_pred.value)**2*fper_sig2 
                +np.log(2.*pi/fper_sig2) ) )
 
-# recurrence time
+        # recurrence time
 
-        tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*_opz)**2)
+        # tdel_sig2 = 1.0/(self.tdel_err.value**2+(mburst.tdel_err.value*_opz)**2)
+        # lhood_cpt = np.append(lhood_cpt, -weights['tdelwt']*(
+        #        (self.tdel.value-mburst.tdel.value*_opz)**2*tdel_sig2
+        #        +np.log(2.*pi/tdel_sig2) ) )
+        tdel_sig2 = 1.0 / (self.tdel_err.value**2+sim_burst.tdel_err.value**2)
         lhood_cpt = np.append(lhood_cpt, -weights['tdelwt']*(
-               (self.tdel.value-mburst.tdel.value*_opz)**2*tdel_sig2
-               +np.log(2.*pi/tdel_sig2) ) )
+                (self.tdel.value-sim_burst.tdel.value)**2*tdel_sig2
+                +np.log(2.*pi/tdel_sig2) ) )
 
-# lightcurve
+        # lightcurve
 
         inv_sigma2 = 1.0/(self.flux_err.value**2)
+        # lhood_cpt = np.append(lhood_cpt,
+        # 	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2
+        #         +np.log(2.0*pi/inv_sigma2) ) )
         lhood_cpt = np.append(lhood_cpt,
-        	-0.5 * np.sum( (model.value-self.flux.value)**2*inv_sigma2
-                +np.log(2.0*pi/inv_sigma2) ) )
+         	-0.5 * np.sum( (sim_burst.flux.value-self.flux.value)**2*inv_sigma2
+                 +np.log(2.0*pi/inv_sigma2) ) )
 
         if debug:
             cl=0.0
             for i in range(len(self.time)):
-                _lhood = -0.5*((model[i].value-self.flux[i].value)**2*inv_sigma2[i]
+                _lhood = -0.5*((sim_burst.flux[i].value-self.flux[i].value)**2*inv_sigma2[i]
                     +np.log(2.0*pi/inv_sigma2[i]))
                 cl += _lhood
-                print ('{:6.2f} {:.4g} {:.4g} {:.4g} {:8.3f} {:8.3f}'.format(self.time[i],self.flux[i].value,self.flux_err[i].value,
-                    model[i].value,_lhood,cl))
+                print ('{:6.2f} {:.4g} {:.4g} {:.4g} {:8.3f} {:8.3f}'.format(self.time[i],
+                    self.flux[i].value, self.flux_err[i].value, sim_burst.flux[i].value,_lhood,cl))
 
         if breakdown:
             print ("Likelihood component breakdown (fper, tdel, lightcurve): ",lhood_cpt)
@@ -811,14 +859,16 @@ class ObservedBurst(Lightcurve):
 
         if plot:
 
-# Now do a more complex plot with a subplot
-# See http://matplotlib.org/users/gridspec.html for documentation
+            # Now do a more complex plot with a subplot
+            # See http://matplotlib.org/users/gridspec.html for documentation
+            #
+            # Want to maintain consistent colors; blue for observed, green for simulated?
 
             fig = plt.figure()
             gs = gridspec.GridSpec(4, 3)
             ax1 = fig.add_subplot(gs[0:3,:])
 
-            self.plot()
+            self.plot(color='b')
         
 # overplot the rescaled model burst
 
@@ -829,8 +879,8 @@ class ObservedBurst(Lightcurve):
 ##		label=mburst.filename.replace('_',r'\_'))
 #		label=mburst.filename)
 
-            ax1.plot(self.time+(0.5-self.timepixr)*self.dt, model,'r-',
-		label=mburst.filename)
+            # ax1.plot(self.time+(0.5-self.timepixr)*self.dt, model,'r-',label=sim_burst.filename)
+            sim_burst.plot(color='g')
 
             if subplot:
 
@@ -843,9 +893,9 @@ class ObservedBurst(Lightcurve):
 
 #                print (self.tdel,self.tdel_err)
                 a.errorbar([0.95], self.tdel.value, 
-                       yerr=self.tdel_err.value, fmt='o')
-                a.errorbar([1.05], mburst.tdel.value*_opz, 
-                       yerr=mburst.tdel_err.value*_opz, fmt='ro')
+                       yerr=self.tdel_err.value, fmt='o', color='b')
+                a.errorbar([1.05], sim_burst.tdel.value,
+                       yerr=sim_burst.tdel_err.value, fmt='o', color='g')
                 plt.ylabel('$\Delta t$ (hr)')
 
 #            plt.plot(self.time,model,'.')
@@ -866,7 +916,7 @@ class ObservedBurst(Lightcurve):
             ax2 = fig.add_subplot(gs[3,:])
 #            ax2.plot(self.time+(0.5-self.timepixr)*self.dt, model-self.flux)
             plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value, 
-		self.flux.value-model.value,
+		self.flux.value-sim_burst.flux.value,
 		yerr=self.flux_err.value,fmt='b.')
             ax2.axhline(0.0, linestyle='--', color='k')
             gs.update(hspace=0.0)
