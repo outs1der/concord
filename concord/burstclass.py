@@ -53,7 +53,7 @@ CONCORD_PATH = pkg_resources.resource_filename('concord','data')
 ETA = 1.e-6
 # default colours for plotting
 OBS_COLOUR = 'b'
-MODEL_COLOUR = 'b'
+MODEL_COLOUR = 'g'
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -143,12 +143,13 @@ def modelFunc(p,obs,model, disc_model):
     # We also account for the distance, and the anisotropy parameter, using the
     # convention of Fujimoto et al. 1988, i.e.
     #   L_b = 4\pi d^2 \xi_b F_b
+    # The scaling here is as per eq. B15 in Keek et al. 2011
 
     #    return ( (model.xi/opz)**2
     # since xi = sqrt(_opz) (see above), this first term just becomes 1/_opz
     #    return ( (xi/_opz)**2
 
-    return ( (xi**2 / _opz)
+    return ( (xi / _opz)**2
             * fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*model.lumin.unit
             / (4.*pi*dist.to('cm')**2) / xi_b )
 
