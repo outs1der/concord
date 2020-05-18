@@ -1,13 +1,13 @@
 %%
 %% Beginning of file 'ms.tex'
-%%
 %% Copied from sample61.tex by dkg 15.3.2018
 %%
 %% This is the paper describing the use and design of the concord suite of software
 %% for burst observation-model comparisons
 %%
 %% See https://bitbucket.org/minbar/concord
-%%
+%% and the companion jupyter notebook, Inferring burster properties.ipynb
+
 %% AASTeX is now based on Alexey Vikhlinin's emulateapj.cls 
 %% (Copyright 2000-2015).  See the classfile for details.
 
@@ -24,8 +24,8 @@
 %% does not need to be explicitly stated.
 %%
 %%
-%% using aastex version 6.1
-\documentclass{aastex61}
+%% using aastex version 6.3 from 2020 May; originally 6.1
+\documentclass{aastex63}
 
 %% The default is a single spaced, 10 point font, single spaced article.
 %% There are 5 other style options available via an optional argument. They
@@ -92,6 +92,19 @@
 \newcommand{\epcs}{{\rm erg\,cm^{-2}\,s^{-1}}}
 \newcommand{\epc}{{\rm erg\,cm^{-2}}}
 \newcommand{\Xb}{\ensuremath{\overline{X}}}
+\newcommand{\qnuc}{Q_{\rm nuc}}
+\newcommand{\yign}{y_{\rm ign}}
+\newcommand{\zcno}{Z_{\rm CNO}}
+\newcommand{\xte}{{\it RXTE}}
+\newcommand{\sax}{{\it BeppoSAX}}
+\newcommand{\igr}{{\it INTEGRAL}}
+
+\newcommand{\todo}[1]{\textbf{\textcolor{red}{TODO: #1}}} % Duncan
+
+% standard redshift to use
+% 1./sqrt(1.-2.*c.G*1.4*c.M_sun/((11.2*u.km).to('m')*c.c**2))            
+
+\newcommand{\opz}{1.259}
 
 %% Reintroduced the \received and \accepted commands from AASTeX v5.2
 
@@ -277,6 +290,7 @@ Here we describe some commonly-used approaches for determining system parameters
 \keywords{editorials, notices --- 
 miscellaneous --- catalogs --- surveys}
 
+% ------------------------------------------------------------------------------
 %% From the front matter, we move on to the body of the paper.
 %% Sections are demarcated by \section and \subsection, respectively.
 %% Observe the use of the LaTeX \label
@@ -298,9 +312,11 @@ Thermonuclear (type-I) bursts are observed from neutron stars accreting from low
 
 Here we explore the ways that host system  parameters affect the observed properties of thermonuclear bursts, and assess to what degree these effects can be corrected for.
 %
-In \S\ref{sec:data} we describe the typical characteristics of burst observations along with those properties that can be predicted by numerical models.
+In \S\ref{sec:data} we describe the typical characteristics of burst observations along with those properties that can be 
+% predicted by numerical models.
+inferred from simple calculations or by comparison with numerical models.
 % 
-In \S\ref{sec:analysis} we explore a number of methods to infer properties of the bursting source, and assess their accuracy.
+In \S\ref{sec:analysis} we explore a number of methods to infer properties of the bursting source, based on the extent of available observational data, and assess their accuracy.
 %
 In \S\ref{sec:simulations} we apply these methods to a range of simulated data to assess what degree of systematic errors these measurements might be subject to.
 
@@ -397,17 +413,52 @@ In \S\ref{sec:simulations} we apply these methods to a range of simulated data t
 %in the comments of this \latex\ file and in the online documentation at
 %\url{http://journals.aas.org/authors/aastex.html}.
 
+% ------------------------------------------------------------------------------
 \section{Observations and modelling} 
 \label{sec:data}
 
-\subsection{Burst observations}
-\label{subsec:data}
+%\subsection{Burst observations}
+%\label{subsec:data}
 
-The fundamental observable that we measure is the time-history of the burst flux, the lightcurve $(t_i,F_{i})$. Here the $F_{i}$ may be in instrumental units of count~s$^{-1}$, or may be estimates of the bolometric flux at time $t_i$, derived from model fits of the spectrum at time $t_i$.
+The fundamental observable that we measure is the time-history of the burst flux, the lightcurve $(t_i,F_{i})$. Here the $F_{i}$ may be in instrumental units of count~s$^{-1}$ (or perhaps count~s$^{-1}$~cm$^{-2}$), or may be estimates of the bolometric flux at time $t_i$, derived from model fits of the spectrum at time $t_i$.
 %
 Provided the $F_i$ are in units of flux, or the flux can be estimated from the intensity,  we may measure the peak flux, $F_{\rm pk}$, and integrate to estimate the burst fluence, $E_b$. 
 
-The peak flux $F_{\rm pk}$ provides constraints on the source distance, since the maximum burst luminosity is limited to (roughly) the Eddington luminosity \cite[e.g.][]{lew93}
+Given one or more bursts, we can derive constraints on the recurrence time $\Delta t$. A pair of bursts separated by an interval with complete coverage by X-ray instruments offer an unambiguous measurement of the recurrence time, but such measurements are rare due to the typically low duty cycle for most instruments \cite[e.g.][]{minbar}.
+%
+Such cases also tend to be biased towards lower recurrence times, which may be dominated by so-called ``short waiting time'' bursts, which likely arise from ignition of unburnt fuel from the previous event \cite[]{keek10}. The recurrence time for such events likely does not represent the actual time required to meet the ignition conditions at the base of the fuel layer, and so are generally excluded for the purposes of inferring properties of the burst sources.
+
+Where one or more bursts $N$ are observed in low-duty cycle observations, the rate can be estimated based on the total exposure, i.e.
+\begin{equation}
+\langle R\rangle = \frac{N}{\sum^n T_i}
+\end{equation}
+where each of $n$ observartions has exposure $T_i$. The probable range of the average rate can be estimated assuming Poisson counting statistics for the uncertainty on the burst number $N$. Because of the approximately periodic behavior common for bursts, and the similarity between low-Earth orbital periods and the burst recurrence times, such uncertainty estimates may be wildly incorrect.
+
+From data taken prior to the burst ignition we can measure the persistent flux $F_{\rm per}$, a measure of the accretion rate; 
+% and provided more than one burst is observed, we may also measure (or estimate) the recurrence time, $\Delta t$. 
+%
+these parameters may be combined to estimate the $\alpha$-value, the (observed) ratio of the burst to persistent flux: 
+\begin{equation}
+\alpha = \frac{\Delta t F_{\rm per} c_{\rm bol}}{E_B}
+\end{equation}
+where $c_{\rm bol}$ is the bolometric correction giving the inverse fraction of total persistent flux emitted in the instrumental band.
+
+additional data analysis comments
+\begin{itemize}
+\item correcting lightcurve for variations e.g. from dips, or achromatic variations
+\item using different spectral models than blackbody
+\item allowing the persistent flux to vary
+\item maybe a table with the parameters?
+\end{itemize}
+
+\subsection{Burster distances}
+\label{subsec:distance}
+
+A significant fraction of observed bursts exhibit characteristic variations in their spectral hardness (or the blackbody temperature and normalisation) around their maximum that indicate the presence of photospheric radius-expansion (PRE). 
+%
+Even if such variations are not present, 
+%
+the peak flux $F_{\rm pk}$ provides constraints on the source distance, since the maximum burst luminosity is limited to (roughly) the Eddington luminosity \cite[e.g.][]{lew93}:
 % copied from bcatalog, and updated prefac
 % (8.*pi*const.G*const.m_p*1.4*const.M_sun*const.c/(const.sigma_T*1.259)).to('erg s-1')                                                         
 % Out[16]: <Quantity 2.79569695e+38 erg / s>
@@ -420,7 +471,7 @@ The peak flux $F_{\rm pk}$ provides constraints on the source distance, since th
  \frac{1+(\alpha_{\rm T}T_{\rm e})^{0.86}}{(1+X)}
 \nonumber \\ & & \times\  % line break
 %    \left[\frac{1+z(R)}{1.31}\right]^{-1}\ % \xi_b\
-    \left[\frac{1+z(R)}{1.259}\right]^{-1}\ % \xi_b\
+    \left[\frac{1+z(R)}{\opz}\right]^{-1}\ % \xi_b\
               \eps
   \label{ledd}
 \end{eqnarray}
@@ -435,11 +486,13 @@ mass fraction of hydrogen in the atmosphere.
 The final factor in
 square brackets represents the gravitational redshift 
 at the photosphere $1+z(R)=(1-2GM_{\rm NS}/R
-c^2)^{-1/2}$, which may be lower than the value at the NS surface, while the photosphere is expanded during the radius expansion episode (i.e. $R\ge R_{\rm NS}$).
+c^2)^{-1/2}=1.259$ for $M_{\rm NS}=1.4\ M_\odot$ and $R=R_{\rm NS}=11.2$~km.
+%
+The effective redshift measured at the peak of a PRE burst may be lower than the value at the NS surface, while the photosphere is expanded during the radius expansion episode (i.e. $R\ge R_{\rm NS}$).
 
 % {\it Mention also the empirical value here... } actually later
 
-A significant fraction of observed bursts exhibit characteristic variations in their spectral hardness (or the blackbody temperature and normalisation) around their maximum that indicate the presence of photospheric radius-expansion (PRE). By equating the maximum flux of these events with the Eddington luminosity, the distance to the source can be estimated as
+By equating the maximum flux of these events with the Eddington luminosity, the distance to the source can be estimated as
 % p is the prefactor from the L_Edd expression above
 % np.sqrt(p/(4.*pi*3e-8*u.erg/u.cm**2/u.s)).to('kpc')                     
 % Out[26]: <Quantity 8.82528911 kpc>
@@ -451,7 +504,7 @@ A significant fraction of observed bursts exhibit characteristic variations in t
        	\left(\frac{M_{\rm NS}}{1.4M_\odot}\right)^{1/2}
 \nonumber \\ & & \times\  % line break
 %	\left[\frac{1+z(R)}{1.31}\right]^{-1/2}
-	\left[\frac{1+z(R)}{1.259}\right]^{-1/2}
+	\left[\frac{1+z(R)}{\opz}\right]^{-1/2}
 	(1+X)^{-1/2}\ {\rm kpc}
  \label{disteq}
 \end{eqnarray}
@@ -461,7 +514,7 @@ which is discussed in the next section.
 
 As is obvious from equation \ref{disteq}, several factors will contribute to statistical (and possibly systematic) uncertainties in distance estimates derived in this manner. First, the neutron star mass $M_{\rm NS}$ is unknown...
 %
-Second, the radius $R$ at which the redshift should be calculated may not be clear from the observations. In principle one could take the inferred blackbody nromalisation at the time of maximum flux, but for most PRE bursts the maximum flux is achieved close to the ``touchdown'' point, where the photosphere has returned (more or less) to the neutron star surface \cite[e.g.][]{gal06a}.
+Second, the radius $R$ at which the redshift should be calculated may not be clear from the observations. In principle one could take the inferred blackbody normalisation at the time of maximum flux, but for most PRE bursts the maximum flux is achieved close to the ``touchdown'' point, where the photosphere has returned (more or less) to the neutron star surface \cite[e.g.][]{gal06a}.
 %
 Third, the possible range/likely value for $X$...
 %
@@ -481,12 +534,19 @@ Since the distribution of the burst flux over the neutron star is likely differe
 \subsection{Burst energetics}
 \label{subsec:energetics}
 
-The fluence (and the shape of the burst profile) is determined by the amount of accumulated fuel, and its composition. The nuclear energy generation rate $Q_{\rm nuc}$ depends on the composition; studies with the 1-D numerical code {\sc kepler} suggest that 
+The fluence (and the shape of the burst profile) is determined by the amount of accumulated fuel, and its composition. For accretion of mixed H/He with hydrogen mass fraction $X_0$, the composition at ignition may be modified substantially by $\beta$-limited CNO burning. In extreme cases the recurrence time is sufficiently long that the accreted hydrogen at the base of the fuel layer is exhausted, and ignition of intense, fast He-rich bursts occur.
+
+For a fuel layer consisting of mixed H/He, $\qnuc$ depends on the mean hydrogen fraction at ignition, \Xb:
+% The nuclear energy generation rate $\qnuc$ depends on the composition; 
+studies with the 1-D numerical code {\sc kepler} suggest that 
 \begin{eqnarray}
 Q_{\rm nuc} &= & 1.31+6.95\Xb-1.92\Xb^2 \nonumber \\
 & \approx & 1.35 + 6.05 \Xb
+\label{eq:qnuc}
 \end{eqnarray}
-\cite[]{goodwin19a} where $\Xb$ is the average H-fraction of the fuel layer at ignition. For fuel with solar composition (i.e. $X=0.7$), $Q_{\rm nuc}=5.22$~MeV/nucleon.
+\cite[]{goodwin19a}.
+% where $\Xb$ is the average H-fraction of the fuel layer at ignition. 
+For fuel with solar composition (i.e. $X=0.7$), $Q_{\rm nuc}=5.22$~MeV/nucleon.
 
 {\it Perhaps put in here some estimates of the fuel composition as a function of $X_0$ and recurrence time; could perhaps develop a ``prior'' for $\Xb$ }
 
@@ -505,20 +565,12 @@ y & = & \frac{L_b d^2 (1+z)}{R_{\rm NS}^2 Q_{\rm nuc}}\
 \nonumber \\ & & \times\  % line break
 %                      \left(\frac{1+z}{1.31}\right)
 %                      \left(\frac{R_{\rm NS}}{10\ {\rm km}}\right)^{-2}
-                      \left(\frac{1+z}{1.259}\right)
+                      \left(\frac{1+z}{\opz}\right)
                       \left(\frac{R_{\rm NS}}{11.2\ {\rm km}}\right)^{-2}
                       {\rm g\,cm^{-2}}
-\label{column}
+\label{eq:column}
 \end{eqnarray}
 % {\it need to update prefactor, denominator in $Q_{\rm nuc}$ term here } - done
-
-From data taken prior to the burst ignition we can measure the persistent flux $F_{\rm per}$, a measure of the accretion rate; and provided more than one burst is observed, we may also measure (or estimate) the recurrence time, $\Delta t$. 
-
-These parameters may be combined to estimate the $\alpha$-value, the ratio of the burst to persistent flux: 
-\begin{equation}
-\alpha = \frac{\Delta t F_{\rm per} c_{\rm bol}}{E_B}
-\end{equation}
-where $c_{\rm bol}$ is the bolometric correction giving the inverse fraction of total persistent flux emitted in the instrumental band.
 
 \subsection{Burst models}
 \label{subsec:models}
@@ -697,11 +749,11 @@ While it may seem strange to base an analysis on the {\it non-}detection of burs
 
 In cases where we can be confident that the compact object is a neutron star (e.g. where persistent pulsations are detected) but no bursts are observed, we can constrain the distance by adopting a composition for the fuel and comparing the predictions of burst models to the good-time intervals of our X-ray data.
 
-For example, based on {\it RXTE}/PCA observations of the accretion-powered millisecond pulsar IGR~J00291+5934, \cite{gal06b} derived joint constraints over the distance $d$ and fuel H-fraction $X_0$, adopting  the predictions of a simple numerical model ({\it ref to {\sc settle}}). These constraints suggest the distance is $\gtrsim5$~kpc (at 3-sigma significance), provided $X_0\approx0.7$, a reasonable choice given the expectation of a H-rich donor in this $2.46$~hr binary orbital period system \cite[]{gal05a}. 
+For example, based on {\it RXTE}/PCA observations of the accretion-powered millisecond pulsar IGR~J00291+5934, \cite{gal06b} derived joint constraints over the distance $d$ and fuel H-fraction $X_0$, adopting  the predictions of a simple numerical model ({\it ref to {\sc settle}}). These constraints suggest the distance is $\gtrsim5$~kpc (at 3-sigma significance), provided $X_0\approx0.7$, a reasonable choice given the expectation of a H-rich donor in this $2.46$~hr binary orbital period system \cite[]{gal05a}.  \todo{give more detail about how this was done}
 
 In a subsequent outburst in 2015, a single burst was detected by {\it Swift}/XRT \cite[]{kuin15}, offering the opportunity to verify the previously-determined distance limit. The estimated peak 
 % 0.3--10~keV flux in the range (3.0--$5.6)\times10^{-11}\ \epcs$. 
-0.1--35~keV flux was $(18\pm4)\times10^{-8}\ \epcs$ \cite[]{defalco17}, with the burst exhibiting spectral variations indicative of PRE. By comparing the peak flux to the empirical Eddington luminosity, the corresponding distance 
+0.1--35~keV flux was $(18\pm4)\times10^{-8}\ \epcs$ \cite[]{defalco17}, with the burst exhibiting spectral variations indicative of PRE. By comparing the peak flux to the empirical Eddington luminosity (see \S\ref{subsec:1burst}, below), the corresponding distance 
 \cite[including the inclination range of 22--32$^\circ$ suggested by][]{torres08},
 % possible inclinations as described in sec \S\ref{subsec:data}) is $4.4_{-0.7}^{+0.8}$~kpc, which is mostly inconsistent with the earlier limit. Clearly, such limits must be viewed with some caution.
 is $5.0_{-0.5}^{+0.7}$~kpc, which is fully consistent with the previously established limit. The effect of the inclination constraints is illustrated in Fig. \ref{fig:dist_igr00291}).
@@ -715,16 +767,67 @@ The distribution for an isotropic distribution of system inclinations (up to a m
 \end{figure}
 
 \subsection{One burst -- estimating the burst rate} 
-\label{subsec:burstrate}
+\label{subsec:1burst}
 
-{\it copy the analysis for the IGR source here }
+% {\it copy the analysis for the IGR source here }
 
+For a single burst detected from a source, we can expect to measure the burst peak flux, fluence, and timescale, and infer the distance and hence the expected burst rate. The detailed shape of the lightcurve can provide constraints from comparisons with numerical models (see \S\ref{subsec:lccompare}), but here we focus on the more straightforward calculation which may be done from the simple burst measurements alone. 
+
+We use for example the sole burst detected with \igr/JEM-X from IGR~J17591$-$2342 \cite[]{kuiper20}. This burst was observed  when the estimated persistent bolometric flux was $(1.2\pm0.2)\times10^{-9}\ \epcs$, and exhibited a fluence of $E_b =(1.1\pm0.1)\times10^{-6}\ {\rm erg\,cm^{-2}}$. The peak flux was $(7.6\pm1.4)\times10^{-6}\ \epcs$.
+
+\cite{kuiper20} first estimated the distance to the source based on the empirical value of the Eddington luminosity, and incorporating the expected anisotropy for an inclination range of 
+% kuiper20 uses slightly more restrictive 28-30
+24--30$^\circ$ \cite[]{sanna18} as $7.7_{-0.6}^{+0.8}$~kpc. Here the uncertainty is dominated by the peak flux, since the anisotropy factor is effectively fixed for such a narrow range of inclination, at $\xi_b=0.70$.
+
+\todo{potentially also demonstrate here the effect of inclination}
+
+We can use this distance constraint to estimate in turn the accretion and burst rate, as follows.
+%
+The persistent flux can then be converted to an accretion rate, given the estimated anisotropy factor predicted (separately) for the persistent emission, as
+\begin{eqnarray}
+\dot{m} & = L_{\rm pers} (1+z) (4\pi R^2(GM/R_{\rm NS}))^{-1}\\
+& = \ldots
+% TODO: give expanded expression for this and move to earlier section
+\end{eqnarray}
+via the {\tt mdot} method, and incorporating the estimated distance distribution already determined. The estimated value is within the range $(2.0_{-0.4}^{+0.6})\times10^3\ \rm{g\,cm^{-2}\,s^{-1}}$ with the usual assumed range for neutron star mass and radius (and hence redshift).
+
+In parallel, we can estimate the ignition column using equation \ref{eq:column}, given an estimate of the nuclear burning yield, $\qnuc$. ; as before, we could potentially obtain an estimate of this quantity by comparison of the observed lightcurve to simulations. However, in the absence of an estimate of this quantity, all is not lost. 
+
+Instead we can work backwards, 
+% 
+and assume a set of randomly generated values of \Xb\
+to estimate $\yign$ from equation \ref{column}, and $\Delta t_{\rm rec} = \yign/\dot{m}$.
+%
+We choose a uniform distribution for \Xb\ in the range 0--0.7; this distribution is probably not realistic for a wide sample of bursts, but it is difficult to do better.
+% text copied from Kuiper et al. 2020 down to ********
+% not yet edited (need to modify sufficiently to avoid plagiarism issues
+Given each pair of (\Xb,  $\Delta t_{\rm rec}$) we can infer the accreted H-fraction $X_0$, based on 
+% the expectation that hydrogen burns via the hot-CNO cycle and will be exhausted in a time $t_{\rm CNO} =9.8(X_0/0.7)(Z_{\rm CNO}/0.02)^{-1}$ \citep[e.g.][]{lampe16}.
+equation \ref{eq:X_0}.
+%
+Since $Z_{\rm CNO}$ is also unknown, we similarly draw random values from a uniform distribution in the range 0.0--0.02.
+We then select only those $X_0$ values within a physically realistic range $X_0<0.75$, and compute the confidence limits on the remaining parameters. 
+
+For the single burst observed from IGR~J17591$-$2342 the inferred ignition column is $2.2_{-0.8}^{+1.4}\times10^8\,{\rm g\,cm^{-2}}$, and the average expected recurrence time is $1.8\pm0.7$~d. 
+% Such long recurrence times likely guarantee that the hydrogen in the accreted fuel is exhausted at the base prior to ignition, and explaining the fast rise and short duration of the burst. 
+We can also infer lower (upper) limits on $X_0$ ($Z_{\rm CNO}$), although these limits are not strongly constraining; we find $X_0>0.17$ and $Z_{\rm  CNO}<0.017$ at 95\% confidence.
+% *******
+
+% Figure produced from the notebook; used 100000 samples for a smoother set of 
+% distributions
+\begin{figure}[ht!]
+\plotone{igrJ17591-2342.pdf}
+\caption{Inferred distributions of burst parameters for the single event observed from IGR~J17591$-$2342 with \igr/JEM-X, as reported by \cite{kuiper20}. An initially uniform distribution of \Xb, the mean H fraction at ignition, is used to estimate the burst ignition column $\yign$\ from the measured fluence, $E_b$. The column $\yign$\ and accretion rate are then used to estimate the recurrence time $\Delta t$ and the accreted H-fraction $X_0$, and we select only the physically realistic values $X_0<0.75$. The resulting constraints on the fuel composition parameters $X_0$ and $\zcno$ are rather weak, but the recurrence time is somewhat better constrained.
+\label{fig:param_igr17591}}
+\end{figure}
+
+% ------------------------------------------------------------------------------
 \subsection{Two bursts -- inferring fuel composition} 
 \label{subsec:fuelcomp}
 
 Given a minimally complete set of burst observations as described in \S\ref{subsec:data}, a common approach \cite[e.g][]{falanga11} is to estimate the fuel composition at ignition, and hence the accreted fuel composition, based on simple analytic estimates of the burst energy production $Q_{\rm nuc}$.
 
-One issue with this approach (as for analyses based on one burst, as described in \S\ref{subsec:burstrate}) is that the effects of anisotropy are frequently neglected.
+One issue with this approach (as for analyses based on one burst, as described in \S\ref{subsec:1burst}) is that the effects of anisotropy are frequently neglected.
 %
 A second issue which has emerged recently is that the commonly used estimates for the nuclear energy generation rate $Q_{\rm nuc}$ are not supported by recent {\sc kepler} models. 
 %
@@ -826,6 +929,7 @@ X_0 = \begin{cases}
                         \left(z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145\right) }
                         & f_{\rm burn} > 1
         \end{cases}
+    \label{eq:X_0}
 \end{equation}
 Practically, the issue with these expressions is that calculating $f_{\rm burn}$ requires knowledge of $X_0$, which is the unknown we are trying to constrain. One approach is to adopt a trial value of $X_0$, calculate $f_{\rm burn}$ and hence an updated estimate of $X_0$ via equation \ref{x0}, and iterate until no further change in the estimate arises.
 

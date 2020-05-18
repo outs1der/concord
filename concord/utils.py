@@ -155,6 +155,57 @@ def Q_nuc(Xbar, quadratic=False, old_relation=False, coeff=False):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
+def X_0(xbar, zcno, tdel, opz=1.259, debug=False, old_relation=False):
+    '''
+    Routine (extracted from hfrac) to determine the accreted H fraction X_0
+    given the average H-fraction at ignition, xbar, the CNO metallicity zcno,
+    and the burst recurrence time, tdel
+    '''
+
+    # This parameter sets the prefactor for the time to burn all H via hot-CNO; see
+    # Lampe et al. (2016, ApJ 819, 46)
+
+    tpref = 9.8 * u.hr
+
+    # Here we allow an option to use the old version if need be; this is already passed to the
+    # Q_nuc function, so we'll get the old parameters from that if need be
+
+    if old_relation:
+        tpref = 11. * u.hr
+
+    # Also here now we distinguish between the two possible cases, the first where there
+    # remains hydrogen at the base, and the second where it is exhausted
+    # This division is quantified via the f_burn fraction, which initially at least we
+    # must estimate
+
+    t_CNO = tpref * (xbar / 0.7) / (zcno / 0.02)
+    f_burn = tdel / (opz * t_CNO)
+    f_burn_prev = 1. / f_burn  # dummy value first off to ensure the loop gets called
+
+    # Loop here to make sure we have a consistent choice
+
+    while (1. - f_burn) * (1. - f_burn_prev) < 0.:
+
+        if (f_burn <= 1.):
+            # still hydrogen at the base
+            x_0 = xbar + 0.35 * (tdel / (opz * tpref)) * (zcno / 0.02)
+        else:
+            # hydrogen exhausted at the base
+            x_0 = np.sqrt(1.4 * xbar * tdel / (opz * tpref) * (zcno / 0.02))
+
+        f_burn_prev = f_burn
+        t_CNO = tpref * (x_0 / 0.7) / (zcno / 0.02)
+        f_burn = tdel / (opz * t_CNO)
+
+        if debug:
+            print(xbar, x_0, t_CNO, xi_b, xi_p)
+            print('flipping f_burn {} -> {}'.format(f_burn_prev, f_burn))
+
+    #        print (i,xbar,t_CNO,f_burn,x_0,xi_b,xi_p)
+    return x_0
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
 def hfrac(alpha, tdel, opz=1.259, zcno=0.02, old_relation=False,
           imin=0.0, imax=75., nsamp=1000, isotropic=False, inclination=None,
           debug=False):
@@ -258,36 +309,8 @@ def hfrac(alpha, tdel, opz=1.259, zcno=0.02, old_relation=False,
     #    x_0 = min([xmax,xbar+0.35*(tdel/(opz*9.8*u.hr))*(zcno/0.02)])
     #    for i in range(10):
     if xbar > 0.0:
-
-        # Also here now we distinguish between the two possible cases, the first where there
-        # remains hydrogen at the base, and the second where it is exhausted
-        # This division is quantified via the f_burn fraction, which initially at least we
-        # must estimate
-
-        t_CNO = tpref * (xbar / 0.7) / (zcno / 0.02)
-        f_burn = tdel / (opz * t_CNO)
-        f_burn_prev = 1. / f_burn  # dummy value first off to ensure the loop gets called
-
-        # Loop here to make sure we have a consistent choice
-
-        while (1. - f_burn) * (1. - f_burn_prev) < 0.:
-
-            if (f_burn <= 1.):
-                # still hydrogen at the base
-                x_0 = xbar + 0.35 * (tdel / (opz * tpref)) * (zcno / 0.02)
-            else:
-                # hydrogen exhausted at the base
-                x_0 = np.sqrt(1.4 * xbar * tdel / (opz * tpref) * (zcno / 0.02))
-
-            f_burn_prev = f_burn
-            t_CNO = tpref * (x_0 / 0.7) / (zcno / 0.02)
-            f_burn = tdel / (opz * t_CNO)
-
-            if debug:
-                print(xbar, x_0, t_CNO, xi_b, xi_p)
-                print('flipping f_burn {} -> {}'.format(f_burn_prev, f_burn))
-
-    #        print (i,xbar,t_CNO,f_burn,x_0,xi_b,xi_p)
+        # split this off as a separate routine
+        x_0 = X_0(xbar, zcno, tdel, opz, debug=debug, old_relation=old_relation)
 
     #    return xbar, xbar+0.35*(tdel/(opz*tpref))*(zcno/0.02), inclination
     return xbar, x_0, inclination
