@@ -1,15 +1,14 @@
 # README #
 
-This repository contains files related to the burst class and model comparison code.
+This repository contains code intended to simplify the analysis of astronomical X-ray data of thermonuclear (type-I) bursts.
 
-To get started, look at the Burst matching tutorial notebook
-
-A work in progress
+To get started, look at the accompanying paper (in the `doc/` folder), or the `Burst matching tutorial` jupyter notebook (in the `notebooks/` folder)
 
 ### What is this repository for? ###
 
-* Reading in and plotting thermonuclear burst data and models, and performing model-observation comparisons
-* Version 0.1
+* Analysis of thermonuclear X-ray bursts
+* Reading in and plotting thermonuclear burst data and models
+* Performing model-observation comparisons
 
 ### How do I get set up? ###
 
