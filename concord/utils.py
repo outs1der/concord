@@ -8,17 +8,32 @@
 # def decode_LaTeX(string):
 # def Q_nuc(Xbar, quadratic=False, old_relation=False, coeff=False)
 # def hfrac(alpha, tdel, opz=1.259, zcno=0.02, old_relation=False, ...)
-# def iso_dist(nsamp=1000, imin=0., imax=75.)
+# def iso_dist(nsamp=1000, imin=0., imax=IMAX_NDIP)
 # def dist(F_pk, F_pk_err, nsamp=10000, X=0.0, empirical=False, ...)
-# def mdot(F_per, F_per_err, dist, nsamp=10000, M_NS=1.4 * u.M_sun, R_NS=11.2 * u.km, ...)
+# def mdot(F_per, F_per_err, dist, nsamp=10000, M=M_NS, R=R_NS, ...)
 # def yign(E_b, E_b_err, dist, R_NS=10., Xbar=0.7, opz=1.259, ...)
 # def L_Edd(F_pk, F_pk_err, dist, dist_err=0.0, nsamp=10000, dip=False, ...)
+
+import astropy.units as u
+
+# Some defaults
+
+CONF=68.        # default 68% confidence intervals
+IMAX_NDIP=75.   # [degrees] maximum possible inclination angle for non-dipper
+M_NS=1.4 * u.M_sun  # default neutron-star mass
+R_NS=11.2 * u.km    # default neutron-star radius
+
+# This parameter sets the prefactor for the time to burn all H via hot-CNO; see
+# Lampe et al. (2016, ApJ 819, 46)
+
+TPREF_CNO = 9.8 * u.hr
+TPREF_CNO_OLD = 11.0 * u.hr
 
 import numpy as np
 from math import *
 from .diskmodel import *
 import astropy.constants as const
-import astropy.units as u
+from scipy.special import erfinv
 import re
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
@@ -66,10 +81,10 @@ def calc_mr(g,opz):
 
     # Now calculate the mass and radius and convert to cgs units
 
-    R_NS = (const.c**2*(opz**2-1)/(2.*g*opz)).to(u.cm)
-    M_NS = (g*R_NS**2/(const.G*opz)).to(u.g)
+    R = (const.c**2*(opz**2-1)/(2.*g*opz)).to(u.cm)
+    M = (g*R**2/(const.G*opz)).to(u.g)
 
-    return M_NS, R_NS
+    return M, R
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -81,11 +96,11 @@ def solve_radius(M,R_Newt,eta=1e-6):
     Solving is tricky so we just use an iterative approach
     '''
 
-    R_NS = R_Newt	# trial
-    while (abs(g(M,R_NS)-g(M,R_Newt,Newt=True))/g(M,R_NS) > eta):
-        R_NS = R_Newt*sqrt(opz(M,R_NS))
+    R = R_Newt	# trial
+    while (abs(g(M,R)-g(M,R_Newt,Newt=True))/g(M,R) > eta):
+        R = R_Newt*sqrt(opz(M,R))
 
-    return R_NS
+    return R
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -162,16 +177,13 @@ def X_0(xbar, zcno, tdel, opz=1.259, debug=False, old_relation=False):
     and the burst recurrence time, tdel
     '''
 
-    # This parameter sets the prefactor for the time to burn all H via hot-CNO; see
-    # Lampe et al. (2016, ApJ 819, 46)
-
-    tpref = 9.8 * u.hr
+    tpref = TPREF_CNO
 
     # Here we allow an option to use the old version if need be; this is already passed to the
     # Q_nuc function, so we'll get the old parameters from that if need be
 
     if old_relation:
-        tpref = 11. * u.hr
+        tpref = TPREF_CNO_OLD
 
     # Also here now we distinguish between the two possible cases, the first where there
     # remains hydrogen at the base, and the second where it is exhausted
@@ -207,7 +219,7 @@ def X_0(xbar, zcno, tdel, opz=1.259, debug=False, old_relation=False):
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 def hfrac(alpha, tdel, opz=1.259, zcno=0.02, old_relation=False,
-          imin=0.0, imax=75., nsamp=1000, isotropic=False, inclination=None,
+          imin=0.0, imax=IMAX_NDIP, nsamp=1000, isotropic=False, inclination=None,
           debug=False):
     '''
     This routine estimates the h-fraction at ignition, based on the burst properties
@@ -254,13 +266,13 @@ def hfrac(alpha, tdel, opz=1.259, zcno=0.02, old_relation=False,
     # This parameter sets the prefactor for the time to burn all H via hot-CNO; see
     # Lampe et al. (2016, ApJ 819, 46)
 
-    tpref = 9.8 * u.hr
+    tpref = TPREF_CNO
 
     # Here we allow an option to use the old version if need be; this is already passed to the
     # Q_nuc function, so we'll get the old parameters from that if need be
 
     if old_relation:
-        tpref = 11. * u.hr
+        tpref = TPREF_CNO_OLD
 
     # Set the inclination parameters, by default for isotropy
 
@@ -317,7 +329,7 @@ def hfrac(alpha, tdel, opz=1.259, zcno=0.02, old_relation=False,
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def iso_dist(nsamp=1000, imin=0., imax=75.):
+def iso_dist(nsamp=1000, imin=0., imax=IMAX_NDIP):
     '''
     Routine to generate an isotropic distribution of inclinations (angle from the system
     rotation axis to the line of sight) from imin up to some maximum value, defaulting to
@@ -340,8 +352,8 @@ def iso_dist(nsamp=1000, imin=0., imax=75.):
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 def dist(F_pk, F_pk_err, nsamp=10000, X=0.0, empirical=False,
-         M_NS=1.4 * u.M_sun, opz=1.259, T_e=0.0, dip=False,
-         isotropic=False, imin=0., imax=75., fulldist=False, plot=False):
+         M=M_NS, opz=1.259, T_e=0.0, dip=False,
+         isotropic=False, imin=0., imax=IMAX_NDIP, conf=CONF, fulldist=False, plot=False):
     '''
     This routine estimates the distance to the source, based on the measured peak flux
     of a radius-expansion burst. Two main options are available;
@@ -368,7 +380,7 @@ def dist(F_pk, F_pk_err, nsamp=10000, X=0.0, empirical=False,
 
         # Galloway et al. 2008, ApJS 179, 360
 
-        L_Edd = 2.7e38 * ((M_NS / (1.4 * u.M_sun)) * (1 + (alpha_T * T_e) ** 0.86) / (1 + X)
+        L_Edd = 2.7e38 * ((M / (1.4 * u.M_sun)) * (1 + (alpha_T * T_e) ** 0.86) / (1 + X)
                           / (opz / 1.31)) * u.erg / u.s
         L_Edd_err = 0. * u.erg / u.s
 
@@ -401,8 +413,8 @@ def dist(F_pk, F_pk_err, nsamp=10000, X=0.0, empirical=False,
             plt.hist(dist / u.kpc, bins=50, density=True)
             plt.xlabel('Distance (kpc)')
             plt.axvline(np.median(dist).value, color='g')
-            plt.axvline(np.percentile(dist, 16), color='g', ls='--')
-            plt.axvline(np.percentile(dist, 84), color='g', ls='--')
+            plt.axvline(np.percentile(dist, 50-conf/2), color='g', ls='--')
+            plt.axvline(np.percentile(dist, 50+conf/2), color='g', ls='--')
             # plt.show()
         # else:
         # print (plot)
@@ -416,16 +428,48 @@ def dist(F_pk, F_pk_err, nsamp=10000, X=0.0, empirical=False,
 
             # Return the median value and the (asymmetric) lower and upper errors
 
-            return np.median(dist), np.percentile(dist, (16, 84)) * u.kpc - np.median(dist)
+            return np.median(dist), np.percentile(dist, (50-conf/2, 50+conf/2)) * u.kpc - np.median(dist)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def luminosity(F_X, F_X_err=0.0, dist=8*u.kpc, nsamp=10000, isotropic=False, burst=True,
-               imin=0., imax=75., model='he16_a', fulldist=False, plot=False):
+def asym_norm(m, sigm, sigp, nsamp=10000, positive=False, model=1):
+    '''
+    Probability density function for an asymmetric error distribution
+    characterised by a mean and upper and lower 68% confidence intervals
+    (sigp and sigm, respectively).
+    Follows the treatment of Barlow (2003)
+    With the positive flag set, it will continue drawing samples until all
+    are > 0. Note that the resulting distribution may not quite have the
+    required shape
+    '''
+
+    if model !=1:
+        print ("** ERRROR ** other types of asymmetric distributions not yet implemented")
+        return None
+
+    x = np.random.uniform(size=nsamp)
+    bd = abs(sigm) / (sigp + abs(sigm))
+
+    _l = x < bd
+    x[_l] = m + erfinv(x[_l] / bd - 1) * 2 ** 0.5 * abs(sigm)
+    x[~_l] = m + erfinv((x[~_l] - bd) / (1 - bd)) * 2 ** 0.5 * sigp
+
+    while positive & (np.any(x <= 0.)):
+        _l = x <= 0.
+        x[_l] = asym_norm(m, sigm, sigp, len(np.where(_l)[0]), model=model)
+
+    return x
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def luminosity(F_X, F_X_err=0.0, dist=8*u.kpc, dist_err=None, nsamp=10000, isotropic=False, burst=True,
+               imin=0., imax=IMAX_NDIP, model='he16_a', conf=CONF, fulldist=False, plot=False):
     """
     Calculate the inferred luminosity given a measured X-ray flux and distance
     The flux, error and distance can be single values, or arrays (in which case
     it's assumed that they're distributions)
+
+    This is a more sophisticated version of the L_Edd routine (forgot I had that)
 
     Usage:
     import concord as cd
@@ -469,13 +513,29 @@ def luminosity(F_X, F_X_err=0.0, dist=8*u.kpc, nsamp=10000, isotropic=False, bur
 
     dist0 = dist.copy()
     if np.shape(dist) != ():
+        # Select the median of the distance distribution, as the value to show for the label
         dist0 = np.median(dist)
+    elif dist_err is not None:
+        # If you've passed a distance error, and it's not already a distribution, you can
+        # define one here
+        if np.shape(dist_err) == ():
+            if not (hasattr(dist_err,'unit')):
+                dist_err *= dist.unit
+            dist = np.random.normal(0., 1., size=nsamp) * dist_err + dist0
+        elif np.shape(dist_err) == (2,):
+            # We've got a tuple or list defining lower and upper uncertainties
+            # Generate an anisotropic distribution
+
+            dist = asym_norm(dist.value, dist_err[0], dist_err[1], nsamp, positive=True) * dist.unit
+        else:
+            print ('** ERROR ** distance uncertainty must be a scalar or 2-element array')
+            return None
 
     isscalar = np.shape(F_X) == ()
     label = 'Isotropic luminosity @ {:.2f} (erg/s)'.format(dist0)
     if (np.shape(F_X) == ()) & (F_X_err > 0.0):
         # Generate a distribution for the flux values, consistent with the (assumed) normal error
-        if np.shape(dist) != ():
+        if (np.shape(dist) != ()) & (dist_err is None):
             print ('** WARNING ** setting number of samples = {} to match distance array'.format(
                 len(dist)))
             nsamp = len(dist)
@@ -504,8 +564,8 @@ def luminosity(F_X, F_X_err=0.0, dist=8*u.kpc, nsamp=10000, isotropic=False, bur
         plt.hist(lum / (u.erg/u.s), bins=50, density=True)
         plt.xlabel(label)
         plt.axvline(np.median(lum).value, color='g')
-        plt.axvline(np.percentile(lum, 16), color='g', ls='--')
-        plt.axvline(np.percentile(lum, 84), color='g', ls='--')
+        plt.axvline(np.percentile(lum, 50-conf/2), color='g', ls='--')
+        plt.axvline(np.percentile(lum, 50+conf/2), color='g', ls='--')
         # plt.show()
     # else:
     # print (plot)
@@ -513,7 +573,7 @@ def luminosity(F_X, F_X_err=0.0, dist=8*u.kpc, nsamp=10000, isotropic=False, bur
     if fulldist and not isscalar:
 
         # Return a dictionary with all the parameters you'll need
-        return {'lum': lum, 'i': idist, 'xi': xi_b, 'model': model}
+        return {'lum': lum, 'd': dist, 'i': idist, 'xi': xi_b, 'model': model}
 
     elif isscalar and isotropic:
 
@@ -524,12 +584,12 @@ def luminosity(F_X, F_X_err=0.0, dist=8*u.kpc, nsamp=10000, isotropic=False, bur
 
         # Return the median value and the (asymmetric) lower and upper errors
 
-        return np.median(lum), np.percentile(lum, (16, 84)) * (u.erg/u.s) - np.median(lum)
+        return np.median(lum), np.percentile(lum, (50-conf/2, 50+conf/2)) * (u.erg/u.s) - np.median(lum)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def mdot(F_per, F_per_err, dist, nsamp=10000, M_NS=1.4 * u.M_sun, R_NS=11.2 * u.km, opz=1.259,
-         isotropic=False, inclination=None, fulldist=False):
+def mdot(F_per, F_per_err, dist, nsamp=10000, M=M_NS, R=R_NS, opz=1.259,
+         isotropic=False, inclination=None, conf=CONF, fulldist=False):
     '''
     Routine to estimate the mdot given a (bolometric) persistent flux, distance, and
     inclination
@@ -545,10 +605,10 @@ def mdot(F_per, F_per_err, dist, nsamp=10000, M_NS=1.4 * u.M_sun, R_NS=11.2 * u.
 
     if isotropic:
 
-        # scale factors for opz and R_NS are kept at the old values, even though the
+        # scale factors for opz and R are kept at the old values, even though the
         # best current estimates for these quantities have changed
         mdot_iso = (6.7e3 * (F_per / 1e-9 / flux_unit) * (dist / 10 / u.kpc) ** 2
-                    / (M_NS / (1.4 * u.M_sun)) * (opz / 1.31) / (R_NS / (10. * u.km))) * mdot_unit
+                    / (M / (1.4 * u.M_sun)) * (opz / 1.31) / (R / (10. * u.km))) * mdot_unit
 
         mdot_iso_err = mdot_iso * np.sqrt((F_per_err / F_per) ** 2 + (2. * dist_err / dist) ** 2)
 
@@ -560,7 +620,7 @@ def mdot(F_per, F_per_err, dist, nsamp=10000, M_NS=1.4 * u.M_sun, R_NS=11.2 * u.
         _F_per = np.random.normal(0., 1., size=nsamp) * F_per_err + F_per
 
         mdot_iso = (6.7e3 * (_F_per / 1e-9 / flux_unit) * (dist / 10 / u.kpc) ** 2
-                    / (M_NS / (1.4 * u.M_sun)) * (opz / 1.31) / (R_NS / (10. * u.km))) * mdot_unit
+                    / (M / (1.4 * u.M_sun)) * (opz / 1.31) / (R / (10. * u.km))) * mdot_unit
 
         # print ("taking into account anisotropy here...")
         if inclination is not None:
@@ -581,12 +641,12 @@ def mdot(F_per, F_per_err, dist, nsamp=10000, M_NS=1.4 * u.M_sun, R_NS=11.2 * u.
 
             # Return the median value and the (asymmetric) lower and upper errors
 
-            return np.median(mdot), np.percentile(mdot, (16, 84)) * mdot_unit - np.median(mdot)
+            return np.median(mdot), np.percentile(mdot, (50-conf/2, 50+conf/2)) * mdot_unit - np.median(mdot)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def yign(E_b, E_b_err, dist, R_NS=10., Xbar=0.7, opz=1.259,
-         isotropic=False, inclination=None, fulldist=False):
+def yign(E_b, E_b_err, dist, R=R_NS, Xbar=0.7, opz=1.259,
+         isotropic=False, inclination=None, conf=CONF, fulldist=False):
     '''
     Calculate the burst column from the fluence
     '''
@@ -600,7 +660,7 @@ def yign(E_b, E_b_err, dist, R_NS=10., Xbar=0.7, opz=1.259,
 
     if isotropic:
         yign_iso = (3e8 * (E_b / 1e-6 / fluen_unit) * (dist / 10. / u.kpc) ** 2
-                    / (Q_nuc(Xbar) / 4.4) * (opz / 1.31) / (R_NS / 10.) ** 2) * yign_unit
+                    / (Q_nuc(Xbar) / 4.4) * (opz / 1.31) / (R / (10.*u.km)) ** 2) * yign_unit
 
         yign_iso_err = yign_iso * np.sqrt((E_b_err / E_b) ** 2)  # +...
 
@@ -613,7 +673,7 @@ def yign(E_b, E_b_err, dist, R_NS=10., Xbar=0.7, opz=1.259,
         _E_b = np.random.normal(0., 1., size=nsamp) * E_b_err + E_b
 
         yign_iso = (3e8 * (_E_b / 1e-6 / fluen_unit) * (dist / 10. / u.kpc) ** 2
-                    / (Q_nuc(Xbar) / 4.4) * (opz / 1.31) / (R_NS / 10.) ** 2) * yign_unit
+                    / (Q_nuc(Xbar) / 4.4) * (opz / 1.31) / (R / (10.*u.km)) ** 2) * yign_unit
 
         # print ("taking into account anisotropy here...")
         if inclination is not None:
@@ -634,59 +694,24 @@ def yign(E_b, E_b_err, dist, R_NS=10., Xbar=0.7, opz=1.259,
 
             # Return the median value and the (asymmetric) lower and upper errors
 
-            return np.median(yign), np.percentile(yign, (16, 84)) * yign_unit - np.median(yign)
+            return np.median(yign), np.percentile(yign, (50-conf/2, 50+conf/2)) * yign_unit - np.median(yign)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def L_Edd(F_pk, F_pk_err, dist, dist_err=0.0, nsamp=10000, dip=False,
-          isotropic=False, imin=0., imax=75., fulldist=False):
+def L_Edd(F_pk, F_pk_err=0.0, dist=8 * u.kpc, dist_err=None, nsamp=10000,
+          isotropic=False, imin=0., imax=IMAX_NDIP, conf=CONF, fulldist=False):
     '''
     This routine estimates the Eddington luminosity of the source, based on the measured
     peak flux of a radius-expansion burst and the distance (or some distribution thereof.
     The default isotropic=False option also takes into account the likely effect of
     anisotropic burst emission, based on the models provided by concord
+
+    This routine supplanted by luminosity, which it now calls; the only thing not
+    incorporated into the new routine is the "simple" estimate of the isotropic
+    luminosity error,
+    L_Edd_iso_err = L_Edd_iso * np.sqrt((F_pk_err / F_pk) ** 2 + (2. * dist_err / dist) ** 2)
     '''
 
-    flux_unit = F_pk.unit
+    return luminosity(F_pk, F_pk_err, dist, dist_err, nsamp, isotropic, burst=True,
+                   imin=imin, imax=imax, model='he16_a', conf=conf, fulldist=fulldist)
 
-    vector_dist = not (np.shape(dist) == ())
-    if vector_dist:
-        nsamp = len(dist)
-
-    if isotropic:
-        L_Edd_iso = (4 * np.pi * dist ** 2 * F_pk).to('erg s-1')
-
-        # Simple estimate of the error
-
-        L_Edd_iso_err = L_Edd_iso * np.sqrt((F_pk_err / F_pk) ** 2 + (2. * dist_err / dist) ** 2)
-
-        return L_Edd_iso, L_Edd_iso_err
-
-    else:
-        _F_pk = np.random.normal(0., 1., size=nsamp) * F_pk_err + F_pk
-        if vector_dist:
-            _dist = dist
-        else:
-            _dist = np.random.normal(0., 1., size=nsamp) * dist_err + dist
-
-        L_Edd_iso = (4 * np.pi * _dist ** 2 * _F_pk).to('erg s-1')
-
-        # print ('take into account the disk effect')
-        if (dip == True) & (imax < 75.):
-            print('** WARNING ** isotropic distribution not correct for dipping sources')
-
-        idist = iso_dist(nsamp, imin=imin, imax=imax)
-        xi_b, xi_p = anisotropy(idist)
-
-        L_Edd = L_Edd_iso * xi_b
-
-    if fulldist:
-
-        # Return a dictionary with all the parameters you'll need
-
-        return {'L_Edd': L_Edd, 'dist': _dist, 'i': idist, 'xi_b': xi_b}
-    else:
-
-        # Return the median value and the (asymmetric) lower and upper errors
-
-        return np.median(L_Edd), np.percentile(L_Edd, (16, 84)) * u.erg / u.s - np.median(L_Edd)
