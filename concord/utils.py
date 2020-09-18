@@ -332,7 +332,7 @@ def iso_dist(nsamp=1000, imin=0., imax=75.):
     # Convert to radians
     cos_imin = np.cos(imin * np.pi / 180.)
     cos_imax = np.cos(imax * np.pi / 180.)
-    print(cos_imin, cos_imax)
+    # print(cos_imin, cos_imax)
     # uniform in cos(i) up to i=imax
 
     return np.arccos(cos_imax + np.random.random(nsamp) * (cos_imin - cos_imax)) * 180. / np.pi * u.deg
@@ -417,6 +417,114 @@ def dist(F_pk, F_pk_err, nsamp=10000, X=0.0, empirical=False,
             # Return the median value and the (asymmetric) lower and upper errors
 
             return np.median(dist), np.percentile(dist, (16, 84)) * u.kpc - np.median(dist)
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+def luminosity(F_X, F_X_err=0.0, dist=8*u.kpc, nsamp=10000, isotropic=False, burst=True,
+               imin=0., imax=75., model='he16_a', fulldist=False, plot=False):
+    """
+    Calculate the inferred luminosity given a measured X-ray flux and distance
+    The flux, error and distance can be single values, or arrays (in which case
+    it's assumed that they're distributions)
+
+    Usage:
+    import concord as cd
+    # calculate the isotropic luminosity corresponding to a flux
+    # of 3e-9 erg/cm^2/s at 7.3 kpc
+    cd.luminosity(3e-9,0.,7.3,isotropic=True)
+
+    # Calculate the range of luminosities corresponding to a persistent
+    # flux of 3e-9 erg/cm^2/s at 7.3 kpc, and assuming isotropic
+    # inclination distribution (i < 75 deg)
+    cd.luminosity(3e-9,0.,7.3,burst=False)
+
+    # Calculate the range of luminosities corresponding to a burst flux
+    # of 3e-8, with uncertainty 1e-9, and an inclination of 45-60 degrees,
+    # plot (and return) the resulting distribution
+    cd.luminosity(3e-8,1e-9,7.3,imin=45,imax=60,plot=True,fulldist=True)
+    :param F_X:
+    :param F_X_err:
+    :param dist:
+    :param nsamp:
+    :param isotropic:
+    :param burst:
+    :param imin:
+    :param imax:
+    :param fulldist:
+    :param plot:
+    :return:
+    """
+
+    if not (hasattr(F_X, 'unit') & hasattr(F_X_err, 'unit') & hasattr(dist, 'unit')):
+        # Make sure everything has sensible units here
+        if not (hasattr(F_X, 'unit')):
+            flux_unit = u.erg/u.cm**2/u.s
+            print ('** WARNING ** flux has no units, assuming {}'.format(flux_unit))
+            F_X *= flux_unit
+        if not (hasattr(F_X_err, 'unit')):
+            F_X_err *= flux_unit
+        if not (hasattr(dist, 'unit')):
+            print ('** WARNING ** distance has no units, assuming {}'.format(u.kpc))
+            dist *= u.kpc
+
+    dist0 = dist.copy()
+    if np.shape(dist) != ():
+        dist0 = np.median(dist)
+
+    isscalar = np.shape(F_X) == ()
+    label = 'Isotropic luminosity @ {:.2f} (erg/s)'.format(dist0)
+    if (np.shape(F_X) == ()) & (F_X_err > 0.0):
+        # Generate a distribution for the flux values, consistent with the (assumed) normal error
+        if np.shape(dist) != ():
+            print ('** WARNING ** setting number of samples = {} to match distance array'.format(
+                len(dist)))
+            nsamp = len(dist)
+        _F_X = np.random.normal(0., 1., size=nsamp) * F_X_err + F_X
+        isscalar = False
+    else:
+        _F_X = F_X
+
+    xi_b = 1. # for isotropic
+    if not isotropic:
+        # print ('take into account the disk effect')
+        label = 'Luminosity @ {:.2f} (erg/s)'.format(dist0)
+
+        idist = iso_dist(nsamp, imin=imin, imax=imax)
+        xi_b, xi_p = anisotropy(idist, model=model)
+
+        if not burst:
+            # If you're calculating the persistent flux/luminosity, better use the right \xi
+            xi_b = xi_p
+
+    lum = (4 * np.pi * _F_X * dist ** 2 * xi_b).to('erg s-1')
+
+    if plot:
+        # Do a simple plot of the distance distribution
+
+        plt.hist(lum / (u.erg/u.s), bins=50, density=True)
+        plt.xlabel(label)
+        plt.axvline(np.median(lum).value, color='g')
+        plt.axvline(np.percentile(lum, 16), color='g', ls='--')
+        plt.axvline(np.percentile(lum, 84), color='g', ls='--')
+        # plt.show()
+    # else:
+    # print (plot)
+
+    if fulldist and not isscalar:
+
+        # Return a dictionary with all the parameters you'll need
+        return {'lum': lum, 'i': idist, 'xi': xi_b, 'model': model}
+
+    elif isscalar and isotropic:
+
+        # Just return the value; we only keep F_X as scalar if there's no
+        # uncertainty provided
+        return lum
+    else:
+
+        # Return the median value and the (asymmetric) lower and upper errors
+
+        return np.median(lum), np.percentile(lum, (16, 84)) * (u.erg/u.s) - np.median(lum)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
