@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import astropy.io.ascii as ascii
 from scipy.interpolate import interp1d
 import astropy.units as u
+import astropy.uncertainty as unc
 import os
 
 import pkg_resources
@@ -70,11 +71,17 @@ def anisotropy(inclination, model='he16_a', test=False):
 
         plt.show()
 
-# Calculate the values for the passed quantity, and return
-# numpy cos will correctly treat the units, so no need to do a conversion
-# in that case
+    # Calculate the values for the passed quantity, and return
+    # numpy cos will correctly treat the units, so no need to do a conversion
+    # in that case
 
-    theta = inclination
+    # Ensure the routine works with astropy distributions as well as arrays
+    if hasattr(inclination,'distribution'):
+        theta = inclination.distribution
+        scalar = False
+    else:
+        theta = inclination
+        scalar = (np.shape(theta) == ()) or (np.shape(theta) == (1,))
     if (hasattr(inclination,'unit') == False):
         print ("** WARNING ** assuming inclination in degrees")
         theta *= u.degree
@@ -83,7 +90,11 @@ def anisotropy(inclination, model='he16_a', test=False):
         xi_b = 1./(0.5+abs(np.cos(theta)))
         xi_p = 0.5/abs(np.cos(theta))
 
-        return xi_b, xi_p
+        if scalar:
+            return xi_b, xi_p
+        else:
+            return unc.Distribution(xi_b*u.dimensionless_unscaled), \
+                   unc.Distribution(xi_p*u.dimensionless_unscaled)
 
 
     elif model in he16_models:
@@ -103,7 +114,11 @@ def anisotropy(inclination, model='he16_a', test=False):
             xi_b = 1./(inv_xi_d+inv_xi_r)
             xi_p = 1./inv_xi_p
 
-        return xi_b, xi_p
+        if scalar:
+            return xi_b, xi_p
+        else:
+            return unc.Distribution(xi_b*u.dimensionless_unscaled), \
+                   unc.Distribution(xi_p*u.dimensionless_unscaled)
 
 
     else:
