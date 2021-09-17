@@ -301,7 +301,7 @@ miscellaneous --- catalogs --- surveys}
 
 \section{Introduction} \label{sec:intro}
 
-Thermonuclear (type-I) bursts are observed from neutron stars accreting from low-mass ($\lesssim 1\ M_\odot$) binary companions \cite[e.g.][]{gal17b}. ...
+Thermonuclear (type-I) bursts are observed from neutron stars accreting from low-mass ($\lesssim 1\ M_\odot$) binary companions \cite[e.g.][]{gal21a}. ...
 
 Here we explore the ways that host system  parameters affect the observed properties of thermonuclear bursts, and assess to what degree these effects can be corrected for.
 %
@@ -420,7 +420,7 @@ The fundamental observable that we measure is the time-history of the burst flux
 %
 The net (excluding the persistent emission) burst spectra generally can be well fit with a blackbody model, and it is thought such models can provide a reasonable estimate of the bolometric flux [{\bf ref}]
 
-[{\bf insert table with key burst parameters here? }]
+\todo{insert table with key burst parameters here? }
 
 
 Provided the $F_i$ are in units of flux, or the flux can be estimated from the intensity,  we may measure the peak flux, $F_{\rm pk}$, and integrate to estimate the burst fluence, $E_b$. 
@@ -442,7 +442,7 @@ One of the most significant astrophysical uncertainties that has largely been ne
 % [{\bf move discussion from later section to here?}]
 % \subsection{Emission anisotropy}
 % \label{subsec:anisotropy}
-[{\bf bit more description here }]
+\todo{ bit more description here }
 
 The anisotropy factor $\xi_b$ introduced into the expression for the distance (equation  \ref{disteq}) is defined in the same sense as \citep{fuji88}, such that the total luminosity of the burst $L_b=4\pi d^2\xi_b F_{\rm pk}$. The range of values of $\xi_b$ can thus be understood that if $\xi_b<1$ the burst flux is enhanced (i.e. preferentially beamed) toward our line of sight (so that $L_b$ would be {\it overestimated} were it not included in the calculation), while if $\xi_b>1$ the burst flux is suppressed.
 %
@@ -529,7 +529,7 @@ These issues may be avoided by adopting instead the empirical Eddington luminosi
 
 The fluence (and the shape of the burst profile) is determined by the amount of accumulated fuel, and its composition. For accretion of mixed H/He with hydrogen mass fraction $X_0$, the composition at ignition may be modified substantially by $\beta$-limited CNO burning. In extreme cases the recurrence time is sufficiently long that the accreted hydrogen at the base of the fuel layer is exhausted, and ignition of intense, fast He-rich bursts occur.
 
-From data taken prior to the burst ignition we can measure the persistent flux $F_{\rm per}$, a measure of the accretion rate; [{\bf add expression here}]
+From data taken prior to the burst ignition we can measure the persistent flux $F_{\rm per}$, a measure of the accretion rate; \todo{ add expression here; see eq. \ref{eq:fper}}
 % and provided more than one burst is observed, we may also measure (or estimate) the recurrence time, $\Delta t$. 
 the persistent spectra of burst sources are  more complex than the bursts themselves, and typically exhibit thermal as well as non-thermal components [{\bf ref}].
 %
@@ -541,7 +541,7 @@ where $c_{\rm bol}$ is the bolometric correction giving the inverse fraction of 
 %
 The $\alpha$ parameter is an important diagnostic of the burst fuel and ignition conditions.
 %
-[{\bf mention the average method, as used in the rates paper }]
+\todo{mention the average method, as used in the rates paper }
 
 Given the measured $\alpha$-value, the nuclear energy generation rate $Q_{\rm nuc}$ can be estimated, as follows:
 \begin{eqnarray}
@@ -701,6 +701,7 @@ F_{p,\infty} = \frac{L_p}{4\pi d^2} =
 % \frac{\dot{M} Q_{\rm grav}}{1+z} \left(\frac{R_{\rm NS}}{d}\right)^2 \xi_p^{-1}
 % expression used in code
 \frac{\dot{m} Q_{\rm grav}}{4\pi d^2 (1+z)\xi_p c_{\rm bol}}
+\label{eq:fper}
 \end{equation}
 % Q_grav already defined in the previous section
 % where $Q_{\rm grav} = c^2z/(1+z) \approx GM_{\rm NS}/R_{\rm NS}$ is the gravitational energy release per gram. % gal03d 
@@ -779,6 +780,11 @@ Surface redshift & $1+z$ & \nodata & 1--2\\
 \label{subsec:code}
 
 Describe how the code is written and how it works, the astropy.distribution thingy, MCMC for error determination etc.
+\begin{itemize}
+  \item Approach for calculations via astropy distributions
+  \item 7(?) different methods for defining observational/input quantities
+\end{itemize}
+
 
 % ------------------------------------------------------------------------------
 \section{Analysis} 
@@ -791,9 +797,33 @@ Describe how the code is written and how it works, the astropy.distribution thin
 
 Here we describe different approaches that have been used to deduce system parameters from observations of thermonuclear bursts.
 %
-We focus on adopting a suitable approach given the availability of data, which will differ for different sources. 
+We describe how the {\sc concord} code can be used to fully account for the astrophysical uncertainties, and as a companion to this section (and the code itself) we provide a companion {\sc jupyter} notebook [{\bf ref}] which replicates the analyses described below.
+
+% simple example
+
+As a simple example of the code utility, we describe here how the confidence range for peak luminosity may be estimated for a burst from a source with independently known distance. We consider the PRE burst observed from 4U~0513$-$40 with the {\it Rossi X-ray Timing Explorer} ({\it RXTE}) PCA on MJD~54043.68857 \cite[observation ID 92403-01-15-04; MINBAR ID \#3443;][]{minbar}. According to the MINBAR analysis this burst reached a peak flux of $(21.7\pm0.6)\times10^{-9}\ \epcs$. The source is located in the globular cluster NGC~1851, for which the distance is estimated at $(10.32^{+0.20}_{-0.24})$~kpc \cite[]{WatkinsEtAl2015}.
+
+The isotropic luminosity can be calculated from the peak flux and distance using the {\tt luminosity} method, with {\tt isotropic=True} as $2.77\times10^{38}\ \epcs$. 
 %
-We also describe how the {\sc concord} code can be used to fully account for the astrophysical uncertainties, and as a companion to this section (and the code itself) we provide a companion {\sc jupyter} notebook [{\bf ref}] which replicates the analyses described below.
+However, a more accurate calculation should take into account the uncertainty in the flux; the (asymmetric) uncertainty in the distance; and the likely effect of the anisotropy in the burst emission, based on the estimated system inclination $i>80^\circ$ \cite[]{fiocchi11}. This can be achieved by passing the flux and distance uncertainties to the routine; {\sc astropy} distributions are generated for both these parameters, with the required properties (e.g. Figure \ref{fig:burstlum}, panel (a)). We also pass the inclination limits, and an array of inclination values is generated assuming an isotropic distribution of inclinations within the limits. We calculate the anisotropy factor based on the modelling of \cite{he16}, and the user can select different models to quantify the variation introduced.
+%
+The resulting luminosity is significantly higher, $(4.85_{-0.42}^{+0.46})\times10^{38}\ \eps$ (Fig. \ref{fig:burstlum}, panel (b)); the discrepancy is primarily the result of the significant attenuation of the burst flux from the viewing angle close to the plane of the accretion disk. The corresponding anisotropy value $\xi_b$ is in the range 1.56--2 (Fig. \ref{fig:burstlum}, panel (c)). The dependence of the luminosity on the assumed inclination is illustrated in (Fig. \ref{fig:burstlum}, panel (d)). 
+
+The output from the function is by default the median value and the lower and upper uncertainties, at the required confidence level (68\% by default). Using the {\tt fulldist=True} flag, the function instead returns a dictionary including the full distributions for the luminosity, distance, inclination, anisotropy factor, as well as the anisotropy model identifier. % and the confidence level
+Each of the distribution arrays can be accessed via the {\tt distribution} attribute.
+This object can be written to a file or used for input to subsequent analyses.
+
+\begin{figure}[ht!]
+\plotone{fig0.pdf}
+\caption{Illustration of calculation of burst peak luminosity using {\sc concord}, incorporating measurement uncertainties and the modeled effect of the burst anisotropy. The adopted distance PDF is shown in panel (a); note the slight skew in the distribution. The resulting luminosity PDF in panel (b) is substantially higher than the isotropic value ({\it red dashed line}). The $1\sigma$ confidence intervals are indicated by the green lines. The PDF for the anisotropy factor $\xi_b$ is shown in panel (c); the dependence of the luminosity on the adopted system inclination is shown in panel (d).
+\label{fig:burstlum}}
+\end{figure}
+
+[{\bf comment here perhaps on the additional uncertainties that might contribute; e.g. for $M$, $R$; code is flexible enough to incorporate them }]
+
+In the sections below we describe other examples,
+%
+focussing on adopting approaches tailored to the availability of data, which will differ for different sources. 
 
 \subsection{Zero bursts -- constraining the distance}
 \label{subsec:zerobursts}
@@ -846,7 +876,7 @@ For a single burst detected from a bursting source, provided the data quality an
 
 [{\bf detailed description of approach for distance here}]
 
-The distance can be estimated from the peak flux of a PRE burst based on equation \ref{disteq}. The challenge is taking into account the uncertainties in the various parameters that go into this calculation. If we adopt the empirical Eddington luminosity of \cite[]{kuul03a}, the only remaining factor is the burst emission anisotropy $\xi_b$.
+The distance can be estimated from the peak flux of a PRE burst based on equation \ref{disteq}, using the {\tt dist} method. The challenge is taking into account the uncertainties in the various parameters that go into this calculation. If we adopt the empirical Eddington luminosity of \cite[]{kuul03a}, the only remaining factor is the burst emission anisotropy $\xi_b$.
 %
 As for the case of the burst in IGR~J00291+5934, the approach adopted in {\sc concord} to take this into account is to generate a distribution of $\xi_b$ values, based on an isotropic distribution of inclinations within known limits. The presence (absence) of X-ray dips occurring at the binary orbital period will constrain the inclination to greater (less) than $75^\circ$ [{\bf ref}]. However, more stringent constraints may be available.
 
@@ -860,7 +890,7 @@ We use as an example
 % of analysis of a single burst (\S\ref{subsec:1burst}) 
 the event detected with \igr/JEM-X from IGR~J17591$-$2342 \cite[]{kuiper20}. This burst was observed  when the estimated persistent bolometric flux was $(1.2\pm0.2)\times10^{-9}\ \epcs$, and exhibited a fluence of $E_b =(1.1\pm0.1)\times10^{-6}\ {\rm erg\,cm^{-2}}$. The peak flux was $(7.6\pm1.4)\times10^{-6}\ \epcs$.
 
-\cite{kuiper20} estimated the distance to the source based on the empirical value of the Eddington luminosity, and incorporating the expected anisotropy for an inclination range of 
+Following \cite{kuiper20}, we estimate the distance to the source based on the empirical value of the Eddington luminosity, and incorporating the expected anisotropy for an inclination range of 
 % kuiper20 uses slightly more restrictive 28-30
 24--30$^\circ$ \cite[]{sanna18} as $7.7_{-0.6}^{+0.8}$~kpc. Here the uncertainty is dominated by the peak flux, since the anisotropy factor is effectively fixed for such a narrow range of inclination, at $\xi_b=0.70$.
 %
@@ -884,7 +914,7 @@ The persistent flux can then be converted to an accretion rate, given the estima
 \end{eqnarray}
 via the {\tt mdot} method, and incorporating the estimated distance distribution already determined. 
 %
-Based on the distance constraints, the estimated accretion rate  is within the range $(2.0_{-0.4}^{+0.6})\times10^3\ \rm{g\,cm^{-2}\,s^{-1}}$ for the usual assumed range for neutron star mass and radius (and hence redshift).
+Based on the distance constraints, the estimated accretion rate  is within the range $(2.0_{-0.4}^{+0.6})\times10^3\ \rm{g\,cm^{-2}\,s^{-1}}$ for the usual assumed values for neutron star mass and radius (and hence redshift).
 
 % Figure produced from the notebook; used 100000 samples for a smoother set of 
 % distributions
@@ -898,22 +928,26 @@ Based on the distance constraints, the estimated accretion rate  is within the r
 
 Given a numerical burst ignition model, we could now go on to estimate the recurrence time, and check if it was consistent with the detection of only a single burst over the entire observed outburst. However, there is an extremely wide range of burst recurrence times at fixed accretion rate, depending upon the unknown fuel composition. we could potentially obtain constraints on the fuel composition by comparison of the observed lightcurve to simulations, but it's also possible that multiple different combinations of accretion rate and composition could give rise to similar composition at ignition (and hence shape of the lightcurve).
 
-Instead, we can estimate the ignition column using equation \ref{eq:column}, given an estimate of the nuclear burning yield, $\qnuc$. Since this quantity is unkown, we assume a set of randomly generated values of \Xb\
-to estimate $\yign$ from equation \ref{eq:column}
+Instead, we can constrain the fuel composition via the ignition column (equation \ref{eq:column}), based on an estimate of the nuclear burning yield, $\qnuc$. Since this quantity is unknown, we assume a set of random uniformly-distributed\footnote{Such distribution may not be realistic, but it serves to demonstrate the code capabilities. The largest (and most unlikely) values of \Xb\ are suppressed by the limit on $X_0$ imposed during this process.} values of \Xb\ in the range 0--0.7
+to estimate $\yign$ from equation \ref{eq:column}.
 %
-We choose a uniform distribution for \Xb\ in the range 0--0.7; this distribution is probably not realistic for a wide sample of bursts, but it is difficult to do better.
+We then estimate the recurrence time for each pair of $\yign$, $\dot{m}$ values as
+\begin{equation}
+\Delta t_{\rm rec} = (1+z)\yign/\dot{m}
+\end{equation}
+And finally calculate the fuel composition, $X_0$, for each set of \Xb, $\yign$, $\Delta t$ from equation \ref{eq:X_0}, again assuming a uniform distribution for $Z_{\rm CNO}$ between 0--0.02.
+%
+Because we have chosen uninformative prior distributions for \Xb\ and $Z_{\rm CNO}$, some of the $X_0$ values are unrealistic, well in excess of the maximum expected for such sources, 0.75 or so. We thus limit the distributions of each of the parameters to those such that $X_0\leq0.75$, and quote the $1\sigma$ parameter ranges for each.
+
+% We choose a uniform distribution for \Xb\ in the range 0--0.7; this distribution is % probably not realistic for a wide sample of bursts, but it is difficult to do better.
 % text copied from Kuiper et al. 2020 down to ********
 % For the single burst observed from IGR~J17591$-$2342 
-The inferred ignition column is $2.2_{-0.8}^{+1.4}\times10^8\,{\rm g\,cm^{-2}}$, and the average expected recurrence time is $1.8\pm0.7$~d. 
+% Original values; couldn't replicate in 2021 Sep
+% The inferred ignition column is $2.2_{-0.8}^{+1.4}\times10^8\,{\rm g\,cm^{-2}}$, and the average expected recurrence time is $1.8\pm0.7$~d. 
+% 2021 Sep values
+The inferred ignition column is $1.63_{-0.58}^{+1.05}\times10^8\,{\rm g\,cm^{-2}}$, and the average expected recurrence time is $1.19_{-0.42}^{+0.79}$~d. 
 % Such long recurrence times likely guarantee that the hydrogen in the accreted fuel is exhausted at the base prior to ignition, and explaining the fast rise and short duration of the burst. 
-, and $\Delta t_{\rm rec} = \yign/\dot{m}$.
 % not yet edited (need to modify sufficiently to avoid plagiarism issues
-Given each pair of (\Xb,  $\Delta t_{\rm rec}$) we can infer the accreted H-fraction $X_0$, based on 
-% the expectation that hydrogen burns via the hot-CNO cycle and will be exhausted in a time $t_{\rm CNO} =9.8(X_0/0.7)(Z_{\rm CNO}/0.02)^{-1}$ \citep[e.g.][]{lampe16}.
-equation \ref{eq:X_0}.
-%
-Since $Z_{\rm CNO}$ is also unknown, we similarly draw random values from a uniform distribution in the range 0.0--0.02.
-We then select only those $X_0$ values within a physically realistic range $X_0<0.75$, and compute the confidence limits on the remaining parameters. 
 %
 We can also infer lower (upper) limits on $X_0$ ($Z_{\rm CNO}$), although these limits are not strongly constraining; we find $X_0>0.17$ and $Z_{\rm  CNO}<0.017$ at 95\% confidence.
 % *******
