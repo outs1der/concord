@@ -433,7 +433,7 @@ def Q_nuc(Xbar, quadratic=False, old_relation=False, coeff=False):
 
     q = [1.3050, 6.9511, -1.9218]
 
-    if quadratic:
+    if not quadratic:
         q = [1.3455, 6.0455]
 
     if old_relation:

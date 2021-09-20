@@ -521,74 +521,15 @@ Fourth, even if the inclination $i$ of the system is known, converting to the an
 
 These issues may be avoided by adopting instead the empirical Eddington luminosity measured by \cite[]{kuul03a}...
 
-\subsection{Burst energetics}
+\subsection{Burst energetics and fuel composition}
 \label{subsec:energetics}
 
 % \subsection{Burst energetics}
 \label{subsec:energy}
 
-The fluence (and the shape of the burst profile) is determined by the amount of accumulated fuel, and its composition. For accretion of mixed H/He with hydrogen mass fraction $X_0$, the composition at ignition may be modified substantially by $\beta$-limited CNO burning. In extreme cases the recurrence time is sufficiently long that the accreted hydrogen at the base of the fuel layer is exhausted, and ignition of intense, fast He-rich bursts occur.
+The fluence (and the shape of the burst profile) is determined by the amount of accumulated fuel, and its composition. For accretion of mixed H/He with hydrogen mass fraction $X_0$, the composition at ignition may be modified substantially by $\beta$-limited CNO burning, ``catalysed'' by CNO nuclei, with mass fraction $Z_{\rm CNO}$. In extreme cases the recurrence time is sufficiently long that the accreted hydrogen at the base of the fuel layer is exhausted, and ignition of intense, fast He-rich bursts occur.
 
-From data taken prior to the burst ignition we can measure the persistent flux $F_{\rm per}$, a measure of the accretion rate; \todo{ add expression here; see eq. \ref{eq:fper}}
-% and provided more than one burst is observed, we may also measure (or estimate) the recurrence time, $\Delta t$. 
-the persistent spectra of burst sources are  more complex than the bursts themselves, and typically exhibit thermal as well as non-thermal components [{\bf ref}].
-%
-These parameters may be combined to estimate the $\alpha$-value, the (observed) ratio of the burst to persistent flux: 
-\begin{equation}
-\alpha = \frac{\Delta t F_{\rm per} c_{\rm bol}}{E_B}
-\end{equation}
-where $c_{\rm bol}$ is the bolometric correction giving the inverse fraction of total persistent flux emitted in the instrumental band.
-%
-The $\alpha$ parameter is an important diagnostic of the burst fuel and ignition conditions.
-%
-\todo{mention the average method, as used in the rates paper }
-
-Given the measured $\alpha$-value, the nuclear energy generation rate $Q_{\rm nuc}$ can be estimated, as follows:
-\begin{eqnarray}
-\alpha & = & \frac{\Delta t F_{\rm per} c_{\rm bol}}{E_B} \\
-& = & \frac{Q_{\rm grav}}{Q_{\rm nuc}}\frac{\xi_b}{\xi_p}(1+z)
-\end{eqnarray}
-where $Q_{\rm grav} = c^2z/(1+z) \approx GM_{\rm NS}/R_{\rm NS}$ is the gravitational energy release per gram. Note the dependence of the observational $\alpha$-value on both the surface redshift and the anisotropy parameters. The nuclear energy generation rate is thus
-\begin{equation}
-Q_{\rm nuc} = \frac{c^2 z}{\alpha}\frac{\xi_b}{\xi_p} \label{qnuc}
-\end{equation}
-Thus, given an estimate of $z$ and the inclination, the burst measurements can be used to infer $Q_{\rm nuc}$. 
-
-Given an estimate of $Q_{\rm nuc}$, the average hydrogen fraction $\langle X\rangle$ in the fuel layer at ignition has been estimated to date using the relation $Q_{\rm nuc}=1.6 + 4\langle X\rangle$~MeV/nucleon \cite[e.g.][and references therein]{gal03d}. This expression includes $\approx35$\% losses
-attributed to neutrino emission \cite[]{fuji87}. However, the 35\% value applies only to $\beta$-decays in the much more extensive {\it rp}-process burning chain, and recent {\sc kepler} simulations indicate instead an approximation of 
-% $Q{\rm nuc}=0.96+6.6\langle X\rangle$ 
-$Q{\rm nuc}=1.35+6.05\langle X\rangle$ 
-% (Goodwin et al. 2018, in preparation). 
-\cite[]{goodwin19a}.
-[{\it comment on improved quadratic expression}]
-%
-The average H-fraction at ignition $\langle X\rangle$ is a lower limit for the H-fraction in the accreted fuel, $X_0$, as for most sources the H-fraction will be reduced by steady burning prior to burst ignition.
-%
-The recurrence time for the burst can further be used to estimate $X_0$, although the burning rate also depends on the CNO mass fraction, $Z_{\rm CNO}$.
-
-additional data analysis comments
-\begin{itemize}
-\item correcting lightcurve for variations e.g. from dips, or achromatic variations
-\item using different spectral models than blackbody
-\item allowing the persistent flux to vary
-\item maybe a table with the parameters?
-\end{itemize}
-
-For a fuel layer consisting of mixed H/He, $\qnuc$ depends on the mean hydrogen fraction at ignition, \Xb:
-% The nuclear energy generation rate $\qnuc$ depends on the composition; 
-studies with the 1-D numerical code {\sc kepler} suggest that 
-\begin{eqnarray}
-Q_{\rm nuc} &= & 1.31+6.95\Xb-1.92\Xb^2 \nonumber \\
-& \approx & 1.35 + 6.05 \Xb
-\label{eq:qnuc}
-\end{eqnarray}
-\cite[]{goodwin19a}.
-% where $\Xb$ is the average H-fraction of the fuel layer at ignition. 
-For fuel with solar composition (i.e. $X=0.7$), $Q_{\rm nuc}=5.22$~MeV/nucleon.
-
-{\it Perhaps put in here some estimates of the fuel composition as a function of $X_0$ and recurrence time; could perhaps develop a ``prior'' for $\Xb$ }
-
-Provided an estimate of $\Xb$ is available, we can estimate the burst column that has ignited as
+The burst ignition column can be estimated from the fluence $E_b$ as
 % (1e-6*u.erg/u.cm**2*(10.*u.kpc).to('cm')**2/(5.22*u.MeV/const.m_p)*1.259
 %     ...: /(11.2*u.km)**2).to('g cm-2')
 % Out[36]: <Quantity 1.9112067e+08 g / cm2>
@@ -609,6 +550,201 @@ y & = & \frac{L_b d^2 (1+z)}{R_{\rm NS}^2 Q_{\rm nuc}}\
 \label{eq:column}
 \end{eqnarray}
 % {\it need to update prefactor, denominator in $Q_{\rm nuc}$ term here } - done
+where $\qnuc$ is the energy generation rate for the burst.
+
+For a fuel layer consisting of mixed H/He, $\qnuc$ depends on the mean hydrogen fraction at ignition, \Xb. 
+%
+% Given an estimate of $Q_{\rm nuc}$, the average hydrogen fraction $\langle X\rangle$ in the fuel layer at ignition has been estimated to date 
+In the absence of other information, $\qnuc$ (and hence $y$) has in the past been estimated by adopting a value for 
+% the average H-fraction at ignition, 
+$\Xb$,
+%
+and using the relation $Q_{\rm nuc}=1.6 + 4\langle X\rangle$~MeV/nucleon \cite[e.g.][and references therein]{gal03d}. This expression includes $\approx35$\% losses
+attributed to neutrino emission \cite[]{fuji87}. However, the 35\% value applies only to $\beta$-decays in the much more extensive {\it rp}-process burning chain.
+% The nuclear energy generation rate $\qnuc$ depends on the composition; 
+Recent studies with the 1-D numerical code {\sc kepler} suggest instead that 
+\begin{eqnarray}
+Q_{\rm nuc} &= & 1.31+6.95\Xb-1.92\Xb^2 \nonumber \\
+& \approx & 1.35 + 6.05 \Xb
+\label{eq:qnuc}
+\end{eqnarray}
+\cite[]{goodwin19a}.
+% where $\Xb$ is the average H-fraction of the fuel layer at ignition. 
+For fuel with solar composition (i.e. $X=0.7$), $Q_{\rm nuc}=5.22$~MeV/nucleon.
+%
+The average H-fraction at ignition $\Xb$ is a lower limit for the H-fraction in the accreted fuel, $X_0$, as for most sources the H-fraction will be reduced by steady burning prior to burst ignition.
+
+Provided the burst recurrence time is known, $\qnuc$ can be estimated via the $\alpha$-parameter, the (observed) ratio of the burst to persistent flux.
+%
+From data taken prior to the burst ignition we can measure the persistent flux $F_{\rm per}$, a measure of the accretion rate; \todo{ add expression here; see eq. \ref{eq:fper}}
+% and provided more than one burst is observed, we may also measure (or estimate) the recurrence time, $\Delta t$. 
+the persistent spectra of burst sources are  more complex than the bursts themselves, and typically exhibit thermal as well as non-thermal components [{\bf ref}].
+%
+These parameters may be combined to estimate the $\alpha$-value: 
+\begin{equation}
+\alpha = \frac{\Delta t F_{\rm per} c_{\rm bol}}{E_b}
+\label{eq:alpha}
+\end{equation}
+where $c_{\rm bol}$ is the bolometric correction giving the inverse fraction of total persistent flux emitted in the instrumental band.
+%
+% \todo{mention the average method, as used in the rates paper }
+As for the burst rate, we may estimate the average $\alpha$ for a set of $N$ bursts with  
+% average fluence $\langle E_b\rangle$, 
+fluences $E_{b,i}$, 
+%
+observed in $n$ low-duty cycle observations with persistent flux $F_j$ and exposure $T_j$ as
+\begin{equation}
+\langle \alpha\rangle = \frac{c_{\rm bol}\sum^n T_jF_j}{\sum^N E_b,i}
+% {\langle E_b\rangle}
+\label{eq:alphaav}
+\end{equation}
+assuming a common bolometric correction $c_{\rm bol}$ for each observation.
+
+The $\alpha$ parameter is an important diagnostic of the burst fuel and ignition conditions.
+%
+The ``observed'' value given by equations \ref{eq:alpha} and \ref{eq:alphaav} must be interpreted with a little caution, as they likely incorporate the effects of anisotropy of the burst and persistent emission. 
+%
+We can also write $\alpha$ as
+% Given the measured $\alpha$-value, the nuclear energy generation rate $Q_{\rm nuc}$ can be estimated, as follows:
+\begin{equation}
+\alpha % & = & \frac{\Delta t F_{\rm per} c_{\rm bol}}{E_B} \\
+ =  \frac{Q_{\rm grav}}{Q_{\rm nuc}}\frac{\xi_b}{\xi_p}(1+z)
+ \label{eq:alphath}
+\end{equation}
+where $Q_{\rm grav} = c^2z/(1+z) \approx GM_{\rm NS}/R_{\rm NS}$ is the gravitational energy release per gram. Note the implicit dependence of the ``observational'' $\alpha$-value (equations \ref{eq:alpha} and \ref{eq:alphaav}) on both the surface redshift and the anisotropy parameters, illustrated in equation \ref{eq:alphath}. 
+%
+They expected values for $Q_{\rm grav}$ are $\approx190$~MeV~nucleon$^{-1}$ (for $M_{\rm NS}=1.4\ M_\odot$ and $R_{\rm NS}=11.2$~km, giving $1+z=1.259$). Thus, excluding the anisotropy effects, $\alpha$ should be $\approx40$ 
+% (const.c**2*(cd.OPZ-1)/cd.OPZ).to('MeV g-1')*const.m_p.to('g')/(5.22*u.MeV)
+% 36.977056, more precisely
+for bursts burning H-rich fuel, or 140 for pure He.
+
+The nuclear energy generation rate is thus
+\begin{equation}
+Q_{\rm nuc} = \frac{c^2 z}{\alpha}\frac{\xi_b}{\xi_p} \label{qnuc}
+\end{equation}
+%
+%Thus, given an estimate of $z$ and the inclination, the burst measurements can be used to infer $Q_{\rm nuc}$. 
+%
+% Thus, 
+By substituting in equation \ref{eq:qnuc} we can estimate 
+\begin{equation}
+%\langle X\rangle 
+\Xb
+% In [42]: c.c**2/(6.0455*u.MeV/c.m_p).to("m**2/s**2")                             
+% Out[41]: <Quantity 155.20173377>
+%% = \frac{c^2z/\alpha}{6.6\ {\rm Mev/nucleon}}\frac{\xi_b}{\xi_p} - 0.145
+% = z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145 \label{xbar}
+ = z\frac{155}{\alpha}\frac{\xi_b}{\xi_p} - 0.223 \label{xbar}
+\end{equation}
+[{\it comment on the degree of error introduced by ignoring anisotropy etc.}] 
+%
+Clearly this expression is only applicable for $\alpha$-values up to some limit, which we calculate as
+\begin{equation}
+%In [43]: c.c**2/(1.*u.MeV/c.m_p).to("m**2/s**2")/1.3455        
+% Out[43]: <Quantity 697.34082607>
+% \alpha \leq 980\, z \frac{\xi_b}{\xi_p}
+\alpha \leq 697\, z \frac{\xi_b}{\xi_p}
+\end{equation}
+Interestingly, this limit is 
+% $\approx70$\% 
+%  c.c**2/(1.*u.MeV/c.m_p).to("m**2/s**2")/1.6                 
+% Out[44]: <Quantity 586.42005092>
+% In [45]: 697./586.                                                               
+% Out[45]: 1.189
+$\approx20$\%
+%
+larger than the equivalent value derived for the old expression for $Q_{\rm nuc}$. This result suggests that larger observed values of $\alpha$ may be accommodated without resorting to explanations including incomplete burning of burst fuel \cite[e.g.][]{bcatalog}.
+
+% upper limit on xbar
+Conversely, for low values of $\alpha$, we may apply the constraint that $\Xb \lesssim 0.77$, corresponding to the expected maximum possible for accreted fuel with primordial abundances.
+
+The hydrogen fraction at ignition $\Xb$ and the burst recurrence time may then be used to estimate the hydrogen fraction in the fuel, $X_0$. The H-fraction at the base of the fuel layer is reduced steadily by $\beta$-limited hot CNO burning, and will completely exhaust the accreted hydrogen in a time \cite[]{lampe16}:
+\begin{equation}
+t_{\rm CNO} =9.8\left(\frac{X_0}{0.7}\right) \left(\frac{Z_{\rm CNO}}{0.02}\right)^{-1}
+\end{equation}
+measured in the neutron star frame.
+% updated 2019 Aug 26 with exhaustion case
+The hydrogen fraction at the base will thus be $X_0[1-\Delta t/(1+z)t_{\rm CNO}]$, 
+% [{\it should this expression include time dilation?}] -- yes
+%
+provided that $\Delta t < (1+z)t_{\rm CNO}$. Once $\Delta t$ exceeds the time to burn all the hydrogen at the base, the abundance there will be zero, and a growing layer of pure He fuel will develop. The average H-fraction in the layer for these two cases will be 
+%so that the average H-fraction in the layer will be 
+\begin{equation}
+\Xb = \begin{cases}
+%  X_0\left[1-0.5\frac{\Delta t}{(1+z)t_{\rm CNO}}\right] & \Delta t \leq (1+z)t_{\rm CNO} \\
+%  0.5X_0\frac{(1+z)t_{\rm CNO}}{\Delta t} & \Delta t > (1+z)t_{\rm CNO}
+  X_0(1-0.5f_{\rm burn}) & \Delta t \leq (1+z)t_{\rm CNO} \\
+  0.5X_0/f_{\rm burn} & \Delta t > (1+z)t_{\rm CNO}
+  \end{cases}
+\end{equation}
+where $f_{\rm burn} = \frac{\Delta t}{(1+z)t_{\rm CNO}}$ is the ratio of the recurrence time to the time to burn all the H.
+%
+We can combine this expression with equation \ref{xbar} to give
+\begin{equation}
+X_0 = \begin{cases}
+%        & \langle X\rangle +0.35\left[\frac{\Delta t}{(1+z)9.8\ {\rm hr}}\right]
+%                            \left(\frac{Z_{\rm CNO}}{0.02}\right) \nonumber \\
+         z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145 
+                           +\left[\frac{\Delta t}{(1+z)28\,{\rm hr}}\right]
+                       \left(\frac{Z_{\rm CNO}}{0.02}\right) & f_{\rm burn} \leq 1\\
+         \sqrt{ \frac{\Delta t}{(1+z)7\,{\rm hr}}\frac{Z_{\rm CNO}}{0.02}
+                        \left(z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145\right) }
+                        & f_{\rm burn} > 1
+        \end{cases}
+    \label{eq:X_0}
+\end{equation}
+Practically, the issue with these expressions is that calculating $f_{\rm burn}$ requires knowledge of $X_0$, which is the unknown we are trying to constrain. One approach is to adopt a trial value of $X_0$, calculate $f_{\rm burn}$ and hence an updated estimate of $X_0$ via equation \ref{eq:X_0}, and iterate until no further change in the estimate arises.
+
+\begin{figure}[ht!]
+\plotone{xbar.pdf}
+\caption{Hydrogen mass fraction of the accreted fuel, $X_0$, inferred from the average H-fraction of the burst at ignition, $\overline{X}$, as a function of burst recurrence time $\Delta t$. $X_0$ is calculated from equation \ref{eq:X_0}, assuming $\zcno=0.001$ (blue line) or 0.02 (other lines).
+%
+Note how for some combinations of $\overline{X}$, $\Delta t$ the inferred fuel H-fraction is $>0.77$ (red dashed line). Such values are physically implausible, and may be resolved if the CNO mass fraction $\zcno$ is smaller than the adopted value.
+% 
+The top $x$-axis shows the corresponding $\qnuc$ values.
+\label{fig:xbar}}
+\end{figure}
+
+Clearly this estimate of $X_0$ will incorporate systematic errors arising from the assumed values of $z$, the inclination, and $Z_{\rm CNO}$. We explore the typical range of these errors in 
+% the next section.
+\S\ref{sec:simulations}
+
+\todo{rationalise older/redundant text below to end of section}
+
+The recurrence time for the burst can further be used to estimate $X_0$, although the burning rate also depends on the CNO mass fraction, $Z_{\rm CNO}$.
+
+additional data analysis comments
+\begin{itemize}
+\item correcting lightcurve for variations e.g. from dips, or achromatic variations
+\item using different spectral models than blackbody
+\item allowing the persistent flux to vary
+\item maybe a table with the parameters?
+\end{itemize}
+
+{\it Perhaps put in here some estimates of the fuel composition as a function of $X_0$ and recurrence time; could perhaps develop a ``prior'' for $\Xb$ }
+
+% \todo{move later sections here on determining the fuel composition?}
+
+Given a minimally complete set of burst observations as described in \S\ref{subsec:data}, a common approach \cite[e.g][]{falanga11} is to estimate the fuel composition at ignition, and hence the accreted fuel composition, based on simple analytic estimates of the burst energy production $Q_{\rm nuc}$.
+
+One issue with this approach 
+% (as for analyses based on one burst, as described in \S\ref{subsec:1burst}) 
+is that the effects of anisotropy are frequently neglected.
+%
+A second issue which has emerged recently is that the commonly used estimates for the nuclear energy generation rate $Q_{\rm nuc}$ are not supported by recent {\sc kepler} models. 
+
+% describe plausible assumptions for ration of $\xi_b/\xi_p$.
+The system inclination for LMXBs is notoriously difficult to measure. For non-dipping sources, the likely range is up to $72^\circ$, while dipping sources are likely $i\gtrsim79.3^\circ$ \cite[]{gal16a}.
+% 
+% 5, 16, 50, 68, 95 th percentiles:
+% [ 0.58815149  0.72522467  1.12987208  1.49149624  1.59287602]
+% min, max
+% 0.525409532417 1.63715782279
+For an isotropically-distributed population of non-dipping sources, the ratio $\xi_b/\xi_p$ is roughly uniformly-distributed between 0.53--1.64, rising a little towards the high end. The median value is 1.13, while the 95\% confidence interval is 0.73--1.49.
+
+\begin{itemize}
+\item describe plausible assumptions for $z$, e.g. based on recent analysis of bursts
+\end{itemize}
 
 \subsection{Burst models}
 \label{subsec:models}
@@ -618,6 +754,7 @@ Thermonuclear burst simulations \cite[e.g. with {\sc kepler};][]{woos04} are usu
 The model predictions include a recurrence time $\Delta t_{\rm pred}$, burst energy $E_{\rm pred}$ and lightcurve $(t_i,L_{{\rm pred},i})$ covering the extent of the burst.
 %
 The accretion rate $\dot{m}$ may also be converted to a persistent flux level for comparison with observations.
+
 
 \subsection{Simulated observations}
 \label{subsec:simobs}
@@ -957,99 +1094,9 @@ We can also infer lower (upper) limits on $X_0$ ($Z_{\rm CNO}$), although these 
 \subsection{Two bursts -- inferring fuel composition} 
 \label{subsec:fuelcomp}
 
-Given a minimally complete set of burst observations as described in \S\ref{subsec:data}, a common approach \cite[e.g][]{falanga11} is to estimate the fuel composition at ignition, and hence the accreted fuel composition, based on simple analytic estimates of the burst energy production $Q_{\rm nuc}$.
+We describe the general approach below including the effects of these two issues (anisotropy and qnuc).
 
-One issue with this approach (as for analyses based on one burst, as described in \S\ref{subsec:1burst}) is that the effects of anisotropy are frequently neglected.
-%
-A second issue which has emerged recently is that the commonly used estimates for the nuclear energy generation rate $Q_{\rm nuc}$ are not supported by recent {\sc kepler} models. 
-%
-We describe the general approach below including the effects of these two issues.
-
-% describe plausible assumptions for ration of $\xi_b/\xi_p$.
-The system inclination for LMXBs is notoriously difficult to measure. For non-dipping sources, the likely range is up to $72^\circ$, while dipping sources are likely $i\gtrsim79.3^\circ$ \cite[]{gal16a}.
-% 
-% 5, 16, 50, 68, 95 th percentiles:
-% [ 0.58815149  0.72522467  1.12987208  1.49149624  1.59287602]
-% min, max
-% 0.525409532417 1.63715782279
-For an isotropically-distributed population of non-dipping sources, the ratio $\xi_b/\xi_p$ is roughly uniformly-distributed between 0.53--1.64, rising a little towards the high end. The median value is 1.13, while the 95\% confidence interval is 0.73--1.49.
-
-\begin{itemize}
-\item describe plausible assumptions for $z$, e.g. based on recent analysis of bursts
-\end{itemize}
-
-Thus, by substituting in equation \ref{qnuc} we can estimate 
-\begin{equation}
-\langle X\rangle 
-% In [42]: c.c**2/(6.0455*u.MeV/c.m_p).to("m**2/s**2")                             
-% Out[41]: <Quantity 155.20173377>
-%% = \frac{c^2z/\alpha}{6.6\ {\rm Mev/nucleon}}\frac{\xi_b}{\xi_p} - 0.145
-% = z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145 \label{xbar}
- = z\frac{155}{\alpha}\frac{\xi_b}{\xi_p} - 0.223 \label{xbar}
-\end{equation}
-[{\it comment on the degree of error introduced by ignoring anisotropy etc.}] 
-%
-Clearly this expression is only applicable for $\alpha$-values up to some limit, which we calculate as
-\begin{equation}
-%In [43]: c.c**2/(1.*u.MeV/c.m_p).to("m**2/s**2")/1.3455        
-% Out[43]: <Quantity 697.34082607>
-% \alpha \leq 980\, z \frac{\xi_b}{\xi_p}
-\alpha \leq 697\, z \frac{\xi_b}{\xi_p}
-\end{equation}
-Interestingly, this limit is 
-% $\approx70$\% 
-%  c.c**2/(1.*u.MeV/c.m_p).to("m**2/s**2")/1.6                 
-% Out[44]: <Quantity 586.42005092>
-% In [45]: 697./586.                                                               
-% Out[45]: 1.189
-$\approx20$\%
-%
-larger than the equivalent value derived for the old expression for $Q_{\rm nuc}$. This result suggests that larger observed values of $\alpha$ may be accommodated without resorting to explanations including incomplete burning of burst fuel \cite[e.g.][]{bcatalog}.
-
-% upper limit on xbar
-Conversely, for low values of $\alpha$, we may apply the constraint that $\langle X\rangle \lesssim 0.77$, corresponding to the expected maximum possible for accreted fuel with primordial abundances.
-
-The hydrogen fraction at ignition $\langle X\rangle$ and the burst recurrence time may then be used to estimate the hydrogen fraction in the fuel, $X_0$. The H-fraction at the base of the fuel layer is reduced steadily by $\beta$-limited hot CNO burning, and will completely exhaust the accreted hydrogen in a time \cite[]{lampe16}:
-\begin{equation}
-t_{\rm CNO} =9.8\left(\frac{X_0}{0.7}\right) \left(\frac{Z_{\rm CNO}}{0.02}\right)^{-1}
-\end{equation}
-measured in the neutron star frame.
-% updated 2019 Aug 26 with exhaustion case
-The hydrogen fraction at the base will thus be $X_0[1-\Delta t/(1+z)t_{\rm CNO}]$, 
-% [{\it should this expression include time dilation?}] -- yes
-%
-provided that $\Delta t < (1+z)t_{\rm CNO}$. Once $\Delta t$ exceeds the time to burn all the hydrogen at the base, the abundance there will be zero, and a growing layer of pure He fuel will develop. The average H-fraction in the layer for these two cases will be 
-%so that the average H-fraction in the layer will be 
-\begin{equation}
-\langle X \rangle = \begin{cases}
-%  X_0\left[1-0.5\frac{\Delta t}{(1+z)t_{\rm CNO}}\right] & \Delta t \leq (1+z)t_{\rm CNO} \\
-%  0.5X_0\frac{(1+z)t_{\rm CNO}}{\Delta t} & \Delta t > (1+z)t_{\rm CNO}
-  X_0(1-0.5f_{\rm burn}) & \Delta t \leq (1+z)t_{\rm CNO} \\
-  0.5X_0/f_{\rm burn} & \Delta t > (1+z)t_{\rm CNO}
-  \end{cases}
-\end{equation}
-where $f_{\rm burn} = \frac{\Delta t}{(1+z)t_{\rm CNO}}$ is the ratio of the recurrence time to the time to burn all the H.
-%
-We can combine this expression with equation \ref{xbar} to give
-\begin{equation}
-X_0 = \begin{cases}
-%        & \langle X\rangle +0.35\left[\frac{\Delta t}{(1+z)9.8\ {\rm hr}}\right]
-%                            \left(\frac{Z_{\rm CNO}}{0.02}\right) \nonumber \\
-         z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145 
-                           +\left[\frac{\Delta t}{(1+z)28\,{\rm hr}}\right]
-                       \left(\frac{Z_{\rm CNO}}{0.02}\right) & f_{\rm burn} \leq 1\\
-         \sqrt{ \frac{\Delta t}{(1+z)7\,{\rm hr}}\frac{Z_{\rm CNO}}{0.02}
-                        \left(z\frac{142}{\alpha}\frac{\xi_b}{\xi_p} - 0.145\right) }
-                        & f_{\rm burn} > 1
-        \end{cases}
-    \label{eq:X_0}
-\end{equation}
-Practically, the issue with these expressions is that calculating $f_{\rm burn}$ requires knowledge of $X_0$, which is the unknown we are trying to constrain. One approach is to adopt a trial value of $X_0$, calculate $f_{\rm burn}$ and hence an updated estimate of $X_0$ via equation \ref{x0}, and iterate until no further change in the estimate arises.
-
-Clearly this estimate of $X_0$ will incorporate systematic errors arising from the assumed values of $z$, the inclination, and $Z_{\rm CNO}$. We explore the typical range of these errors in 
-% the next section.
-\S\ref{sec:simulations}
-
+% original text here moved to the earlier "methods" section
 \begin{itemize}
 \item Apply the method to the reference bursts
 \end{itemize}
