@@ -2,9 +2,13 @@
 # Augmented 2019 Aug with routines from Inferring\ composition.ipynb
 #
 # def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None):
+# def homogenize_params(theta, nsamp=None):
 # def len_dist(d):
+# def asym_norm(m, sigm=None, sigp=None, nsamp=NSAMP_DEF, positive=False, model=1):
+# def intvl_to_errors(perc):
 # def g(M,R,Newt=False,units='cm/s^2'):
 # def redshift(M,R):
+# def check_M_R_opz(M, R, opz):
 # def calc_mr(g,opz):
 # def solve_radius(M,R_Newt,eta=1e-6):
 # def decode_LaTeX(string):
@@ -14,14 +18,15 @@
 # def hfrac(alpha, tdel, opz=1.259, zcno=0.02, old_relation=False, ...)
 # def iso_dist(nsamp=1000, imin=0., imax=IMAX_NDIP)
 # def dist(F_pk, F_pk_err, nsamp=10000, X=0.0, empirical=False, ...)
+# def luminosity(F_X, F_X_err=0.0, dist=8*u.kpc, dist_err=None, nsamp=NSAMP_DEF, ...)
 # def mdot(F_per, F_per_err, dist, nsamp=10000, M=M_NS, R=R_NS, ...)
 # def yign(E_b, E_b_err, dist, R_NS=10., Xbar=0.7, opz=1.259, ...)
-# def luminosity(F_X, F_X_err=0.0, dist=8*u.kpc, dist_err=None, nsamp=NSAMP_DEF, ...)
 # def L_Edd(F_pk, F_pk_err, dist, dist_err=0.0, nsamp=10000, dip=False, ...)
 
 import astropy.units as u
 import astropy.uncertainty as unc
 from astropy.visualization import quantity_support
+from scipy.stats import poisson
 
 # Some defaults
 
@@ -411,6 +416,40 @@ def decode_LaTeX(string, delim='pm'):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
+def tdel_dist(nburst, exp, nsamp=NSAMP_DEF):
+    """
+    Function to generate a synthetic distribution of recurrence times, given
+    nburst observed events over a total exposure of exp. The resulting
+    distribution may approximate the PDF of the underlying burst rate, but
+    does assume that the bursts are independent, which is obviously not the
+    case
+    :param nburst: number of events detected
+    :param exp: total exposure time
+    :param nsamp: number of samples to generate
+    :return:
+    """
+
+    if exp.decompose().unit != u.s:
+        logger.error('exposure time needs a unit')
+        return None
+
+    # Generate a CDF of the underlying event rate, given nburst events detected
+
+    mu = np.arange(15000) / 500.  # [0-30]
+    prob = 1 - poisson.cdf(nburst, mu)
+
+    # Need to make sure the range of mu is sufficiently wide; you might need
+    # to tweak this for nburst much larger than 5 or so
+
+    assert (1. - max(prob)) < 1e-6
+
+    x = np.random.random(nsamp)
+    y = [mu[np.argmin(abs(prob - _x))] for _x in x]
+
+    return exp / y
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
 def Q_nuc(Xbar, quadratic=False, old_relation=False, coeff=False):
     '''
     This function implements the approximation to the nuclear energy generation rate
@@ -533,7 +572,7 @@ def alpha(_tdel, _fluen, _fper, _c_bol=None, nsamp=NSAMP_DEF):
 def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
           opz=OPZ, zcno=0.02, old_relation=False,
           isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP,
-          conf=CONF, fulldist=False, nsamp=NSAMP_DEF, debug=False):
+          model='he16_a', conf=CONF, fulldist=False, nsamp=None, debug=False):
     '''
     This routine estimates the h-fraction at ignition, based on the burst properties
     In the absence of the alpha-value(s), you need to supply the persistent flux and
@@ -555,9 +594,19 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
     Usage:
     import astropy.units as u
     xbar, x_0, inc = cd.hfrac(2.5*u.hr, 140., inclination=30.) # "single" mode
-    xbar, x_0, inc = cd.hfrac((2.681, 0.007), fluen=(0.381, 0.003),
-                      fper=(3.72, 0.18), c_bol=(1.45, 0.09),nsamp=1000)
+    xbar_dict = cd.hfrac((2.681, 0.007), fluen=(0.381, 0.003),
+                      fper=(3.72, 0.18), c_bol=(1.45, 0.09),nsamp=1000,fulldist=True)
     '''
+
+    if _alpha is None:
+        # Now have the option of providing all the parameters for alpha, instead of the
+        # values. But in that case you need to calculate alpha
+
+        if (fper is None) or (fluen is None):
+            logger.error('need to supply persistent flux & fluence in absence of alpha')
+            return None
+        if c_bol == 1.0:
+            logger.warning('no bolometric correction applied in alpha calculation')
 
     # Flag to check for the "single" mode of operation, used by this routine
 
@@ -572,7 +621,7 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
     # The following parameters define the relation for Q_nuc = q_0 + q_1*hbar, where hbar is the
     # average hydrogen fraction in the fuel column at ignition
 
-    q_0, q_1 = Q_nuc(0.0, old_relation=old_relation, quadratic=True, coeff=True)
+    q_0, q_1 = Q_nuc(0.0, old_relation=old_relation, quadratic=False, coeff=True)
 
     # Does this need to change if the Q_nuc coefficients also change? YES
     # alpha_0 = const.c**2/(6.6*u.MeV/const.m_p).to("m**2/s**2")
@@ -590,42 +639,44 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
         tpref = TPREF_CNO_OLD
 
     # convert the tdel parameter provided, to a distribution (if required)
+    # and check that the other parameters have consistent sizes
     if scalar:
         tdel = _tdel
+        if _alpha is None:
+            alpha_dist = alpha(tdel, fluen, fper, c_bol)
+        else:
+            alpha_dist = _alpha
     else:
-        tdel = value_to_dist(_tdel, nsamp=nsamp, unit=u.hr)
+        if _alpha is None:
+            tdel, _fper, _fluen, _c_bol, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
+                                                                      'fper': (fper, MINBAR_FLUX_UNIT),
+                                                                      'fluen': (fluen, MINBAR_FLUEN_UNIT),
+                                                                      'c_bol': (c_bol)}, nsamp)
+            alpha_dist = alpha(tdel, _fluen, _fper, _c_bol, nsamp=_nsamp)
+        else:
+            tdel, alpha_dist, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
+                                                           'alpha': (_alpha, None)}, nsamp)
+
+        # if no sample size has been passed, but we still need to generate samples
+        # to account for the emission anisotropy, determine the array size here
+        if (nsamp is None) | (not isotropic):
+            nsamp = NSAMP_DEF
+            if (_nsamp > 3):
+                nsamp = _nsamp
 
     # Set the inclination parameters, by default for isotropy
     xi_b = 1.
     xi_p = 1.
     if not isotropic:
         if inclination is None:
-        # With no inclination provided, we set up a uniform distribution of values
-        # up to some maximum, and calculate the composition values for each inclination
+            # With no inclination provided, we set up a uniform distribution of values
+            # up to some maximum, and calculate the composition values for each inclination
             inclination = iso_dist(nsamp, imin=imin, imax=imax)
 
         # Calculate the anisotropy factors for the inclination
-        xi_b, xi_p = anisotropy(inclination)
+        xi_b, xi_p = anisotropy(inclination, model=model)
 
     xmax = 0.77  # no longer used
-
-    # Calculate alpha here, if it's not already provided
-    if _alpha is None:
-        # Now have the option of providing all the parameters for alpha, instead of the
-        # values. But in that case you need to calculate alpha
-
-        if (fper is None) or (fluen is None):
-            logger.error('need to supply persistent flux & fluence in absence of alpha')
-            return None
-        if c_bol == 1.0:
-            logger.error('no bolometric correction applied')
-
-        # this may not be a distribution, but we can't use alpha as a variable name!
-        alpha_dist = alpha(tdel, fluen, fper, c_bol, nsamp=nsamp)
-    elif scalar:
-        alpha_dist = _alpha
-    else:
-        alpha_dist = value_to_dist(_alpha, nsamp=nsamp)
 
     if scalar:
         # I think this part only gets called for scalar values, but you should check here
@@ -644,7 +695,11 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
         # split this off as a separate routine
             x_0 = X_0(xbar, zcno, tdel, opz, debug=debug, old_relation=old_relation)
 
+        # Although it's probably a mistake, return a tuple of values for the scalar version
+        # in contrast to the fulldist one, which returns a dict
         return xbar, x_0, inclination
+        # return {'xbar': xbar, 'X_0': x_0, 'i': inclination, 'alpha': alpha_dist,
+        #         'fluen': fluen, 'fper': fper, 'model': model}
 
     else:
 
@@ -659,10 +714,14 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
                 debug=debug)
 
         if fulldist:
-            return unc.Distribution(xbar), unc.Distribution(x_0), inclination
+            return {'xbar': unc.Distribution(xbar), 'X_0': unc.Distribution(x_0), 'i': inclination,
+                    'alpha': alpha_dist, 'fluen': _fluen, 'fper': _fper, 'model': model}
         else:
             cval = [50, 50 - conf / 2, 50 + conf / 2]
-            return np.percentile(xbar, cval), np.percentile(x_0[x_0 >= 0.], cval), inclination.pdf_percentiles(cval)
+            return { 'xbar': intvl_to_errors(np.percentile(xbar, cval)),
+                     'X_0': intvl_to_errors(np.percentile(x_0[x_0 >= 0.], cval)),
+                     'i': intvl_to_errors(np.pdf_percentiles(inclination[x_0 >= 0.], cval)),
+                     'alpha': alpha_dist, 'fluen': _fluen, 'fper': _fper, 'model': model}
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -1013,7 +1072,7 @@ def mdot(_F_per, _dist, c_bol=1.0, M=None, R=None, opz=None,
 
             # Return a dictionary with all the parameters you'll need
 
-            return {'mdot': mdot, 'dist': dist, 'i': inclination, 'xi_p': xi_p}
+            return {'mdot': mdot, 'dist': dist, 'i': inclination, 'xi_p': xi_p, 'model': model}
         else:
 
             # Return the median value and the (asymmetric) lower and upper errors
@@ -1067,7 +1126,7 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
     if (nsamp is None) | (not isotropic):
         nsamp = NSAMP_DEF
         if (_nsamp > 3):
-            nsamp = _nsamp,
+            nsamp = _nsamp
 
 #    if hasattr(_E_b, 'unit'):
 #        fluen_unit = _E_b.unit
