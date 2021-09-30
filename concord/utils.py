@@ -78,7 +78,7 @@ logger = create_logger()
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None):
+def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, verbose=False):
     """
     This method converts a measurement to a distribution, to allow flexibility
     in how values are implemented in the various routines
@@ -104,7 +104,7 @@ def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None):
 
     # Check here if it's already a distribution; don't want to run this twice
 
-    if hasattr(_num, 'distribution'):
+    if hasattr(_num, 'distribution') & verbose:
         logger.warning('this quantity is already a distribution')
         return _num
 
@@ -192,6 +192,8 @@ def homogenize_params(theta, nsamp=None):
                 logger.warning('passed nsamp overridden by size of one or more parameter distribution')
             nsamp = _nsamp
     # print (scalar, _nsamp, nsamp)
+
+    # Now assemble the output tuple
     theta_hom = []
     for par in theta.keys():
 
@@ -207,6 +209,7 @@ def homogenize_params(theta, nsamp=None):
         theta_hom.append( 1 )
     else:
         theta_hom.append( nsamp )
+
     return tuple(theta_hom)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
@@ -656,6 +659,7 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
         else:
             tdel, alpha_dist, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
                                                            'alpha': (_alpha, None)}, nsamp)
+            _fper, _fluen = fper, fluen
 
         # if no sample size has been passed, but we still need to generate samples
         # to account for the emission anisotropy, determine the array size here
@@ -705,11 +709,18 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
 
         # We loop over each of the inclination values and calculate the corresponding
         # properties
+        # Original version of this had tdel, alpha as distributions, but all the other
+        # parameters not. This makes it a bit hard to mix single values and distributions,
+        # not least because you can't index floats (or single element quantities)
         xbar = np.zeros(nsamp)
         x_0 = np.zeros(nsamp)
         for j, i in enumerate(inclination.distribution):
+            if len_dist(zcno) == 1:
+                _zcno = zcno
+            else:
+                _zcno = zcno[j]
             xbar[j], x_0[j], dummy = hfrac(tdel.distribution[j],
-                alpha_dist.distribution[j], opz=opz, zcno=zcno,
+                alpha_dist.distribution[j], opz=opz, zcno=_zcno,
                 isotropic=isotropic, old_relation=old_relation, inclination=i,
                 debug=debug)
 
