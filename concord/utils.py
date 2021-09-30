@@ -157,8 +157,18 @@ def homogenize_params(theta, nsamp=None):
     This method is for use by the MCMC routines, to ensure consistency of the
     parameter set. We want to make sure that each parameter (if a distribution)
     has the same length as any other parameter (unless it's a scalar).
+    Each parameter is labeled and provided with a value (and possibly also error),
+    and units. Inclination is also provided with the isotropy flag, and the angle
+    limits. If none of the input parameters are already distributions, the provided
+    number of samples nsamp will be used as the dimensions of the output distributions
+    (this may be redundant, since we now also do the inclination distributions here)
     Usage:
-    (par1, par2, ... ) = homogenize_params( dictionary_of_input_params_and_units)
+    (par1, par2, ... nsamp ) = homogenize_params( dictionary_of_input_params_and_units, nsamp )
+    Example:
+    F_pk, _nsamp = homogenize_params( {'fpeak': ((33., 2.), cd.MINBAR_FLUX_UNIT)}, 100)
+    F_pk, _inclination, _nsamp = cd.homogenize_params( {'fpeak': ((33., 2.), cd.MINBAR_FLUX_UNIT),
+                                   'incl': (None, u.deg, isotropic, 0.0, 75.)}, 100)
+
     :param theta: dictionary with parameters and units
     :param nsamp: desired size of distribution objects, if not already set by
                   one or more of the parameters
@@ -166,11 +176,29 @@ def homogenize_params(theta, nsamp=None):
              the actual number of samples per parameter
     """
 
+    # here we maintain a list of "standard" parameters for use in concord
+    # you don't have to use these, but down the track we might do different things
+    # based on the parameter type (e.g. for incl)
+
+    params = ['tdel','fluen','fper','c_bol','alpha','fpeak','flux','dist','incl']
+
+    # this bit will allow us to replace the inclination treatement in the individual
+    # functions
+
+    isotropic = True
+    if 'incl' in theta.keys():
+        if len(theta['incl'] < 5):
+            logger.error('with the inclination you must pass the isotropy flag and limits')
+            return
+        isotropic = theta['incl'][2]
+
     # first loop we have to get the number of samples
     _nsamp = None
     mismatch = False
     l = [] # array for parameter lengths
     for par in theta.keys():
+        if par not in params:
+            logger.warning('parameter {} is not in my list')
         l.append( len_dist(theta[par][0]) )
         if (l[-1] > 3):
             # we have a distribution of some kind
@@ -182,8 +210,12 @@ def homogenize_params(theta, nsamp=None):
         logger.error("mismatch in distribution size")
         return
 
+    # Set the size for the distributions
+    # If any of the inputs are distributions (or we have the isotropy flag unset) we *must*
+    # return distributions
+
     scalar = (max(l) == 1)
-    if (not scalar):
+    if (not scalar) | (not isotropic):
         if (_nsamp is None):
             if (nsamp is None):
                 nsamp = NSAMP_DEF
@@ -203,7 +235,14 @@ def homogenize_params(theta, nsamp=None):
             else:
                 theta_hom.append( theta[par][0] )
         else:
-            theta_hom.append( value_to_dist(theta[par][0], nsamp=nsamp, unit=theta[par][1]) )
+            if (par == 'incl'):
+                # special here for the inclination
+                if (not isotropic) & (theta[par][0] is None):
+                    theta_hom.append( iso_dist(nsamp, imin=theta[par][3], imax=theta[par][4]) )
+                else:
+                    theta_hom.append( theta[par][0] )
+            else:
+                theta_hom.append( value_to_dist(theta[par][0], nsamp=nsamp, unit=theta[par][1]) )
 
     if scalar:
         theta_hom.append( 1 )
@@ -772,7 +811,19 @@ def dist(_F_pk, nsamp=None, dip=False,
     empirical=True, in which case the estimate of Kuulkers et al. 2003 (A&A 399, 663) is used
     The default isotropic=False option also takes into account the likely effect of
     anisotropic burst emission, based on the models provided by concord
-
+    Usage:
+    cd.dist((30., 3.), isotropic=True, empirical=True)
+    Out[3]: <Quantity [10.27267949,  0.50629732,  0.59722829] kpc>
+    cd.dist((30., 2., 5.), isotropic=False, empirical=True)
+    Out[3]: <Quantity [10.75035916,  1.39721634,  1.461003  ] kpc>
+    cd.dist((30., 3.), isotropic=False, empirical=True, fulldist=True, nsamp=100)
+    Out[7]:
+    {'dist': <QuantityDistribution [11.12852694, 11.4435149 ,  9.79809775,  9.82146105,  9.34573615,
+            10.4330567 , 10.99421133, 10.66816313,  8.83667458, 12.83249538,
+            14.15062276, 13.26883293,  9.80702496,  8.72915705, 12.04546987,
+                .
+                .
+                .
     :param _F_pk: peak burst flux
     :param nsamp: number of samples required for the distributions
     :param dip: set to True if the source is a "dipper"
@@ -795,14 +846,15 @@ def dist(_F_pk, nsamp=None, dip=False,
 
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
-    F_pk, _nsamp = homogenize_params( {'fpeak': (_F_pk, MINBAR_FLUX_UNIT)}, nsamp)
+    F_pk, _inclination, _nsamp = homogenize_params( {'fpeak': (_F_pk, MINBAR_FLUX_UNIT),
+                                                      'incl': (inclination, u.deg, isotropic, imin, imax)}, nsamp)
 
     # if no sample size has been passed, but we still need to generate samples
     # to account for the emission anisotropy, determine the array size here
-    if (nsamp is None) | (not isotropic):
-        nsamp = NSAMP_DEF
-        if (_nsamp > 3):
-            nsamp = _nsamp
+    # if (nsamp is None) | (not isotropic):
+    #     nsamp = NSAMP_DEF
+    #     if (_nsamp > 3):
+    #         nsamp = _nsamp
 
     if isotropic:
         xi_b, xi_p = 1., 1.
@@ -810,15 +862,15 @@ def dist(_F_pk, nsamp=None, dip=False,
         if dip == True:
             logger.warning('isotropic distribution not correct for dipping sources')
     else:
-        # set up the inclination array. If it's not been passed to the function,
+        # set up the nclination array. If it's not been passed to the function,
         # and we're not calculating the isotropic value, you need to generate a
         # distribution. If the peak flux is already a distribution you need to match
         # it's size, but if it's a single value you can just use the default sample
         # size
-        if (len_dist(inclination) <= 1):
-            inclination = iso_dist(nsamp, imin=imin, imax=imax)
+        # if (len_dist(inclination) <= 1):
+        #     inclination = iso_dist(nsamp, imin=imin, imax=imax)
 
-        xi_b, xi_p = anisotropy(inclination, model=model)
+        xi_b, xi_p = anisotropy(_inclination, model=model)
 
     # Choose the Eddington flux value to compare the distance against
 
@@ -827,7 +879,7 @@ def dist(_F_pk, nsamp=None, dip=False,
         # Kuulkers et al. 2003, A&A 399, 663
         # L_Edd = 3.79e38 * u.erg / u.s
         # L_Edd_err = 0.15e38 * u.erg / u.s
-        L_Edd = unc.normal(3.79e38 * u.erg / u.s, std=0.15e38 * u.erg / u.s, n_samples=nsamp)
+        L_Edd = unc.normal(3.79e38 * u.erg / u.s, std=0.15e38 * u.erg / u.s, n_samples=_nsamp)
     else:
 
         # Galloway et al. 2008, ApJS 179, 360
@@ -860,11 +912,11 @@ def dist(_F_pk, nsamp=None, dip=False,
     if fulldist:
 
         # Return a dictionary with all the parameters you'll need
-        return {'dist': dist, 'peak_flux': F_pk, 'i': inclination, 'xi_b': xi_b, 'model': model}
+        return {'dist': dist, 'peak_flux': F_pk, 'i': _inclination, 'xi_b': xi_b, 'model': model}
     else:
 
-        # Return the median value and the lower and upper bounds
-        return pc
+        # Return the median value and the lower and upper errors
+        return intvl_to_errors(pc)
         # return (pc[0], pc[0]-pc[1], pc[2]-pc[0])
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
@@ -1024,7 +1076,7 @@ def mdot(_F_per, _dist, c_bol=1.0, M=None, R=None, opz=None,
 
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
-    F_per, dist, _c_bol, nsamp = homogenize_params( {'F_per': (_F_per, flux_unit),
+    F_per, dist, _c_bol, nsamp = homogenize_params( {'fper': (_F_per, flux_unit),
                                                       'dist': (_dist, u.kpc),
                                                       'c_bol': (c_bol, None)}, nsamp )
 #    dist = _dist
@@ -1129,7 +1181,7 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
 
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
-    E_b, _dist, _nsamp = homogenize_params( {'fluence': (_E_b, MINBAR_FLUEN_UNIT),
+    E_b, _dist, _nsamp = homogenize_params( {'fluen': (_E_b, MINBAR_FLUEN_UNIT),
                                            'dist': (dist, u.kpc)} )
 
     # if no sample size has been passed, but we still need to generate samples
