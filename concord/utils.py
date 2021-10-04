@@ -93,9 +93,9 @@ def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, verbose=False):
     :return: astropy distribution object
 
     Example usage:
-    y = cd.value_to_dist(3.) # generate a "distribution" with 1000 repeats of a single value
+    y = cd.value_to_dist(3.) # scalars are kept as single values
     z = cd.value_to_dist((3.,0.1),nsamp=10) # generate 10 samples from a normal distribution around 3.0 with st. dev 0.1
-    a = cd.value_to_dist((3.,0.5,0.1),nsamp=100) # generate 100 samples from an asymmetric Gaussian
+    a = cd.value_to_dist((3.,0.5,0.1)) # generate default number of samples from an asymmetric Gaussian
     b = cd.value_to_dist(a.distribution) # convert an array to a distribution
 
     with units:
@@ -104,8 +104,9 @@ def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, verbose=False):
 
     # Check here if it's already a distribution; don't want to run this twice
 
-    if hasattr(_num, 'distribution') & verbose:
-        logger.warning('this quantity is already a distribution')
+    if hasattr(_num, 'distribution'):
+        if verbose:
+            logger.warning('this quantity is already a distribution')
         return _num
 
     # Want to permit all these combinations:
@@ -187,9 +188,11 @@ def homogenize_params(theta, nsamp=None):
 
     isotropic = True
     if 'incl' in theta.keys():
-        if len(theta['incl'] < 5):
+        if len(theta['incl']) < 5:
             logger.error('with the inclination you must pass the isotropy flag and limits')
-            return
+            # return a tuple of None's here, otherwise we get a confusing "cannot unpack non-iterable
+            # NoneType object" error in addition to the logger error
+            return (None,)*(len(theta)+1)
         isotropic = theta['incl'][2]
 
     # first loop we have to get the number of samples
@@ -207,8 +210,10 @@ def homogenize_params(theta, nsamp=None):
             mismatch = (l[-1] != _nsamp) | mismatch
 
     if mismatch:
-        logger.error("mismatch in distribution size")
-        return
+        logger.error("mismatch in distribution sizes")
+        # return a tuple of None's here, otherwise we get a confusing "cannot unpack non-iterable
+        # NoneType object" error in addition to the logger error
+        return (None,)*(len(theta)+1)
 
     # Set the size for the distributions
     # If any of the inputs are distributions (or we have the isotropy flag unset) we *must*
@@ -230,7 +235,7 @@ def homogenize_params(theta, nsamp=None):
     for par in theta.keys():
 
         if scalar:
-            if (not hasattr(theta[par][0], 'unit')) & (theta[par][1] is not None):
+            if (not hasattr(theta[par][0], 'unit')) & (theta[par][0] is not None) & (theta[par][1] is not None):
                 theta_hom.append( theta[par][0] * theta[par][1] )
             else:
                 theta_hom.append( theta[par][0] )
@@ -381,7 +386,6 @@ def check_M_R_opz(M, R, opz):
 
     return True
 
-
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 def calc_mr(g,opz):
@@ -468,7 +472,7 @@ def tdel_dist(nburst, exp, nsamp=NSAMP_DEF):
     :param nburst: number of events detected
     :param exp: total exposure time
     :param nsamp: number of samples to generate
-    :return:
+    :return: distribution giving the PDF of the average recurrence time
     """
 
     if exp.decompose().unit != u.s:
@@ -488,7 +492,7 @@ def tdel_dist(nburst, exp, nsamp=NSAMP_DEF):
     x = np.random.random(nsamp)
     y = [mu[np.argmin(abs(prob - _x))] for _x in x]
 
-    return exp / y
+    return unc.Distribution( exp / y )
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -533,6 +537,9 @@ def X_0(xbar, zcno, tdel, opz=OPZ, debug=False, old_relation=False):
     given the average H-fraction at ignition, xbar, the CNO metallicity zcno,
     and the burst recurrence time, tdel
     '''
+
+    if max([len_dist(xbar), len_dist(zcno), len_dist(tdel), len_dist(opz)]) > 1:
+        logger.error('scalar arguments only')
 
     tpref = TPREF_CNO
 
@@ -581,7 +588,7 @@ def X_0(xbar, zcno, tdel, opz=OPZ, debug=False, old_relation=False):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def alpha(_tdel, _fluen, _fper, _c_bol=None, nsamp=NSAMP_DEF):
+def alpha(_tdel, _fluen, _fper, _c_bol=None, nsamp=NSAMP_DEF, conf=CONF, fulldist=False):
     """
     Routine to calculate alpha from the input measurables, propagating the errors
     via MC distributions and applying the units appropriately
@@ -602,12 +609,35 @@ def alpha(_tdel, _fluen, _fper, _c_bol=None, nsamp=NSAMP_DEF):
 
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
-    tdel, fluen, fper, c_bol, nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
+    tdel, fluen, fper, c_bol, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
                                                            'fluen': (_fluen, MINBAR_FLUEN_UNIT),
                                                            'fper': (_fper, MINBAR_FLUX_UNIT),
-                                                           'c_bol': (_c_bol, None)} )
+                                                           'c_bol': (_c_bol, None)}, nsamp )
 
-    return (fper * _c_bol * tdel / fluen).decompose()
+    _alpha = (fper * c_bol * tdel / fluen).decompose()
+    if fulldist:
+        return {'alpha': _alpha, 'tdel': tdel, 'fluen': fluen, 'fper': fper, 'c_bol': c_bol}
+
+    ac = np.percentile(_alpha.distribution, [50, 50 - conf / 2, 50 + conf / 2])
+
+    return intvl_to_errors(ac)
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+def _i(obj, ind):
+    """
+    Utility function to permit slicing of arbitrary objects, including scalars
+    (in which case the scalar is returned). For use with hfrac
+    :param obj: array or scalar
+    :param ind: index of value to return
+    :return: slice of array or the scalar
+    """
+
+    if hasattr(obj,'distribution'):
+        return obj.distribution[ind]
+    try:
+        return obj[ind]
+    except:
+        return obj
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -690,12 +720,21 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
             alpha_dist = _alpha
     else:
         if _alpha is None:
-            tdel, _fper, _fluen, _c_bol, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
-                                                                      'fper': (fper, MINBAR_FLUX_UNIT),
-                                                                      'fluen': (fluen, MINBAR_FLUEN_UNIT),
-                                                                      'c_bol': (c_bol)}, nsamp)
-            alpha_dist = alpha(tdel, _fluen, _fper, _c_bol, nsamp=_nsamp)
+            # If you've not passed alpha, then we need to calculate it here, and copy all
+            # the other parameters to make sure we save them for the output dict
+            # The check for consistent array (distribution) sizes is done by alpha (but
+            # excludes the inclination)
+
+            _alpha = alpha(_tdel, fluen, fper, c_bol, nsamp=nsamp, fulldist=True)
+            alpha_dist = _alpha['alpha']
+            tdel = _alpha['tdel']
+            _fper = _alpha['fper']
+            _fluen = _alpha['fluen']
+            _nsamp = len_dist(alpha_dist)
         else:
+            # On the other hand if you pass alpha, we just need to make sure the arrays
+            # (distributions) have consistent sizes
+
             tdel, alpha_dist, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
                                                            'alpha': (_alpha, None)}, nsamp)
             _fper, _fluen = fper, fluen
@@ -751,27 +790,27 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
         # Original version of this had tdel, alpha as distributions, but all the other
         # parameters not. This makes it a bit hard to mix single values and distributions,
         # not least because you can't index floats (or single element quantities)
+        # Now we work around this using the _i utility function, which returns a slice
+        # of an array OR a scalar
         xbar = np.zeros(nsamp)
         x_0 = np.zeros(nsamp)
         for j, i in enumerate(inclination.distribution):
-            if len_dist(zcno) == 1:
-                _zcno = zcno
-            else:
-                _zcno = zcno[j]
-            xbar[j], x_0[j], dummy = hfrac(tdel.distribution[j],
-                alpha_dist.distribution[j], opz=opz, zcno=_zcno,
+
+            # print ('{}/{}: tdel={}, alpha={}, opz={}, zcon={}\n'.format(
+            #     j, len_dist(inclination),_i(tdel,j), _i(alpha_dist,j), _i(opz, j), _i(zcno, j)))
+            xbar[j], x_0[j], dummy = hfrac( _i(tdel,j), _i(alpha_dist,j), _i(opz, j), _i(zcno, j),
                 isotropic=isotropic, old_relation=old_relation, inclination=i,
                 debug=debug)
 
         if fulldist:
             return {'xbar': unc.Distribution(xbar), 'X_0': unc.Distribution(x_0), 'i': inclination,
                     'alpha': alpha_dist, 'fluen': _fluen, 'fper': _fper, 'model': model}
-        else:
-            cval = [50, 50 - conf / 2, 50 + conf / 2]
-            return { 'xbar': intvl_to_errors(np.percentile(xbar, cval)),
-                     'X_0': intvl_to_errors(np.percentile(x_0[x_0 >= 0.], cval)),
-                     'i': intvl_to_errors(np.pdf_percentiles(inclination[x_0 >= 0.], cval)),
-                     'alpha': alpha_dist, 'fluen': _fluen, 'fper': _fper, 'model': model}
+
+        cval = [50, 50 - conf / 2, 50 + conf / 2]
+        return { 'xbar': intvl_to_errors(np.percentile(xbar, cval)),
+                 'X_0': intvl_to_errors(np.percentile(x_0[x_0 >= 0.], cval)),
+                 'i': intvl_to_errors(np.percentile(inclination[x_0 >= 0.], cval)),
+                 'alpha': alpha_dist, 'fluen': _fluen, 'fper': _fper, 'model': model}
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -966,15 +1005,16 @@ def luminosity(_F_X, dist=None, nsamp=None, burst=True, dip=False,
 
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
-    F_X, _dist, _nsamp = homogenize_params( {'flux': (_F_X, MINBAR_FLUX_UNIT),
-                                            'dist': (dist, u.kpc)}, nsamp=nsamp )
+    F_X, _dist, _inclination, _nsamp = homogenize_params( {'flux': (_F_X, MINBAR_FLUX_UNIT),
+                                            'dist': (dist, u.kpc),
+                                            'incl': (inclination, u.deg, isotropic, imin, imax)}, nsamp)
 
     # if no sample size has been passed, but we still need to generate samples
     # to account for the emission anisotropy, determine the array size here
-    if (nsamp is None) | (not isotropic):
-        nsamp = NSAMP_DEF
-        if (_nsamp > 3):
-            nsamp = _nsamp,
+    # if (nsamp is None) | (not isotropic):
+    #     nsamp = NSAMP_DEF
+    #     if (_nsamp > 3):
+    #         nsamp = _nsamp,
 
     # set the nominal distance for the plot labels, dist0
     if hasattr(dist, 'distribution'):
@@ -993,10 +1033,10 @@ def luminosity(_F_X, dist=None, nsamp=None, burst=True, dip=False,
         if dip == True:
             logger.warning('isotropic distribution not correct for dipping sources')
     else:
-        if (len_dist(inclination) <= 1):
-            inclination = iso_dist(nsamp, imin=imin, imax=imax)
+        # if (len_dist(inclination) <= 1):
+        #     inclination = iso_dist(nsamp, imin=imin, imax=imax)
 
-        xi_b, xi_p = anisotropy(inclination, model=model)
+        xi_b, xi_p = anisotropy(_inclination, model=model)
         label = 'Luminosity @ {:.2f} (erg/s)'.format(dist0)
 
         if not burst:
@@ -1029,7 +1069,7 @@ def luminosity(_F_X, dist=None, nsamp=None, burst=True, dip=False,
     if fulldist:
 
         # Return a dictionary with all the parameters you'll need
-        return {'lum': lum, 'flux': F_X, 'dist': _dist, 'i': inclination, 'xi': xi_b, 'model': model}#, 'conf': conf}
+        return {'lum': lum, 'flux': F_X, 'dist': _dist, 'i': _inclination, 'xi': xi_b, 'model': model}#, 'conf': conf}
 
     else:
 
@@ -1076,9 +1116,11 @@ def mdot(_F_per, _dist, c_bol=1.0, M=None, R=None, opz=None,
 
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
-    F_per, dist, _c_bol, nsamp = homogenize_params( {'fper': (_F_per, flux_unit),
+    F_per, dist, _c_bol, _inclination, nsamp = homogenize_params( {'fper': (_F_per, flux_unit),
                                                       'dist': (_dist, u.kpc),
-                                                      'c_bol': (c_bol, None)}, nsamp )
+                                                      'c_bol': (c_bol, None),
+                                                      'incl': (inclination, u.deg, isotropic, imin, imax)},
+                                                      nsamp )
 #    dist = _dist
 #    if not hasattr(dist, 'unit'):
 #        print('** WARNING ** assuming units of {} for distance'.format(u.kpc))
@@ -1099,8 +1141,8 @@ def mdot(_F_per, _dist, c_bol=1.0, M=None, R=None, opz=None,
 #        _c_bol = value_to_dist(c_bol, nsamp=nsamp)
 #        # mdot_unit = u.g / u.cm ** 2 / u.s
 
-    if (nsamp > 1) and (not isotropic) and (len_dist(inclination) <= 1):
-        inclination = iso_dist(nsamp, imin=imin, imax=imax)
+    # if (nsamp > 1) and (not isotropic) and (len_dist(inclination) <= 1):
+    #     inclination = iso_dist(nsamp, imin=imin, imax=imax)
 
     if isotropic:
         xi_b, xi_p = 1., 1.
@@ -1108,7 +1150,7 @@ def mdot(_F_per, _dist, c_bol=1.0, M=None, R=None, opz=None,
         if dip == True:
             logger.warning('isotropic distribution not correct for dipping sources')
     else:
-        xi_b, xi_p = anisotropy(inclination, model=model)
+        xi_b, xi_p = anisotropy(_inclination, model=model)
 
     # scale factors for opz and R are kept at the old values, even though the
     # best current estimates for these quantities have changed
@@ -1123,7 +1165,7 @@ def mdot(_F_per, _dist, c_bol=1.0, M=None, R=None, opz=None,
     # but now with full unit support, we just calculate in a more straightforward way
 
     Q_grav = const.G*M/R
-    mdot = (F_per * _c_bol * dist**2 * opz * xi_p / (R**2 * Q_grav) ).to(mdot_unit)
+    mdot = (F_per * _c_bol * dist * dist * opz * xi_p / (R**2 * Q_grav) ).to(mdot_unit)
 
     if isotropic or (nsamp == 1):
 
@@ -1135,13 +1177,13 @@ def mdot(_F_per, _dist, c_bol=1.0, M=None, R=None, opz=None,
 
             # Return a dictionary with all the parameters you'll need
 
-            return {'mdot': mdot, 'dist': dist, 'i': inclination, 'xi_p': xi_p, 'model': model}
+            return {'mdot': mdot, 'dist': dist, 'i': _inclination, 'xi_p': xi_p, 'model': model}
         else:
 
             # Return the median value and the (asymmetric) lower and upper errors
 
             mc = mdot.pdf_percentiles([50, 50-conf/2, 50+conf/2])
-            return mc
+            return intvl_to_errors(mc)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -1181,15 +1223,16 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
 
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
-    E_b, _dist, _nsamp = homogenize_params( {'fluen': (_E_b, MINBAR_FLUEN_UNIT),
-                                           'dist': (dist, u.kpc)} )
+    E_b, _dist, _inclination, _nsamp = homogenize_params( {'fluen': (_E_b, MINBAR_FLUEN_UNIT),
+                                             'dist': (dist, u.kpc),
+                                             'incl': (inclination, u.deg, isotropic, imin, imax)}, nsamp)
 
     # if no sample size has been passed, but we still need to generate samples
     # to account for the emission anisotropy, determine the array size here
-    if (nsamp is None) | (not isotropic):
-        nsamp = NSAMP_DEF
-        if (_nsamp > 3):
-            nsamp = _nsamp
+    # if (nsamp is None) | (not isotropic):
+    #     nsamp = NSAMP_DEF
+    #     if (_nsamp > 3):
+    #         nsamp = _nsamp
 
 #    if hasattr(_E_b, 'unit'):
 #        fluen_unit = _E_b.unit
@@ -1219,10 +1262,10 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
         if dip == True:
             logger.warning('isotropic distribution not correct for dipping sources')
     else:
-        if (len_dist(inclination) <= 1):
-            inclination = iso_dist(nsamp, imin=imin, imax=imax)
+        # if (len_dist(inclination) <= 1):
+        #     inclination = iso_dist(nsamp, imin=imin, imax=imax)
 
-        xi_b, xi_p = anisotropy(inclination, model=model)
+        xi_b, xi_p = anisotropy(_inclination, model=model)
 
     # old version with the prefactor, which can be calculated as
     # yign(1.,10.,R=10*u.km,opz=1.31, isotropic=True, Xbar=0.52)
@@ -1247,12 +1290,12 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
 
         # Return a dictionary with all the parameters you'll need
 
-        return {'yign': yign, 'fluen': E_b, 'dist': dist, 'i': inclination, 'xi_b': xi_b, 'model': model}
+        return {'yign': yign, 'fluen': E_b, 'dist': dist, 'i': _inclination, 'xi_b': xi_b, 'model': model}
     else:
 
         # Return the median value and the (asymmetric) lower and upper errors
 
-        return yc
+        return intvl_to_errors(yc)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
