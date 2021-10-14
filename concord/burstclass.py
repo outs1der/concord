@@ -23,11 +23,6 @@
 # def lhoodClass(params, obs, model, weights, disc_model):
 # def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 # def plot_contours(sampler,parameters,ignore,plot_size):
-#
-# As well as standard modules, you'll need to install the following:
-#
-# linfit https://github.com/djpine/linfit.git
-#          (the version available via pip is different, and doesn't work)
 
 import os
 from .utils import *
@@ -37,7 +32,6 @@ from astropy.table import Table
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from scipy.interpolate import interp1d
-from linfit import linfit
 from astroquery.vizier import Vizier
 from chainconsumer import ChainConsumer
 from datetime import datetime
@@ -500,16 +494,22 @@ class Lightcurve(object):
 				# ...or, if all the tail points are excluded,
 				#   just take the last three
 
-# Now actually do the fitting (to the log of the flux)
+        # Now actually do the fitting (to the log of the flux)
+        # Originally we used linfit, but this is a bit obscure; subsequently
+        # replaced with np.polyfit (see
+        # https://numpy.org/doc/stable/reference/generated/numpy.polyfit.html)
 
-        result, cvm, fit_info = linfit(
+        # result, cvm, fit_info = linfit(
+        #     self.time[sel]-self.time[sel[0]]+self.dt_nogap[sel]/2.,
+        #     np.log(y[sel].value),
+        #     sigmay=0.5*(np.log((y[sel]+yerr[sel]).value)
+        #                 -np.log((y[sel]-yerr[sel]).value)),
+        #     return_all=True)
+        result = np.polyfit(
           self.time[sel]-self.time[sel[0]]+self.dt_nogap[sel]/2.,
-          np.log(y[sel].value),
-          sigmay=0.5*(np.log((y[sel]+yerr[sel]).value)
-                     -np.log((y[sel]-yerr[sel]).value)),
-          return_all=True)
-
-        # print (fit_info)
+          np.log(y[sel].value), 1,
+          w=1./(0.5*(np.log((y[sel]+yerr[sel]).value)
+                     -np.log((y[sel]-yerr[sel]).value))))
 
 # Result is a 2-element array, slope and intercept (opposite order to IDL)
 
