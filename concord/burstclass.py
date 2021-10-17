@@ -53,31 +53,39 @@ MODEL_COLOUR = 'g'
 
 def fper(mburst, param, c_bol=1.0):
     '''
-    Calculates the persistent flux, based on the inferred mdot, redshift
+    Calculates the persistent flux, based on the supplied mdot, redshift
     etc. Earlier we passed the individual parameters, but easiest to just provide
     the model burst
     '''
 
     dist, inclination, _opz, t_off = param
-    xi_b, xi_p = dm.anisotropy(inclination)
 
-    # The combination of an input redshift an model gravity uniquely define
-    # a mass-radius combination (as for modelFunc)
+    if hasattr(mburst, 'g') & hasattr(mburst, 'R_Newt'):
 
-    _M, _R = calc_mr(mburst.g, _opz)
+        # The combination of an input redshift an model gravity uniquely define
+        # a mass-radius combination (as for modelFunc)
 
-    # Here we calculate the value of xi (ratio of GR to Newtonian radii),
-    # appropriate for the adopted value of (1+z). This is used instead of the
-    # value attached to the model, because that's for a different redshift
+        _M, _R = calc_mr(mburst.g, _opz)
 
-    # xi = sqrt(_opz)
-    xi = (_R / mburst.R_Newt).decompose()
-    # print (xi)
+        # Here we calculate the value of xi (ratio of GR to Newtonian radii),
+        # appropriate for the adopted value of (1+z). This is used instead of the
+        # value attached to the model, because that's for a different redshift
+
+        # xi = sqrt(_opz)
+        xi = (_R / mburst.R_Newt).decompose()
+        # print (xi)
+        _mdot = mburst.mdot
+    else:
+        # if we're not passing a ModelBurst, we assume the input is an mdot
+        # value (in g/s or equivalent, for consistency with the ModelBurst attribute),
+        # and calculate with the additional parameters
+        xi = sqrt(_opz)
+        _mdot = mburst
 
     # The mdot measured by the distant observer now depends upon the assumed
     # redshift; see Keek & Heger (2011) eq. B16
 
-    mdot_infty = xi**2 * mburst.mdot / _opz
+    mdot_infty = xi**2 * _mdot / _opz
 
     # Next we calculate Q_grav, to calculate the inferred persistent flux that
     # we should see (based on the accretion rate); that is not given in Lampe
@@ -88,10 +96,13 @@ def fper(mburst, param, c_bol=1.0):
 #        Q_grav = const.G*M_NS/mburst.R_NS # approximate
     Q_grav = const.c**2*(_opz-1)/_opz
 
+    # Could split this bit off into a separate flux function, which would do the
+    # anisotropy and distance factors
+
     # persistent flux (see Keek & Heger 2011, eq. B20, noting that our mdot is averaged
     # over the neutron star surface):
 
-    return ( mdot_infty*Q_grav/ (4.*pi*_opz*dist**2*xi_p*c_bol) ).to(u.erg/u.cm**2/u.s)
+    return lum_to_flux( mdot_infty*Q_grav/_opz, dist, c_bol, inclination=inclination ).to(u.erg/u.cm**2/u.s)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -327,7 +338,7 @@ class Lightcurve(object):
 
         if luminosity:
             plt.plot(np.array([min(self.time.value),max(self.time.value)]),
-                     np.full(2,self.L_Edd),'--', **kwargs)
+                     np.ones(2)*self.L_Edd,'--', **kwargs)
         plt.xlabel("Time ({0.unit:latex_inline})".format(self.time))
         plt.ylabel(ylabel)
 
@@ -1135,7 +1146,7 @@ class KeplerBurst(Lightcurve):
 #            self.R_NS = self.R_Newt*self.xi
             self.R_NS = solve_radius(self.M_NS,self.R_Newt)
 #            self.opz = 1./sqrt(1.-2.*const.G*self.M_NS/(const.c**2*self.R_NS))
-            self.opz = opz(self.M_NS,self.R_NS)
+            self.opz = redshift(self.M_NS,self.R_NS)
         
             # Set all the remaining attributes, with a few exceptions:
             # exclude the tDel, to avoid confusion with tdel (set earlier)
@@ -1196,7 +1207,7 @@ class KeplerBurst(Lightcurve):
 # already-set value
 
         if hasattr(self,'R_NS'):
-            _opz = opz(self.M_NS,self.R_NS)
+            _opz = redshift(self.M_NS,self.R_NS)
             if hasattr(self,'opz'):
 #                assert abs(_opz-self.opz)/_opz < eta, "Inconsistent value of opz, {} != {}".format(_opz,self.opz)
                 if abs(_opz-self.opz)/_opz >= eta:
@@ -1213,6 +1224,11 @@ class KeplerBurst(Lightcurve):
                 print ("Inconsistent value of xi, {:.4f} != {:.4f}".format(_xi,self.xi))
         else:
             self.xi = _xi
+
+# Compare method requires R_Newt, so calculate it here if it's not already present
+
+        if (not hasattr(self,'R_Newt')):
+            self.R_Newt = self.R_NS/self.xi
 
 # Specifically, for the compare method, we need to know two of g, M_NS,
 # R_Newt, R_NS

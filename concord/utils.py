@@ -181,7 +181,7 @@ def homogenize_params(theta, nsamp=None):
     # you don't have to use these, but down the track we might do different things
     # based on the parameter type (e.g. for incl)
 
-    params = ['tdel','fluen','fper','c_bol','alpha','fpeak','flux','dist','incl']
+    params = ['tdel','fluen','fper','c_bol','alpha','fpeak','flux','lum','dist','incl']
 
     # this bit will allow us to replace the inclination treatement in the individual
     # functions
@@ -232,9 +232,11 @@ def homogenize_params(theta, nsamp=None):
 
     # Now assemble the output tuple
     theta_hom = []
-    for par in theta.keys():
+    for i, par in enumerate(theta.keys()):
 
-        if scalar:
+        # if scalar:
+        if l[i] == 1:
+            # copy scalars through to the output array, with a unit if not already present
             if (not hasattr(theta[par][0], 'unit')) & (theta[par][0] is not None) & (theta[par][1] is not None):
                 theta_hom.append( theta[par][0] * theta[par][1] )
             else:
@@ -246,6 +248,10 @@ def homogenize_params(theta, nsamp=None):
                     theta_hom.append( iso_dist(nsamp, imin=theta[par][3], imax=theta[par][4]) )
                 else:
                     theta_hom.append( theta[par][0] )
+            elif (par == 'c_bol') & (l[i] == 0):
+                # special here for no supplied bolometric correction
+                logger.warning('no bolometric correction applied')
+                theta_hom.append( 1.0 )
             else:
                 theta_hom.append( value_to_dist(theta[par][0], nsamp=nsamp, unit=theta[par][1]) )
 
@@ -588,7 +594,7 @@ def X_0(xbar, zcno, tdel, opz=OPZ, debug=False, old_relation=False):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def alpha(_tdel, _fluen, _fper, _c_bol=None, nsamp=NSAMP_DEF, conf=CONF, fulldist=False):
+def alpha(_tdel, _fluen, _fper, c_bol=None, nsamp=NSAMP_DEF, conf=CONF, fulldist=False):
     """
     Routine to calculate alpha from the input measurables, propagating the errors
     via MC distributions and applying the units appropriately
@@ -603,20 +609,16 @@ def alpha(_tdel, _fluen, _fper, _c_bol=None, nsamp=NSAMP_DEF, conf=CONF, fulldis
     alpha = cd.alpha((2.681, 0.007), (0.381, 0.003), (3.72, 0.18), (1.45, 0.09))
     """
 
-    if _c_bol is None:
-        logger.warning('no bolometric correction applied to persistent flux')
-        _c_bol = 1.0
-
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
-    tdel, fluen, fper, c_bol, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
-                                                           'fluen': (_fluen, MINBAR_FLUEN_UNIT),
-                                                           'fper': (_fper, MINBAR_FLUX_UNIT),
-                                                           'c_bol': (_c_bol, None)}, nsamp )
+    tdel, fluen, fper, _c_bol, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
+                                                            'fluen': (_fluen, MINBAR_FLUEN_UNIT),
+                                                            'fper': (_fper, MINBAR_FLUX_UNIT),
+                                                            'c_bol': (c_bol, None)}, nsamp )
 
-    _alpha = (fper * c_bol * tdel / fluen).decompose()
+    _alpha = (fper * _c_bol * tdel / fluen).decompose()
     if fulldist:
-        return {'alpha': _alpha, 'tdel': tdel, 'fluen': fluen, 'fper': fper, 'c_bol': c_bol}
+        return {'alpha': _alpha, 'tdel': tdel, 'fluen': fluen, 'fper': fper, 'c_bol': _c_bol}
 
     ac = np.percentile(_alpha.distribution, [50, 50 - conf / 2, 50 + conf / 2])
 
@@ -960,7 +962,7 @@ def dist(_F_pk, nsamp=None, dip=False,
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def luminosity(_F_X, dist=None, nsamp=None, burst=True, dip=False,
+def luminosity(_F_X, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
                isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP,
                model='he16_a', conf=CONF, fulldist=False, plot=False):
     """
@@ -1005,9 +1007,10 @@ def luminosity(_F_X, dist=None, nsamp=None, burst=True, dip=False,
 
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
-    F_X, _dist, _inclination, _nsamp = homogenize_params( {'flux': (_F_X, MINBAR_FLUX_UNIT),
-                                            'dist': (dist, u.kpc),
-                                            'incl': (inclination, u.deg, isotropic, imin, imax)}, nsamp)
+    F_X, _dist, _inclination, _c_bol, _nsamp = homogenize_params( {'flux': (_F_X, MINBAR_FLUX_UNIT),
+                                                                   'dist': (dist, u.kpc),
+                                                                   'incl': (inclination, u.deg, isotropic, imin, imax),
+                                                                   'c_bol': (c_bol, None)}, nsamp)
 
     # if no sample size has been passed, but we still need to generate samples
     # to account for the emission anisotropy, determine the array size here
@@ -1041,10 +1044,10 @@ def luminosity(_F_X, dist=None, nsamp=None, burst=True, dip=False,
 
         if not burst:
             # If you're calculating the persistent flux/luminosity, better use the right \xi
-            logger.info('adopting anisotropy model {} for burst emission'.format(model))
+            logger.info('adopting anisotropy model {} for persistent emission'.format(model))
             xi_b = xi_p
 
-    lum = (4 * np.pi * F_X * _dist ** 2 * xi_b).to('erg s-1')
+    lum = (4 * np.pi * F_X * _c_bol * _dist ** 2 * xi_b).to('erg s-1')
 
     if len_dist(lum) == 1:
 
@@ -1069,7 +1072,7 @@ def luminosity(_F_X, dist=None, nsamp=None, burst=True, dip=False,
     if fulldist:
 
         # Return a dictionary with all the parameters you'll need
-        return {'lum': lum, 'flux': F_X, 'dist': _dist, 'i': _inclination, 'xi': xi_b, 'model': model}#, 'conf': conf}
+        return {'lum': lum, 'flux': F_X, 'c_bol': _c_bol, 'dist': _dist, 'i': _inclination, 'xi': xi_b, 'model': model}#, 'conf': conf}
 
     else:
 
@@ -1080,7 +1083,7 @@ def luminosity(_F_X, dist=None, nsamp=None, burst=True, dip=False,
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def mdot(_F_per, _dist, c_bol=1.0, M=None, R=None, opz=None,
+def mdot(_F_per, _dist, c_bol=None, M=None, R=None, opz=None,
          isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP, dip=False,
          model='he16_a', nsamp=None, conf=CONF, fulldist=False):
     '''
@@ -1177,7 +1180,7 @@ def mdot(_F_per, _dist, c_bol=1.0, M=None, R=None, opz=None,
 
             # Return a dictionary with all the parameters you'll need
 
-            return {'mdot': mdot, 'dist': dist, 'i': _inclination, 'xi_p': xi_p, 'model': model}
+            return {'mdot': mdot, 'flux': F_per, 'c_bol': _c_bol, 'dist': dist, 'i': _inclination, 'xi_p': xi_p, 'model': model}
         else:
 
             # Return the median value and the (asymmetric) lower and upper errors
@@ -1317,3 +1320,69 @@ def L_Edd(F_pk, dist=8 * u.kpc, nsamp=NSAMP_DEF,
     return luminosity(F_pk, dist, nsamp, isotropic, burst=True,
                    imin=imin, imax=imax, model='he16_a', conf=conf, fulldist=fulldist)
 
+
+def lum_to_flux(_lum, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
+                   isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP,
+                   model='he16_a', conf=CONF, fulldist=False, plot=False):
+    """
+    This routine converts luminosity to flux, based on the provided distance
+    Basically the inverse of the luminosity function
+    :param lum:
+    :param dist:
+    :param c_bol:
+    :param isotropic:
+    :param burst:
+    :param imin:
+    :param imax:
+    :param model:
+    :param conf:
+    :param fulldist:
+    :return:
+    """
+
+    # if a distance is not supplied, use a reasonable value, but flag it
+    if dist is None:
+        dist = 8.0*u.kpc
+        logger.warning('assuming distance of {:3.1f}'.format(dist))
+
+    # generate distributions where required, with correct units, and make sure
+    # the lengths are consistent
+    lum, _dist, _inclination, _c_bol, _nsamp = homogenize_params( {'lum': (_lum, u.erg/u.s),
+                                                           'dist': (dist, u.kpc),
+                                                           'incl': (inclination, u.deg, isotropic, imin, imax),
+                                                           'c_bol': (c_bol, None)}, nsamp)
+
+    if isotropic:
+        xi_b, xi_p = 1., 1.
+        # print ('take into account the disk effect')
+        if dip == True:
+            logger.warning('isotropic distribution not correct for dipping sources')
+    else:
+        xi_b, xi_p = anisotropy(_inclination, model=model)
+
+        if not burst:
+            # If you're calculating the persistent flux/luminosity, better use the right \xi
+            logger.info('adopting anisotropy model {} for persistent emission'.format(model))
+            xi_b = xi_p
+
+    flux = (lum/(4 * np.pi * _dist ** 2 * xi_b * _c_bol)).to('erg cm-2 s-1')
+
+    if len_dist(flux) == 1:
+
+        # Just return the value; we only keep F_X as scalar if there's no
+        # uncertainty provided
+        return flux
+
+    fc = flux.pdf_percentiles([50, 50 - conf / 2, 50 + conf / 2])
+
+    if fulldist:
+
+        # Return a dictionary with all the parameters you'll need
+        return {'flux': flux, 'lum': _lum, 'c_bol': _c_bol, 'dist': _dist, 'i': _inclination, 'xi': xi_b, 'model': model}#, 'conf': conf}
+
+    else:
+
+        # Return the median value and the (asymmetric) lower and upper errors
+
+        # return np.median(lum), np.percentile(lum, (50-conf/2, 50+conf/2)) * (u.erg/u.s) - np.median(lum)
+        return intvl_to_errors(fc)
