@@ -764,7 +764,10 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
 
     if scalar:
         # I think this part only gets called for scalar values, but you should check here
-        assert len_dist(tdel) == len_dist(alpha_dist) == len_dist(inclination) == 1
+
+        # this will fail for isotropic=True
+        # assert len_dist(tdel) == len_dist(alpha_dist) == len_dist(inclination) == 1
+        assert len_dist(tdel) == len_dist(alpha_dist) == len_dist(xi_b) == len_dist(xi_p) == 1
 
         # And finally calculate the hydrogen fraction(s)
         # Early on I was limiting this by xmax, but we want to do that in the
