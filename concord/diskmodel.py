@@ -24,7 +24,6 @@ def load_he16(model):
     return a
 
 
-
 def anisotropy(inclination, model='he16_a', test=False):
     '''This function returns the burst and persistent anisotropy factors
 
@@ -47,29 +46,37 @@ def anisotropy(inclination, model='he16_a', test=False):
         _theta = np.arange(50)/49.*pi/2.*u.radian
         ct = np.cos(_theta)
 
-        plt.figure(figsize=(6,10))
-        plt.ylim(0,3)
-        plt.xlim(0,1)
-        plt.xlabel(r"$\cos\theta$")
-        plt.ylabel(r"$\xi_p/\xi_b$")
+        fig, ax = plt.subplots(constrained_layout=True)
+
+        fig.set_size_inches(6,8)
+        ax.set_ylim(0,3)
+        ax.set_xlim(0,1)
+        # plt.xlabel(r"$\cos\theta$")
+        ax.set_xlabel(r"$\cos\,i$")
+        # plt.ylabel(r"$\xi_p/\xi_b$")
+        ax.set_ylabel('Anisotropy factor/ratio')
+
+        secax = ax.secondary_xaxis('top', functions=(lambda x: np.degrees(np.arccos(x)),
+                                                     lambda i: np.cos(np.deg2rad(i))))
+        secax.set_xlabel("Inclination [deg]")
 
         s='-'
-#        for m in ['fuji88' ,'he16']:
+        # for m in ['fuji88' ,'he16']:
         for m in ['fuji88' ,'he16_a']:
             xi_p = np.zeros(len(_theta))
             xi_b = np.zeros(len(_theta))
             for i, _th in enumerate(_theta):
                 xi_b[i], xi_p[i] = anisotropy(_th,model=m)
 
-            plt.plot(ct,1./xi_b,'b'+s,label=r"$\xi_b^{-1}$ ("+m+")")
-            plt.plot(ct,1./xi_p,'r'+s,label=r"$\xi_p^{-1}$ ("+m+")")
-            plt.plot(ct,xi_p/xi_b,'g'+s,label=r"$\xi_p/\xi_b$ ("+m+")")
+            ax.plot(ct,1./xi_b,'b'+s,label=r"$\xi_b^{-1}$ ("+m+")")
+            ax.plot(ct,1./xi_p,'r'+s,label=r"$\xi_p^{-1}$ ("+m+")")
+            ax.plot(ct,xi_p/xi_b,'g'+s,label=r"$\xi_p/\xi_b$ ("+m+")")
 
             s=':'
 
-        plt.legend()
+        ax.legend()
 
-        plt.show()
+        fig.show()
 
     # Calculate the values for the passed quantity, and return
     # numpy cos will correctly treat the units, so no need to do a conversion
