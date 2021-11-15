@@ -7,3 +7,4 @@ CONCORD_PATH = pkg_resources.resource_filename('concord','data')
 # from concord import burstclass
 from .utils import *
 from .burstclass import *
+

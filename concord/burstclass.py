@@ -49,6 +49,20 @@ ETA = 1.e-6
 OBS_COLOUR = 'b'
 MODEL_COLOUR = 'g'
 
+# Set a flag here so that we know if MINBAR is present or not
+
+MINBAR_PRESENT = True
+try:
+    import minbar as mb
+except:
+    MINBAR_PRESENT = False
+
+# Set a flag here to determine if the reference bursts are present
+
+REF_PRESENT = False
+if os.path.isfile(CONCORD_PATH+'/table2.tex'):
+    REF_PRESENT = True
+
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 def fper(mburst, param, c_bol=1.0):
@@ -242,13 +256,20 @@ class Lightcurve(object):
         '''
 
         print ('Lightcurve properties')
+        if hasattr(self,'minbar_id'):
+            print (f'  MINBAR id = {self.minbar_id}')
+            # print (f'  Observed from {self.name} by {self.instr} on MJD {self.time_start}, obsID {self.obsid}')
+            print ('  Observed from {} with {} on MJD {}, obsID {}'.format(self.name,
+                            # self.instr,
+                            [key for key in mb.MINBAR_INSTR_LABEL.items() if key[1] == self.instr[0:2]][0][0],
+                            self.time_start, self.obsid))
         print (f'  filename = {self.filename}')
-        print ('  time range = ({:.3f},{:.3f})'.format(min(self.time),max(self.time)))
+        print ('  time range = ({:.3f},{:.3f})'.format(min(self.time.value),max(self.time)))
 #        if hasattr(self,'lumin'):
         if self.lumin is not None:
-            print ('  luminosity range = ({:.3e},{:.3e})'.format(min(self.lumin),max(self.lumin)))
+            print ('  luminosity range = ({:.3e},{:.3e})'.format(min(self.lumin.value),max(self.lumin)))
         else:
-            print ('  flux range = ({:.3e},{:.3e})'.format(min(self.flux),max(self.flux)))
+            print ('  flux range = ({:.3e},{:.3e})'.format(min(self.flux.value),max(self.flux)))
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -322,15 +343,20 @@ class Lightcurve(object):
             y = self.lumin
             yerr = self.lumin_err
             ylabel = "Luminosity ({0.unit:latex_inline})".format(self.lumin)
-        
-        plt.step(self.time,y,where='post',label=self.filename, **kwargs)
+
+        # screen here for observed bursts from MINBAR
+        # This produces somewhat inconsistent results near the tail of the burst, where
+        # the steps don't seem to match with the errorbars
+        good = np.where((y.value > 0.) & (yerr.value > 0.))[0]
+        imin, imax = min(good), max(good)
+        plt.step(self.time[imin:imax],y[imin:imax],where='post',label=self.filename, **kwargs)
 #        print (type(self.dt), type(yerr))
 #        print (yerror & (self.dt != None) & (yerr != None))
 #        if (yerror & (self.dt != None) & (yerr != None)):
         if yerror:
             try:
-                plt.errorbar(self.time.value+(0.5-self.timepixr)*self.dt.value,
-                    y.value, yerr=yerr.value,fmt='.', **kwargs)
+                plt.errorbar(self.time.value[good]+(0.5-self.timepixr)*self.dt.value[good],
+                    y.value[good], yerr=yerr.value[good],fmt='.', **kwargs)
 #            plt.plot(self.time,y,label=self.filename)
             except:
                 pass
@@ -594,21 +620,74 @@ class ObservedBurst(Lightcurve):
                                 flux = flux*u.erg/u.cm**2/u.s,
                                 flux_err= flux_err*u.erg/u.cm**2/u.s)
 
-# End block for adding attributes from the file. Below you can use the
-# additional arguments on init to set or override attributes
+        # End block for adding attributes from the file. Below you can use the
+        # additional arguments on init to set or override attributes
 
         if kwargs != None:
 
             for key in kwargs:
 #                print (key, kwargs[key])
                 # I think these special cases below were for instances where the parameters might
-                # be passed as strings, e.g. from the LaTeX table
+                # be passed as strings, e.g. from the LaTeX table via the ref classmethod
                 if ((key == 'tdel') | (key == 'tdel_err')) & (not hasattr(kwargs[key],'unit')):
                     setattr(self,key,float(kwargs[key])*u.hr)
                 elif ((key == 'fper') | (key == 'fper_err')) & (not hasattr(kwargs[key],'unit')):
                     setattr(self,key,float(kwargs[key])*u.erg/u.cm**2/u.s)
                 else:
                     setattr(self,key,kwargs[key])
+
+
+    @classmethod
+    def minbar(cls, id, remote=False):
+        '''
+        Method to generate an observed burst from MINBAR, and populate the relevant
+        arrays. Requires the minbar repo to be present (obviously)
+        Calling approach:
+        obs = ObservedBurst.minbar(2203)
+        :param id: the burst ID in MINBAR DR1
+        :param remote: if true, force download from the remote repo
+        :return:
+        '''
+
+        if not MINBAR_PRESENT:
+            logger.error('minbar module not found')
+            return None
+
+        # Only want to do this once
+
+        if not hasattr(cls,'minbar_bursts'):
+            cls.minbar_bursts = mb.Bursts()
+
+        if remote:
+            cls.local_data = cls.minbar_bursts.local_data
+            cls.minbar_bursts.local_data = False # temp to circumvent issue on next
+
+        d = cls.minbar_bursts.get_burst_data(id)
+        if d is None:
+            return d
+
+        # Units are added for the lightcurve at the point of initiation, but you need to
+        # get the numerical value right
+
+        if remote:
+            cls.minbar_bursts.local_data = cls.local_data
+
+        return ObservedBurst(d['time'].values, d['dt'].values,
+                             d['flux'].values*1e-9, d['fluxerr'].values*1e-9,
+                             # additional attributes
+                             minbar_id=id, filename=d.attrs['file'],
+                             name = cls.minbar_bursts[id]['name'], instr = cls.minbar_bursts[id]['instr'],
+                             time_start = cls.minbar_bursts[id]['time'], obsid = cls.minbar_bursts[id]['obsid'],
+                             tdel = cls.minbar_bursts[id]['tdel'],
+                             # comments - are they present? Don't think so
+                             # Following parameters are given as tuples, for completeness
+                             fper = (cls.minbar_bursts[id]['perflx'], cls.minbar_bursts[id]['e_perflx'])*MINBAR_FLUX_UNIT,
+                             c_bol = cls.minbar_bursts[id]['bc'], # there's also an e_bc if you want
+                             fluen_table = (cls.minbar_bursts[id]['bfluen'], cls.minbar_bursts[id]['e_bfluen'])*MINBAR_FLUEN_UNIT,
+                             F_pk = (cls.minbar_bursts[id]['bpflux'], cls.minbar_bursts[id]['e_bpflux'])*MINBAR_FLUX_UNIT,
+                             alpha = (cls.minbar_bursts[id]['alpha'], cls.minbar_bursts[id]['e_alpha'])
+                             )
+
 
     @classmethod
     def ref(cls, source, dt):
@@ -618,6 +697,10 @@ class ObservedBurst(Lightcurve):
         Calling approach:
         obs = ObservedBurst.ref('GS 1826-24', 3.5)
         '''
+
+        if not REF_PRESENT:
+            logger.error('reference data not found in {}'.format(CONCORD_PATH))
+            return None
 
         # First read in the table
         # Because we apply this at the class level, it's available to all instances
