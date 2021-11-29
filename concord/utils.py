@@ -62,8 +62,10 @@ import logging
 
 def create_logger():
     """
-    Create a logger instance where messages are sent
+    Create a logger instance where messages are sent.
     See https://docs.python.org/3/library/logging.html
+
+    :return: loggerinstance
     """
     logger = logging.getLogger(__name__)
     if not logger.handlers: # Check if created before, otherwise a reload will add handlers
@@ -81,25 +83,31 @@ logger = create_logger()
 def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, verbose=False):
     """
     This method converts a measurement to a distribution, to allow flexibility
-    in how values are implemented in the various routines
-    Wanted to make this very flexible in terms of the way the units are provided,
+    in how values are implemented in the various routines. Primarily used
+    by :py:meth:`concord.utils.homogenize_distributions`.
+
+    Intended to be very flexible in terms of the way the units are provided,
     but unfortunately np.shape for a tuple with elements having units, does not
     work! So have to pass the units on the entire object
-    Also have an issue with combining distributions with and without units; "...the
-    NdarrayDistribution will not combine with Quantity objects containing units"
+
+    Also have an issue with combining distributions with and without
+    units; "...the NdarrayDistribution will not combine with Quantity
+    objects containing units"
     see https://docs.astropy.org/en/stable/uncertainty for more details
 
     :param num: scalar/array to convert to distribution
     :return: astropy distribution object
 
     Example usage:
-    y = cd.value_to_dist(3.) # scalars are kept as single values
-    z = cd.value_to_dist((3.,0.1),nsamp=10) # generate 10 samples from a normal distribution around 3.0 with st. dev 0.1
-    a = cd.value_to_dist((3.,0.5,0.1)) # generate default number of samples from an asymmetric Gaussian
-    b = cd.value_to_dist(a.distribution) # convert an array to a distribution
+
+    >>> y = cd.value_to_dist(3.) # scalars are kept as single values
+    >>> z = cd.value_to_dist((3.,0.1),nsamp=10) # generate 10 samples from a normal distribution around 3.0 with st. dev 0.1
+    >>> a = cd.value_to_dist((3.,0.5,0.1)) # generate default number of samples from an asymmetric Gaussian
+    >>> b = cd.value_to_dist(a.distribution) # convert an array to a distribution
 
     with units:
-    z = cd.value_to_dist((3.,0.1)*u.hr,nsamp=10) # generate 10 samples from a normal distribution around 3.0 with st. dev 0.1
+
+    >>> z = cd.value_to_dist((3.,0.1)*u.hr,nsamp=10) # generate 10 samples from a normal distribution around 3.0 with st. dev 0.1
     """
 
     # Check here if it's already a distribution; don't want to run this twice
@@ -155,26 +163,34 @@ def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, verbose=False):
 
 def homogenize_params(theta, nsamp=None):
     """
-    This method is for use by the MCMC routines, to ensure consistency of the
+    This method is used by the MC routines, to ensure consistency of the
     parameter set. We want to make sure that each parameter (if a distribution)
     has the same length as any other parameter (unless it's a scalar).
-    Each parameter is labeled and provided with a value (and possibly also error),
-    and units. Inclination is also provided with the isotropy flag, and the angle
-    limits. If none of the input parameters are already distributions, the provided
-    number of samples nsamp will be used as the dimensions of the output distributions
-    (this may be redundant, since we now also do the inclination distributions here)
+    Each parameter is labeled and provided with a value (and possibly also
+    error), and units. Inclination is also provided with the isotropy
+    flag, and the angle limits.
+
+    If none of the input parameters are already distributions, the
+    provided number of samples nsamp will be used as the dimensions of the
+    output distributions (this may be redundant, since we now also do the
+    inclination distributions here)
+
     Usage:
+
     (par1, par2, ... nsamp ) = homogenize_params( dictionary_of_input_params_and_units, nsamp )
-    Example:
-    F_pk, _nsamp = homogenize_params( {'fpeak': ((33., 2.), cd.MINBAR_FLUX_UNIT)}, 100)
-    F_pk, _inclination, _nsamp = cd.homogenize_params( {'fpeak': ((33., 2.), cd.MINBAR_FLUX_UNIT),
+
+    Example usage:
+
+    >>> F_pk, _nsamp = homogenize_params( {'fpeak': ((33., 2.), cd.MINBAR_FLUX_UNIT)}, 100)
+
+    >>> F_pk, _inclination, _nsamp = cd.homogenize_params( {'fpeak': ((33., 2.), cd.MINBAR_FLUX_UNIT),
                                    'incl': (None, u.deg, isotropic, 0.0, 75.)}, 100)
 
     :param theta: dictionary with parameters and units
     :param nsamp: desired size of distribution objects, if not already set by
                   one or more of the parameters
-    :return: tuple with all the parameters in the same order they're passed, plus
-             the actual number of samples per parameter
+    :return: tuple with all the parameters in the same order they're
+        passed, plus the actual number of samples per parameter
     """
 
     # here we maintain a list of "standard" parameters for use in concord
@@ -266,9 +282,11 @@ def homogenize_params(theta, nsamp=None):
 
 def len_dist(d):
     """
-    utility routine to replace the len function for distributions
+    Utility routine to replace the len function for distributions, and
+    also return sensible values for scalars rather than throwing an error
+
     :param d:
-    :return: length of the array
+    :return: length of the array OR distribution
     """
 
     if d is None:
@@ -284,13 +302,27 @@ def len_dist(d):
 
 def asym_norm(m, sigm=None, sigp=None, nsamp=NSAMP_DEF, positive=False, model=1):
     '''
-    Probability density function for an asymmetric error distribution
-    characterised by a mean and upper and lower 68% confidence intervals
-    (sigp and sigm, respectively).
-    Follows the treatment of Barlow (2003)
+    Draw samples from an asymmetric error distribution characterised by a
+    mean and upper and lower 68% confidence intervals (sigp and sigm,
+    respectively). Used primarily to generate distributions from
+    quantities with asymmetric errors, by :py:meth:`concord.utils.value_to_dist`.
+
+    Follows the treatment of `Barlow (2003)
+    <https://ui.adsabs.harvard.edu/abs/2003sppp.conf..250B>`_
+
     With the positive flag set, it will continue drawing samples until all
     are > 0. Note that the resulting distribution may not quite have the
     required shape
+
+    :param m: mean (central) value for the distribution
+    :param sigm: lower 68th-percentile uncertainty
+    :param sigp: upper 68th-percentile uncertainty
+    :param nsamp: number of samples required
+    :param positive: ensure all the samples are positive (may affect the
+        distribution)
+    :param model: implementation of the distribution function; only one
+        option is currently implemented
+    :return: distribution with ``nsamp`` values having the desired shape
     '''
 
     if (sigm is None) or (sigp is None):
@@ -325,6 +357,7 @@ def intvl_to_errors(perc):
     """
     This function converts a confidence interval defined by a 3-element array
     to the more useful version with errors .
+
     :param perc: the array of percentiles (central, lower limit, upper limit)
     :return: 3-element array with (central value, lower uncertainty, upper uncertainty)
     """
@@ -342,6 +375,13 @@ def g(M,R,Newt=False,units='cm/s^2'):
     using the Newtonian expression if the flag Newt is set to True
 
     The result is returned in units of cm/s^2 by default
+
+    :param M: neutron-star mass
+    :param R: neutron-star radius
+    :param Newt: default ``False`` returns the GR value, set to True to
+        calculate the Newtonian value
+    :param units: the required units
+    :return: the surface gravity, in the required units
     '''
 
     if Newt:
@@ -355,6 +395,10 @@ def g(M,R,Newt=False,units='cm/s^2'):
 def redshift(M,R):
     '''
     This function calculates the gravitational redshift 1+z
+
+    :param M: neutron-star mass
+    :param R: neutron-star radius
+    :return: 1+z
     '''
 
     return 1./sqrt(1.-2.*(const.G*M/(const.c**2*R)).decompose())
@@ -365,10 +409,11 @@ def check_M_R_opz(M, R, opz):
     """
     Utility routine to check the consistency of the mass, radius and redshift
     passed to various routines (e.g. mdot)
+
     :param M: neutron star mass, or None
     :param R: neutron star radius, or None
     :param opz: 1+z where z is the surface gravitational redshift, or None
-    :return:
+    :return: boolean, ``True`` if the values are consistent, ``False`` otherwise
     """
 
     # define booleans here for whether or not we've got non-default values
@@ -396,8 +441,17 @@ def check_M_R_opz(M, R, opz):
 
 def calc_mr(g,opz):
     ''''
-    this function calculates neutron star mass and radius given a surface
-    gravity and redshift
+    Calculates neutron star mass and radius given a surface gravity and
+    redshift. This routine is required when (for example) comparing a
+    model computed at a fixed gravity, with observations requiring a
+    particular value of redshift (to stretch the model lightcurve to match
+    the observed one). The combination of surface gravity and redshift
+    implies unique mass and radius, and the constraints on 1+z can be
+    translated to constraints on M, R
+
+    :param g: surface gravity, in units equivalent to cm/s**2
+    :param opz: surface redshift 1+z
+    :return: neutron star mass in g, radius in cm
     '''
 
     # First some checks
@@ -425,6 +479,11 @@ def solve_radius(M,R_Newt,eta=1e-6):
     radius, assuming the GR and Newtonian masses are identical
 
     Solving is tricky so we just use an iterative approach
+
+    :param M: neutron-star mass
+    :param R_Newt: Newtonian neutron-star radius
+    :param eta: tolerance for convergence
+    :return: neutron-star radius R in GR
     '''
 
     R = R_Newt	# trial
@@ -439,7 +498,19 @@ def decode_LaTeX(string, delim='pm'):
     '''
     This function converts a LaTeX numerical value (with error) to one
     or more floating point values. It is expected that the number is formatted
-    as $3.1\pm1.2$, and the default delimiter assumes this scenario
+    as ``$3.1\pm1.2$``, and the default delimiter assumes this scenario
+
+    Will not work on asymmetric errors, expressed (for example) as
+    ``$1.4_{-0.1}^{+0.2}$``
+
+    Example usage:
+
+    >>> cd.decode_LaTeX('$1.4\pm0.3')
+    (1.4, 0.3)
+
+    :param string: string with LaTeX numerical value and error
+    :param delim: separator of number and uncertainty; defaults to ``\pm``
+    :return: tuple giving the value and error(s)
     '''
 
     assert (type(string) == str) or (type(string) == np.str_)
@@ -473,8 +544,9 @@ def tdel_dist(nburst, exp, nsamp=NSAMP_DEF):
     Function to generate a synthetic distribution of recurrence times, given
     nburst observed events over a total exposure of exp. The resulting
     distribution may approximate the PDF of the underlying burst rate, but
-    does assume that the bursts are independent, which is obviously not the
+    does assume that the bursts are independent, which is generally not the
     case
+
     :param nburst: number of events detected
     :param exp: total exposure time
     :param nsamp: number of samples to generate
@@ -502,24 +574,38 @@ def tdel_dist(nburst, exp, nsamp=NSAMP_DEF):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def Q_nuc(Xbar, quadratic=False, old_relation=False, coeff=False):
+def Q_nuc(Xbar, quadratic=True, old_relation=False, coeff=False):
     '''
-    This function implements the approximation to the nuclear energy generation rate
-    Q_nuc given the mean hydrogen fraction in the fuel layer, Xbar, determined by
-    Goodwin et al. 2019 (ApJ 870, #64). The value returned is in units of MeV/nucleon:
-    q = Q_nuc(0.73)
+    This function implements the approximation to the nuclear energy
+    generation rate Q_nuc given the mean hydrogen fraction in the fuel
+    layer, Xbar, determined by `Goodwin et al. 2019 (ApJ 870, #64)
+    <https://ui.adsabs.harvard.edu/abs/2019ApJ...870...64G>`_. The
+    value returned is in units of MeV/nucleon:
+
+    >>> q = Q_nuc(0.73)
     5.35517578
-    There are three versions of the approximation, which can be selected by using the
-    quadratic and old_relation flags; by default the most precise (and recent) version
-    is used:
-    q = Q_nuc(0.73, quadratic=True)
+
+    There are three versions of the approximation, which can be selected
+    by using the quadratic and old_relation flags; by default the most
+    precise (and recent) version is used:
+
+    >>> q = Q_nuc(0.73, quadratic=False)
     5.758715
-    q = Q_nuc(0.73, old_relation=True)
+    >>> q = Q_nuc(0.73, old_relation=True)
     4.52
-    If you want the coefficients, rather than the actual Q_nuc value, you can use the
-    coeff flag (in which case the first argument is ignored):
-    q_0, q_1 = Q_nuc(0.0,quadratic=True,coeff=True)
+
+    If you want the coefficients, rather than the actual Q_nuc value, you
+    can use the coeff flag (in which case the first argument is ignored):
+
+    >>> q_0, q_1 = Q_nuc(0.0,quadratic=False,coeff=True)
     [1.3455, 6.0455]
+
+    :param Xbar: average hydrogen mass fraction of the burst column
+    :param quadratic: set to ``True`` to use the (more accurate) quadratic approximation
+    :param old_relation: set to ``True`` to use the earlier approximation
+    :param coeff: set to ``True`` to return the coefficients used, in which
+                  case ``Xbar`` is ignored
+    :return: Q_nuc value, in MeV/nucleon, or the coefficients if ``coeff=True``
     '''
 
     q = [1.3050, 6.9511, -1.9218]
@@ -537,14 +623,30 @@ def Q_nuc(Xbar, quadratic=False, old_relation=False, coeff=False):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def X_0(xbar, zcno, tdel, opz=OPZ, debug=False, old_relation=False):
+def X_0(Xbar, zcno, tdel, opz=OPZ, debug=False, old_relation=False):
     '''
-    Routine (extracted from hfrac) to determine the accreted H fraction X_0
-    given the average H-fraction at ignition, xbar, the CNO metallicity zcno,
-    and the burst recurrence time, tdel
+    Routine (extracted from :py:meth:`concord.utils.hfrac`) to determine
+    the accreted H fraction X_0 given the average H-fraction at ignition,
+    Xbar, the CNO metallicity zcno, and the burst recurrence time, tdel.
+
+    The time to exhaust the accreted hydrogen is calculated according to
+    the formula derived by `Lampe et al. (2016, ApJ 819, #46)
+    <http://adsabs.harvard.edu/abs/2016ApJ...819...46L>`_; if the
+    ``old_relation=True`` flag is set, the alternative prefactor quoted by
+    `Galloway et al. (2004 ApJ 601, 466)
+    <https://ui.adsabs.harvard.edu/abs/2004ApJ...601..466G>`_ is used instead
+
+    :param Xbar: average hydrogen mass fraction of the burst column
+    :param zcno: CNO mass fraction in the burst fuel
+    :param tdel: burst recurrence time
+    :param opz: NS surface redshift, 1+z
+    :param old_relation: use the older expression for the time to exhaust the accreted hydrogen
+    :param debug: display debugging messages
+
+    :return: inferred hydrogen mass fraction X_0 of the accreted fuel
     '''
 
-    if max([len_dist(xbar), len_dist(zcno), len_dist(tdel), len_dist(opz)]) > 1:
+    if max([len_dist(Xbar), len_dist(zcno), len_dist(tdel), len_dist(opz)]) > 1:
         logger.error('scalar arguments only')
 
     tpref = TPREF_CNO
@@ -560,7 +662,7 @@ def X_0(xbar, zcno, tdel, opz=OPZ, debug=False, old_relation=False):
     # This division is quantified via the f_burn fraction, which initially at least we
     # must estimate
 
-    t_CNO = tpref * (xbar / 0.7) / (zcno / 0.02)
+    t_CNO = tpref * (Xbar / 0.7) / (zcno / 0.02)
     f_burn = tdel / (opz * t_CNO)
     f_burn_prev = 1. / f_burn  # dummy value first off to ensure the loop gets called
     if debug:
@@ -575,18 +677,18 @@ def X_0(xbar, zcno, tdel, opz=OPZ, debug=False, old_relation=False):
 
         if (f_burn <= 1.):
             # still hydrogen at the base
-            x_0 = xbar + 0.35 * (tdel / (opz * tpref)) * (zcno / 0.02)
+            x_0 = Xbar + 0.35 * (tdel / (opz * tpref)) * (zcno / 0.02)
         else:
             # hydrogen exhausted at the base
-            x_0 = np.sqrt(1.4 * xbar * tdel / (opz * tpref) * (zcno / 0.02))
+            x_0 = np.sqrt(1.4 * Xbar * tdel / (opz * tpref) * (zcno / 0.02))
 
         f_burn_prev = f_burn
         t_CNO = tpref * (x_0 / 0.7) / (zcno / 0.02)
         f_burn = tdel / (opz * t_CNO)
 
         if debug:
-            print('X_0: xbar = {:.4f}, t_CNO = {:.4f}, x_0 = {:.4f}'.format(
-                xbar, t_CNO, x_0))#, xi_b, xi_p)
+            print('X_0: Xbar = {:.4f}, t_CNO = {:.4f}, x_0 = {:.4f}'.format(
+                Xbar, t_CNO, x_0))#, xi_b, xi_p)
             print('flipping f_burn {} -> {}'.format(f_burn_prev, f_burn))
 
     #        print (i,xbar,t_CNO,f_burn,x_0,xi_b,xi_p)
@@ -596,17 +698,29 @@ def X_0(xbar, zcno, tdel, opz=OPZ, debug=False, old_relation=False):
 
 def alpha(_tdel, _fluen, _fper, c_bol=None, nsamp=NSAMP_DEF, conf=CONF, fulldist=False):
     """
-    Routine to calculate alpha from the input measurables, propagating the errors
-    via MC distributions and applying the units appropriately
+    Routine to calculate alpha, the observed ratio of persistent to burst
+    energy (integrated over the recurrence time, tdel) from the input
+    measurables
+
+    Usage:
+
+    >>> alpha = cd.alpha(2.681, 0.381, 3.72, 1.45)
+    >>> print (alpha)
+    136.64233701
+
+    >>> alpha = cd.alpha((2.681, 0.007), (0.381, 0.003), (3.72, 0.18), (1.45, 0.09))
+    >>> print (alpha)
+    [136.23913536   9.88340505  11.21502717]
+
     :param tdel: burst recurrence time
     :param fluen: burst fluence
     :param fper: persistent flux
     :param c_bol: bolometric correction on persistent flux
-    :return:
-
-    Usage:
-    alpha = cd.alpha(2.681, 0.381, 3.72, 1.45)
-    alpha = cd.alpha((2.681, 0.007), (0.381, 0.003), (3.72, 0.18), (1.45, 0.09))
+    :return: alpha-values, either a scalar (if all the inputs are also
+	scalars); a central value and confidence range; or (if
+        ``fulldist=True``) a dictionary with the distributions of the
+	alpha value and the input or adopted distributions of the
+        intermediate values
     """
 
     # generate distributions where required, with correct units, and make sure
@@ -617,6 +731,10 @@ def alpha(_tdel, _fluen, _fper, c_bol=None, nsamp=NSAMP_DEF, conf=CONF, fulldist
                                                             'c_bol': (c_bol, None)}, nsamp )
 
     _alpha = (fper * _c_bol * tdel / fluen).decompose()
+
+    if len_dist(_alpha) == 1:
+        return _alpha
+
     if fulldist:
         return {'alpha': _alpha, 'tdel': tdel, 'fluen': fluen, 'fper': fper, 'c_bol': _c_bol}
 
@@ -629,6 +747,7 @@ def _i(obj, ind):
     """
     Utility function to permit slicing of arbitrary objects, including scalars
     (in which case the scalar is returned). For use with hfrac
+
     :param obj: array or scalar
     :param ind: index of value to return
     :return: slice of array or the scalar
@@ -648,28 +767,62 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
           isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP,
           model='he16_a', conf=CONF, fulldist=False, nsamp=None, debug=False):
     '''
-    This routine estimates the h-fraction at ignition, based on the burst properties
-    In the absence of the alpha-value(s), you need to supply the persistent flux and
-    burst fluence, along with the recurrence time, so that alpha can be calculated
+    Estimates the H-fraction at burst ignition, based on the burst properties
+    In the absence of the alpha-value(s), you need to supply the
+    persistent flux and burst fluence, along with the recurrence time, so
+    that alpha can be calculated
 
-    There is also a mode for calculating a single value of the parameters, based on
-    a single value of alpha, tdel and the inclination; this mode is used by the function
-    itself, within a loop over the inclination values.
+    There is also a mode for calculating a single value of the parameters,
+    based on a single value of alpha, tdel and the inclination; this mode
+    is used by the function itself, within a loop over the inclination
+    values.
 
-    There are three main options for the treatment of emission anisotropy:
-    isotropic=True  - assumes both the burst and persistent emission is isotropic (xi_b=xi_p=1)
-    isotropic=False - incorporates anisotropy, by drawing a set of inclination values and
-                        calculating the H-fraction for each value. Inclinations are uniform on
-                        the sphere (up to a maximum value of i=72 deg, based on the absence
-                        of dips) and the value returned is the mean and 1-sigma error, or
-                        the complete distributions (with the fulldist option)
-    inclination=<i> - calculate for a specific value of inclination
+    Example usage:
 
-    Usage:
-    import astropy.units as u
-    xbar, x_0, inc = cd.hfrac(2.5*u.hr, 140., inclination=30.) # "single" mode
-    xbar_dict = cd.hfrac((2.681, 0.007), fluen=(0.381, 0.003),
-                      fper=(3.72, 0.18), c_bol=(1.45, 0.09),nsamp=1000,fulldist=True)
+    >>> import astropy.units as u
+    >>> cd.hfrac(2.5*u.hr, 140., inclination=30.)
+    ** WARNING ** assuming inclination in degrees
+    (<Quantity 0.19564785>, <Quantity 0.26656582>, 30.0)
+
+    >>> cd.hfrac((2.681, 0.007), fluen=(0.381, 0.003),
+            fper=(3.72, 0.18), c_bol=(1.45, 0.09),nsamp=100,fulldist=True)
+    {'xbar': NdarrayDistribution([ 0.15246606,  0.20964612,  0.14169592,  0.11998812,  0.14293726,
+        0.13757633, -0.0850957 ,  0.27077167,  0.01620781,  0.13673547,
+       -0.00821256,  0.10193499, -0.08151998, -0.0370918 ,  0.26400253,
+        0.1813988 , -0.04371571,  0.14432454,  0.28422351, -0.04962202,
+		.
+		.
+		.
+     'X_0': NdarrayDistribution([ 0.22852126,  0.28567535,  0.21799341,  0.19609461,  0.21895133,
+		.
+		.
+		.
+     'i': <QuantityDistribution [45.58518673, 15.61321579, 36.30632308, 48.18062101, 45.46515182,
+		.
+		.
+		.
+
+    :param tdel: burst recurrence time
+    :param alpha: burst alpha, which (if not supplied) can be calculated
+        instead from the fluence, fper, and c_bol
+    :param fper: persistent flux
+    :param fluen: burst fluence
+    :param c_bol: bolometric correction on persistent flux
+    :param opz: neutron-star surface redshift
+    :param zcno: CNO mass fraction in the burst fuel
+    :param old_relation: flag to use the old (incorrect) relation for Q_nuc
+    :param isotropic: set to True to assume isotropic emission
+    :param inclination: inclination value (or distribution)
+    :param imin: minimum of allowed inclination range
+    :param imax: maximum of allowed inclination range
+    :param conf: confidence interval for output limits
+    :param model: model string of He & Keek (2016), defaults to "A"
+    :param conf: confidence % level for limits, ignored if fulldist=True
+    :param fulldist: set to True to return the distributions of each parameter
+    :param debug: display debugging messages
+    :return: a tuple of values of Xbar, X_0 and inclination; or a
+        dictionary including distributions of each of the values, as well
+        as the distributions adopted for the observables
     '''
 
     if _alpha is None:
@@ -821,10 +974,15 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
 
 def iso_dist(nsamp=NSAMP_DEF, imin=0., imax=IMAX_NDIP):
     '''
-    Routine to generate an isotropic distribution of inclinations (angle from the system
-    rotation axis to the line of sight) from imin up to some maximum value, defaulting to
-    75 degrees. This value corresponds to the likely maximum possible for a non-dipping
-    source.
+    Routine to generate an isotropic distribution of inclinations (angle
+    from the system rotation axis to the line of sight) from imin up to
+    some maximum value, defaulting to 75 degrees. This value corresponds
+    to the likely maximum possible for a non-dipping source.
+
+    :param nsamp: number of samples required
+    :param imin: lower limit of distribution in degrees (default is zero)
+    :param imax: upper limit of distribution in degrees (default is IMAX_NDIP)
+    :return: distribution of inclinations between ``imin``, ``imax``
     '''
 
     if imin < 0. or imin > imax or imax > 90.:
@@ -848,26 +1006,32 @@ def dist(_F_pk, nsamp=None, dip=False,
          isotropic=False, inclination=None, imin=0., imax=IMAX_NDIP,
          model='he16_a', conf=CONF, fulldist=False, plot=False):
     """
-    This routine estimates the distance to the source, based on the measured peak flux
-    of a radius-expansion burst. Two main options are available;
-    empirical=False (default), in which case the Eddington flux is calculated as equation
-    7 from Galloway et al. (2008, ApJS 179, 360); or
-    empirical=True, in which case the estimate of Kuulkers et al. 2003 (A&A 399, 663) is used
-    The default isotropic=False option also takes into account the likely effect of
-    anisotropic burst emission, based on the models provided by concord
-    Usage:
-    cd.dist((30., 3.), isotropic=True, empirical=True)
-    Out[3]: <Quantity [10.27267949,  0.50629732,  0.59722829] kpc>
-    cd.dist((30., 2., 5.), isotropic=False, empirical=True)
-    Out[3]: <Quantity [10.75035916,  1.39721634,  1.461003  ] kpc>
-    cd.dist((30., 3.), isotropic=False, empirical=True, fulldist=True, nsamp=100)
-    Out[7]:
+    This routine estimates the distance to the source, based on the
+    measured peak flux of a radius-expansion burst. Two main options are
+    available;
+    ``empirical=False`` (default), in which case the Eddington luminosity is
+    calculated as equation 7 from `Galloway et al. (2008, ApJS 179, 360) 
+    <http://adsabs.harvard.edu/abs/2008ApJS..179..360G>`_; or
+    ``empirical=True``, in which case the estimate of `Kuulkers et al. 2003
+    (A&A 399, 663) <http://adsabs.harvard.edu/abs/2003A%26A...399..663K>`_
+    is used. The default ``isotropic=False`` option also takes into account
+    the likely effect of anisotropic burst emission, based on the models
+    provided by concord
+
+    Example usage:
+
+    >>> cd.dist((30., 3.), isotropic=True, empirical=True)
+    <Quantity [10.27267949,  0.50629732,  0.59722829] kpc>
+    >>> cd.dist((30., 2., 5.), isotropic=False, empirical=True)
+    <Quantity [10.75035916,  1.39721634,  1.461003  ] kpc>
+    >>> cd.dist((30., 3.), isotropic=False, empirical=True, fulldist=True, nsamp=100)
     {'dist': <QuantityDistribution [11.12852694, 11.4435149 ,  9.79809775,  9.82146105,  9.34573615,
             10.4330567 , 10.99421133, 10.66816313,  8.83667458, 12.83249538,
             14.15062276, 13.26883293,  9.80702496,  8.72915705, 12.04546987,
                 .
                 .
                 .
+
     :param _F_pk: peak burst flux
     :param nsamp: number of samples required for the distributions
     :param dip: set to True if the source is a "dipper"
@@ -883,7 +1047,11 @@ def dist(_F_pk, nsamp=None, dip=False,
     :param conf: confidence interval for output limits
     :param fulldist: set to True to output full distributions for all parameters
     :param plot: set to True to generate a simple plot
-    :return:
+    :return: inferred distance values, either a scalar (if all the inputs
+        are also scalars); a central value and confidence range; or (if
+        ``fulldist=True``) a dictionary with the distributions of the
+	distance and the input or adopted distributions of the
+        other parameters
     """
 
     alpha_T = 2.2e-9  # K^-1
@@ -975,31 +1143,40 @@ def luminosity(_F_X, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
 
     This is a more sophisticated version of the L_Edd routine (forgot I had that)
 
-    Usage:
-    import concord as cd
-    # calculate the isotropic luminosity corresponding to a flux
-    # of 3e-9 erg/cm^2/s at 7.3 kpc
+    Example usage:
+
+    Calculate the isotropic luminosity corresponding to a flux
+    of 3e-9 erg/cm^2/s at 7.3 kpc
+
+    >>> import concord as cd
     cd.luminosity(3e-9,7.3,isotropic=True)
 
-    # Calculate the range of luminosities corresponding to a persistent
-    # flux of 3e-9 erg/cm^2/s at 7.3 kpc, and assuming isotropic
-    # inclination distribution (i < 75 deg)
-    cd.luminosity(3e-9,7.3,burst=False)
+    Calculate the range of luminosities corresponding to a persistent
+    flux of 3e-9 erg/cm^2/s at 7.3 kpc, and assuming isotropic
+    inclination distribution (i < 75 deg)
 
-    # Calculate the range of luminosities corresponding to a burst flux
-    # of 3e-8, with uncertainty 1e-9, and an inclination of 45-60 degrees,
-    # plot (and return) the resulting distribution
-    cd.luminosity((3e-8,1e-9),7.3,imin=45,imax=60,plot=True,fulldist=True)
-    :param F_X:
-    :param dist:
-    :param nsamp:
-    :param burst:
-    :param isotropic:
-    :param inclination:
-    :param imin:
-    :param imax:
-    :param fulldist:
-    :param plot:
+    >>> cd.luminosity(3e-9,7.3,burst=False)
+
+    Calculate the range of luminosities corresponding to a burst flux
+    of 3e-8, with uncertainty 1e-9, and an inclination of 45-60 degrees,
+    plot (and return) the resulting distribution
+
+    >>> cd.luminosity((3e-8,1e-9),7.3,imin=45,imax=60,plot=True,fulldist=True)
+
+    :param F_X: X-ray flux, MINBAR units assumed if not present
+    :param dist: distance to the source
+    :param c_bol: bolometric correction to apply
+    :param nsamp: number of samples
+    :param burst: set to True for burst emission, to select the model anisotropy for bursts
+    :param dip: set to True for a dipping source (deprecated)
+    :param isotropic: set to True if isotropic value required
+    :param inclination: system inclination or distribution thereof
+    :param imin: minimum inclination for generated distribution
+    :param imax: maximum inclination for generated distribution
+    :param model: model string of He & Keek (2016), defaults to "A"
+    :param conf: confidence % level for limits, ignored if fulldist=True
+    :param fulldist: set to True to return the distributions of each parameter
+    :param plot: plots the resulting distributions
     :return:
     """
 
@@ -1086,22 +1263,77 @@ def luminosity(_F_X, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
+def L_Edd(F_pk, dist=8 * u.kpc, nsamp=NSAMP_DEF,
+	  isotropic = False, inclination = None, imin = 0.0, imax = IMAX_NDIP,
+          dip = False, conf=CONF, fulldist=False):
+    '''
+    This routine estimates the Eddington luminosity of the source, based
+    on the measured peak flux of a radius-expansion burst and the distance
+    (or some distribution thereof.  The default isotropic=False option also
+    takes into account the likely effect of anisotropic burst emission, based
+    on the models provided by concord
+
+    This routine has been supplanted by :py:meth:`concord.utils.luminosity`, which
+    it now calls; the only thing not incorporated into the new routine is
+    the "simple" estimate of the isotropic luminosity error,
+
+    ``L_Edd_iso_err = L_Edd_iso * np.sqrt((F_pk_err / F_pk) ** 2 + (2. * dist_err / dist) ** 2)``
+
+    Burst emission is assumed (``burst=True``); apart from the F_pk value,
+    parameters are as for :py:meth:`concord.utils.luminosity`
+
+    :param F_pk: peak burst flux, MINBAR units assumed if not present
+    :return: dictionary including calculation results and assumed distributions (as for luminosity)
+    '''
+
+    return luminosity(F_pk, dist, nsamp, isotropic, burst=True,
+                   imin=imin, imax=imax, model='he16_a', conf=conf, fulldist=fulldist)
+
+# ------- --------- --------- --------- --------- --------- --------- ---------
+
+
 def mdot(_F_per, _dist, c_bol=None, M=None, R=None, opz=None,
          isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP, dip=False,
          model='he16_a', nsamp=None, conf=CONF, fulldist=False):
     '''
-    Routine to estimate the mdot given a (bolometric) persistent flux, distance, and
-    inclination. This calculation was adapted initially from equation 2 of
-    Galloway et al. (2008), and uses an approximation to
-    Q_grav = c**2*z/(1+z) \approx GM_NS/R_NS
+    Routine to estimate the mdot given a (bolometric) persistent flux,
+    distance, and inclination. This calculation was adapted initially from
+    equation 2 of `Galloway et al. (2008, ApJS 179, 360) 
+    <http://adsabs.harvard.edu/abs/2008ApJS..179..360G>`_, and uses an
+    approximation to ``Q_grav = c**2*z/(1+z) \approx GM_NS/R_NS``
     which is good to about 10% for a typical neutron star
 
     Usage:
-    import concord as cd
+
+    >>> import concord as cd
     # calculate the mdot corresponding to a flux of 1e-9 at 10kpc, for a 10km
     # 1.4 M_sun neutron star (this is the prefactor for equation 2 in Galloway
     # et al. 2008)
-    cd.mdot(1., 10., M=1.4*c.M_sun, R=10.*u.km, isotropic=True)
+    >>> import astropy.constants as c
+    >>> cd.mdot(1., 10., M=1.4*c.M_sun, R=10.*u.km, isotropic=True)
+    WARNING:homogenize_params:no bolometric correction applied
+    <Quantity 6691.30392224 g / (cm2 s)>
+
+    :param F_per: persistent flux, MINBAR units assumed if not present
+    :param dist: distance to the source
+    :param c_bol: bolometric correction to apply
+    :param M: neutron-star mass
+    :param R: neutron-star radius
+    :param opz: 1+z where z is the surface gravitational redshift, or None
+    :param isotropic: set to True if isotropic value required
+    :param inclination: system inclination or distribution thereof
+    :param imin: minimum inclination for generated distribution
+    :param imax: maximum inclination for generated distribution
+    :param dip: set to True for a dipping source (deprecated)
+    :param model: model string of He & Keek (2016), defaults to "A"
+    :param nsamp: number of samples to generate
+    :param conf: confidence % level for limits, ignored if fulldist=True
+    :param fulldist: set to True to return the distributions of each parameter
+    :return: mdot-values, either a scalar (if all the inputs are also
+	scalars); a central value and confidence range; or (if
+        ``fulldist=True``) a dictionary with the distributions of the
+	mdot value and the input or adopted distributions of the
+        intermediate values
     '''
 
     mdot_unit = 'g cm-2 s-1'
@@ -1197,8 +1429,9 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
          isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP, dip=False,
          model='he16_a', conf=CONF, fulldist=False):
     """
-    Calculate the burst column from the burst fluence, adapted initially from equation 4
-    of Galloway et al. (2008)
+    Calculate the burst column from the burst fluence, adapted initially
+    from equation 4 of `Galloway et al. (2008, ApJS 179, 360) 
+    <http://adsabs.harvard.edu/abs/2008ApJS..179..360G>`_
 
     :param _E_b: burst fluence
     :param _dist: distance ot bursting source
@@ -1216,7 +1449,11 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
     :param nsamp: number of samples to generate
     :param conf: confidence interval for uncertainties; or
     :param fulldist: output the full distribution of calculated values
-    :return:
+    :return: inferred ignition column values, either a scalar (if all the
+	inputs are also scalars); a central value and confidence range; or
+        (if ``fulldist=True``) a dictionary with the distributions of the
+	ignition column and the input or adopted distributions of the
+        other parameters
     """
 
     # yign_unit = u.g / u.cm ** 2
@@ -1305,42 +1542,32 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def L_Edd(F_pk, dist=8 * u.kpc, nsamp=NSAMP_DEF,
-          isotropic = False, inclination = None, imin = 0.0, imax = IMAX_NDIP, dip = False,
-          conf=CONF, fulldist=False):
-    '''
-    This routine estimates the Eddington luminosity of the source, based on the measured
-    peak flux of a radius-expansion burst and the distance (or some distribution thereof.
-    The default isotropic=False option also takes into account the likely effect of
-    anisotropic burst emission, based on the models provided by concord
-
-    This routine supplanted by luminosity, which it now calls; the only thing not
-    incorporated into the new routine is the "simple" estimate of the isotropic
-    luminosity error,
-    L_Edd_iso_err = L_Edd_iso * np.sqrt((F_pk_err / F_pk) ** 2 + (2. * dist_err / dist) ** 2)
-    '''
-
-    return luminosity(F_pk, dist, nsamp, isotropic, burst=True,
-                   imin=imin, imax=imax, model='he16_a', conf=conf, fulldist=fulldist)
-
-
 def lum_to_flux(_lum, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
                    isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP,
                    model='he16_a', conf=CONF, fulldist=False, plot=False):
     """
     This routine converts luminosity to flux, based on the provided distance
-    Basically the inverse of the luminosity function
-    :param lum:
-    :param dist:
-    :param c_bol:
-    :param isotropic:
-    :param burst:
-    :param imin:
-    :param imax:
-    :param model:
-    :param conf:
-    :param fulldist:
-    :return:
+    Basically the inverse of the :py:meth:`concord.utils.luminosity` function
+
+    :param lum: luminosity to convert to flux
+    :param dist: distance to the source
+    :param c_bol: bolometric correction to apply
+    :param nsamp: number of samples
+    :param burst: set to True for burst emission, to select the model anisotropy for bursts
+    :param dip: set to True for a dipping source (deprecated)
+    :param isotropic: set to True if isotropic value required
+    :param inclination: system inclination or distribution thereof
+    :param imin: minimum inclination for generated distribution
+    :param imax: maximum inclination for generated distribution
+    :param model: model string of He & Keek (2016), defaults to "A"
+    :param conf: confidence % level for limits, ignored if fulldist=True
+    :param fulldist: set to True to return the distributions of each parameter
+    :param plot: plots the resulting distributions
+    :return: inferred flux, either a scalar (if all the inputs are also
+	scalars); a central value and confidence range; or (if
+        ``fulldist=True``) a dictionary with the distributions of the
+	flux and the input or adopted distributions of the intermediate
+        values
     """
 
     # if a distance is not supplied, use a reasonable value, but flag it
