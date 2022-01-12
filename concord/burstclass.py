@@ -124,10 +124,14 @@ def modelFunc(p,obs,model, disc_model):
     '''
     This function performs the stretching and rescaling of the (model
     predicted) burst lightcurve based on the input parameter set
-    The calculations are based on those in Appendix B of Keek & Heger
-    2011 (ApJ 743:189)
-    Parameter array is (for now) a tuple with the appropriate units:
-    ( distance, inclination, redshift, time offset )
+    The calculations are based on those in Appendix B of 
+    `Keek & Heger (2011, ApJ 743, #189) <http://adsabs.harvard.edu/abs/2011ApJ...743..189K>`_
+
+    :param p: parameter array, (for now) a tuple with the appropriate units;
+      ( distance, inclination, redshift, time offset )
+    :param obs: observed burst to use for the time bins
+    :param model: model burst to be stretched and rescaled
+    :param disc_model: choice of disc model for the anisotropy
     '''
 
     dist, inclination, _opz, t_off = p
@@ -180,24 +184,21 @@ class Lightcurve(object):
     flux/luminosity etc. and methods including plot. Minimal attributes
     are:
 
-    time, dt - array of times and time bin duration
-    timepixr - set to 0.0 (default) if time is the start of the bin, 0.5 for
+    :time, dt: array of times and time bin duration
+    :timepixr: set to 0.0 (default) if time is the start of the bin, 0.5 for
                midpoint
-    flux, flux_err - flux and error (no units assumed)
-    lumin, lumin_err - luminosity and error
+    :flux, flux_err: flux and error (no units assumed)
+    :lumin, lumin_err: luminosity and error
 
     Normally only one of flux or luminosity would be supplied
 
     Example: simulated burst (giving time and luminosity)
 
-    Lightcurve(self, time=d['time']*u.s,
-        lumin=d['luminosity']*u.erg/u.s, lumin_err=d['u_luminosity']*u.erg/u.s)
+    >>> Lightcurve(self, time=d['time']*u.s, lumin=d['luminosity']*u.erg/u.s, lumin_err=d['u_luminosity']*u.erg/u.s)
 
     Example: observed burst giving flux
 
-    Lightcurve(self, time=d['col1']*u.s, dt=d['col2']*u.s,
-        flux=d['col3']*1e-9*u.erg/u.cm**2/u.s,
-        flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
+    >>> Lightcurve(self, time=d['col1']*u.s, dt=d['col2']*u.s, flux=d['col3']*1e-9*u.erg/u.cm**2/u.s, flux_err=d['col4']*1e-9*u.erg/u.cm**2/u.s)
     """
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
@@ -250,8 +251,10 @@ class Lightcurve(object):
     def print(self):
         '''
         Print the basic parameters of the lightcurve. Can be called in turn
-        by the info commands for KeplerBurst, ObservedBurst to display the
+        by the info commands for :py:class:`concord.burstclass.KeplerBurst`,
+	:py:class:`concord.burstclass.ObservedBurst` to display the
         properties of the parent class... once those are written
+
         :return:
         '''
 
@@ -276,6 +279,9 @@ class Lightcurve(object):
     def write(self,filename='lightcurve.csv',addhdr=None):
         '''
         Write the lightcurve to a file
+
+        :param filename: filename to save the data to
+        :param addhdr: additional text to include as a header (default ``None``)
         '''
 
         if not hasattr(self,'flux'):
@@ -317,7 +323,14 @@ class Lightcurve(object):
 # where argument for step is appropriate for timepixr=0.0
 
     def plot(self, yerror=True, obs_color='b', model_color='g',**kwargs):
-        """Plot the lightcurve, accommodating both flux and luminosities"""
+        """
+        Plot the lightcurve, accommodating both flux and luminosities
+
+        :param yerror: display flux/luminosity errors (default ``True``)
+        :param obs_color: set the colour for an observed burst
+        :param model_color: set the colour for a simulated burst
+        :returns: the plot
+        """
 
         assert self.timepixr == 0.0
 
@@ -378,12 +391,22 @@ class Lightcurve(object):
         disc_model='he16_a',c_bol=1.0):
         """
         Convert a luminosity profile to a simulated observation, with
-        plausible errors. See Keek & Heger (2011) for the background calculations
+        plausible errors. See 
+        `Keek & Heger (2011, ApJ 743, #189) <http://adsabs.harvard.edu/abs/2011ApJ...743..189K>`_
+        for the background calculations
 
-        This method might make more sense as part of the KeplerBurst class
-        (or a parent SimulatedBurst class), but for now we include this method
-        as part of the lightcurve class, so that future classes of model
-        bursts can access it
+        This method might make more sense as part of the 
+	:py:class:`KeplerBurst`_ class (or a parent ``SimulatedBurst`` class),
+	but for now we include this method as part of the lightcurve
+	class, so that future classes of model bursts can access it
+
+        :param param: tuple with the distance, inclination, redshift and
+          time offset
+        :param obs: template observed burst to use for the time bins. If
+          not supplied, uniform 0.25 s bins will be used, covering the burst
+        :param disc_model: choice of disc model for the anisotropy
+        :param c_bol: bolometric correction to adjust the burst fluxes
+        :return: :py:class:`concord.burstclass.ObservedBurst` object
         """
 
         if not hasattr(self,'lumin'):
@@ -473,9 +496,15 @@ class Lightcurve(object):
     def fluence(self, plot=False, warnings=True):
         """
         Calculate the fluence for a lightcurve, following the approach
-        from get_burst_data
-        This code relies on the presence of dt_nogap and good attributes,
-        which should be calculated when the Lightcurve object is defined
+        from ``get_burst_data``, as used for MINBAR
+
+        This code relies on the presence of the ``dt_nogap`` and ``good``
+	attributes, which should be calculated when the Lightcurve object
+        is defined
+
+        :param plot: set to ``True`` to display a diagnostic plot
+        :param warnings: set to ``False`` to suppress display of warnings
+        :return: the burst fluence and uncertainty
         """
 
         minpts=4	# Fit to a minimum of this number of points in the tail
@@ -585,21 +614,21 @@ class Lightcurve(object):
 class ObservedBurst(Lightcurve):
     '''
     Observed burst class. Apart from the lightcurve (which is
-    defined with time, flux, and flux_err columns), the additional
+    defined with ``time``, ``flux``, and ``flux_err`` columns), the additional
     attributes set are:
 
-    filename - source file name
-    tdel, tdel_err - recurrence time and error (hr)
-    comments - ASCII file header text
-    table_file - LaTeX file of table 2 from Galloway et al. (2017)
-    table - contents of table 2
-    row - entry in the table corresponding to this burst
-    fper, fper_err - persistent flux level (1e-9 erg/cm^2/s)
-    c_bol - bolometric correction
-    mdot - accretion rate (total, not per unit area)
-    fluen_table - burst fluence
-    F_pk - burst peak flux
-    alpha - alpha value
+    :filename: source file name
+    :tdel, tdel_err: recurrence time and error (hr)
+    :comments: ASCII file header text
+    :table_file: LaTeX file of table 2 from Galloway et al. (2017)
+    :table: contents of table 2
+    :row: entry in the table corresponding to this burst
+    :fper, fper_err: persistent flux level (1e-9 erg/cm^2/s)
+    :c_bol: bolometric correction
+    :mdot: accretion rate (total, not per unit area)
+    :fluen_table: burst fluence
+    :F_pk: burst peak flux
+    :alpha: alpha value
 
     The units for selected parameters are all stored as astropy.units
     objects
@@ -609,11 +638,14 @@ class ObservedBurst(Lightcurve):
         '''
         Now we define a Lightcurve instance, using the columns from the file
         Units are applied to the input arrays (and assumed to be correct!)
-        :param time:
-        :param dt:
-        :param flux:
-        :param flux_err:
-        :param kwargs:
+
+        :param time: array of times (start of time bin is assumed)
+        :param dt: width of each bin
+        :param flux: flux averaged over each time bin
+        :param flux_err: uncertainty on the flux in each bin
+        :param kwargs: any other parameters
+
+        :returns:
         '''
 
         Lightcurve.__init__(self, time = time*u.s, dt = dt*u.s,
@@ -640,10 +672,13 @@ class ObservedBurst(Lightcurve):
     @classmethod
     def minbar(cls, id, remote=False):
         '''
-        Method to generate an observed burst from MINBAR, and populate the relevant
-        arrays. Requires the minbar repo to be present (obviously)
+	Method to generate an observed burst from MINBAR, and populate the
+        relevant arrays. Requires the minbar repo to be present (obviously)
+
         Calling approach:
-        obs = ObservedBurst.minbar(2203)
+
+        >>> obs = ObservedBurst.minbar(2203)
+
         :param id: the burst ID in MINBAR DR1
         :param remote: if true, force download from the remote repo
         :return:
@@ -692,10 +727,12 @@ class ObservedBurst(Lightcurve):
     @classmethod
     def ref(cls, source, dt):
         '''
-        Method to read in a reference burst and populate the relevant arrays to create
-        an ObservedBurst
+	Method to read in a reference burst and populate the relevant
+        arrays to create an :py:class:`concord.burstclass.ObservedBurst`
+
         Calling approach:
-        obs = ObservedBurst.ref('GS 1826-24', 3.5)
+
+        >>> obs = ObservedBurst.ref('GS 1826-24', 3.5)
         '''
 
         if not REF_PRESENT:
@@ -804,22 +841,22 @@ class ObservedBurst(Lightcurve):
     def from_file(cls, filename, path='.', **kwargs):
         '''
         Method to read in a file and populate the relevant arrays to create
-        an ObservedBurst
+        an :py:class:`concord.burstclass.ObservedBurst` object
         This routine will read in any ascii lightcurve file which matches the
-        format of the "reference" bursts:
+        format of the "reference" bursts, i.e. with columns::
 
-        'Time [s]' 'dt [s]' 'flux [10^-9 erg/cm^2/s]' 'flux error [10^-9
-        erg/cm^2/s]' 'blackbody temperature kT [keV]' 'kT error [keV]'
-        'blackbody normalisation K_bb [(km/d_10kpc)^2]' 'K_bb error
-        [(km/d_10kpc)^2]' chi-sq
+          'Time [s]' 'dt [s]' 'flux [10^-9 erg/cm^2/s]' 'flux error [10^-9 erg/cm^2/s]' 'blackbody temperature kT [keV]' 'kT error [keV]' 'blackbody normalisation K_bb [(km/d_10kpc)^2]' 'K_bb error [(km/d_10kpc)^2]' chi-sq
             -1.750  0.500   1.63    0.054   1.865  0.108   13.891   4.793  0.917
             -1.250  0.500   2.88    1.005   1.862  0.246   22.220   4.443  1.034
             -0.750  0.500   4.38    1.107   1.902  0.093   30.247   2.943  1.089
             -0.250  0.500   6.57    0.463   1.909  0.080   46.936   6.969  0.849
+              .
+              .
+              .
 
         Calling approach:
-        obs = ObservedBurst.from_file(filename)
-        obs = ObservedBurst.from_file('gs1826-24_3.530h.dat','example_data')
+        >>> obs = ObservedBurst.from_file(filename)
+        >>> obs = ObservedBurst.from_file('gs1826-24_3.530h.dat','example_data')
         '''
 
         d = ascii.read(path+'/'+filename)
@@ -833,6 +870,7 @@ class ObservedBurst(Lightcurve):
     def info(self):
         '''
         Display information about the ObservedBurst
+
         :return:
         '''
 
@@ -870,14 +908,32 @@ class ObservedBurst(Lightcurve):
                 weights={'fluxwt':1.0, 'tdelwt':2.5e3},
                 disc_model='he16_a', debug = False):
         '''
-        This is the key method for running the mcmc; it can be used to plot the
-        observations with the models rescaled by the appropriate parameters, and
-        also returns a likelihood value
+        This is the key method for burst observation-model lightcurve
+        comparisons, and generates a likelihood that can be used for MCMC
+	(for example). It can be used to plot the observations with the
+        models rescaled by the appropriate parameters.
 
-        'weights' give the relative weight to the tdel and persistent
-        flux for the likelihood. Since you have many more points in the
-        lightcurve, you may want to weight these greater than one so that the
-        MCMC code will try to match those preferentially'''
+        ``weights`` give the relative weight to the recurrence time and
+	persistent flux for the likelihood. Since you have many more
+	points in the lightcurve, you may want to weight these greater
+	than one so that the MCMC code will try to match those
+        preferentially
+
+        :param mburst: model burst for comparison, for example an
+          :py:class:`concord.burstclass.KeplerBurst` object
+        :param param: tuple with the distance, inclination, redshift and
+          time offset
+        :param breakdown: display the breakdown of the likelihood between
+          the recurrence time, persistent flux and lightcurve
+        :param plot: set to ``True`` to show a plot of the comparison
+        :param subplot: include a subplot with the recurrence time
+          comparison (default ``True``)
+        :param weights: dict giving the relative weight to the recurrence
+	  time (key ``tdelwt``) and persistent flux (``fluxwt``) for the
+          likelihood. 
+        :param disc_model: choice of disc model for the anisotropy
+        :param debug: display debugging information
+        '''
 
         # Calculate the simulated burst using the observe method
 
@@ -1030,26 +1086,23 @@ class KeplerBurst(Lightcurve):
     defined with time, lumin, and lumin_err columns), the additional
     (minimal) attributes requred are:
 
-    filename - source file name
-    tdel, tdel_err - recurrence time and error (hr)
-    Lacc - accretion luminosity (in units of Mdot_Edd)
-    R_NS - model-assumed radius of the neutron star (GR)
-    g - surface gravity assumed for the run
+    :filename: source file name
+    :tdel, tdel_err: recurrence time and error (hr)
+    :Lacc: accretion luminosity (in units of Mdot_Edd)
+    :R_NS: model-assumed radius of the neutron star (GR)
+    :g: surface gravity assumed for the run
 
     An example call is as follows:
 
-    c_loZ=KeplerBurst(filename='mean1.data',path='kepler',
-                  lAcc=0.1164,Z=0.005,H=0.7,
-                  tdel=4.06/opz,tdel_err=0.17/opz,
-                  g = 1.858e+14*u.cm/u.s**2, R_NS=11.2*u.km)
+    >>> c_loZ=KeplerBurst(filename='mean1.data',path='kepler', lAcc=0.1164,Z=0.005,H=0.7, tdel=4.06/opz,tdel_err=0.17/opz, g = 1.858e+14*u.cm/u.s**2, R_NS=11.2*u.km)
 
     If you provide a batch and run value, like so:
 
-    c = KeplerBurst(batch=2,run=9)
+    >>> c = KeplerBurst(batch=2,run=9)
 
     or (for the older results) a run_id value, like so:
 
-    c = KeplerBurst(run_id='a028',path='../../burst/reference')
+    >>> c = KeplerBurst(run_id='a028',path='../../burst/reference')
 
     the appropriate model lightcurve will be read in, and the model parameters
     will be populated from the table
@@ -1347,7 +1400,6 @@ class KeplerBurst(Lightcurve):
     def info(self):
         '''
         Display information about the KeplerBurst
-        :return:
         '''
 
         print("\nKeplerBurst parameters:")
@@ -1444,10 +1496,17 @@ def lhoodClass(params, obs, model, **kwargs):
     comparisons The corresponding call to emcee will (necessarily) look
     something like this:
 
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, lhoodClass, args=[obs, models, weights])
+    >>> sampler = emcee.EnsembleSampler(nwalkers, ndim, lhoodClass, args=[obs, models, weights])
 
     Use the kwargs construction to pass the additional parameters weights,
     disc_model to the compare method if required
+
+    :param params: tuple with the distance, inclination, redshift and
+      as many time offsets as there are bursts to compare
+    :param obs: one or more :py:class:`concord.burstclass.ObservedBurst`s
+    :param model: one or more model bursts, one for each of the observed
+      bursts; for example a  :py:class:`concord.burstclass.KeplerBurst`
+    :return: likelihood value
     '''
 
     uparams = apply_units(params)

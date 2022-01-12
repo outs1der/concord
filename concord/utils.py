@@ -65,7 +65,7 @@ def create_logger():
     Create a logger instance where messages are sent.
     See https://docs.python.org/3/library/logging.html
 
-    :return: loggerinstance
+    :return: logger instance
     """
     logger = logging.getLogger(__name__)
     if not logger.handlers: # Check if created before, otherwise a reload will add handlers
@@ -285,8 +285,8 @@ def len_dist(d):
     Utility routine to replace the len function for distributions, and
     also return sensible values for scalars rather than throwing an error
 
-    :param d:
-    :return: length of the array OR distribution
+    :param d: object (scalar, array or distribution)
+    :return: length of the object (0 if empty/``None``)
     """
 
     if d is None:
@@ -1177,7 +1177,11 @@ def luminosity(_F_X, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
     :param conf: confidence % level for limits, ignored if fulldist=True
     :param fulldist: set to True to return the distributions of each parameter
     :param plot: plots the resulting distributions
-    :return:
+    :return: luminosity, either a scalar (if all the inputs are also
+	scalars); a central value and confidence range; or (if
+        ``fulldist=True``) a dictionary with the distributions of the
+	luminosity and the input or adopted distributions of the intermediate
+        values
     """
 
     # if a distance is not supplied, use a reasonable value, but flag it
@@ -1300,7 +1304,8 @@ def mdot(_F_per, _dist, c_bol=None, M=None, R=None, opz=None,
     distance, and inclination. This calculation was adapted initially from
     equation 2 of `Galloway et al. (2008, ApJS 179, 360) 
     <http://adsabs.harvard.edu/abs/2008ApJS..179..360G>`_, and uses an
-    approximation to ``Q_grav = c**2*z/(1+z) \approx GM_NS/R_NS``
+    approximation to
+    :math:`Q_\\rm{grav} = c^2 z/(1+z) \\approx GM_{\\rm NS}/R_{\\rm NS}`
     which is good to about 10% for a typical neutron star
 
     Usage:
