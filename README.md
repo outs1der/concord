@@ -6,7 +6,7 @@ Full documentation can be found at https://burst.sci.monash.edu/concord/
 
 This code is under development, and a companion paper is expected to be submitted in early 2022
 
-To get started, look at the accompanying paper (in the `doc/` folder), or the `Burst matching tutorial` jupyter notebook (in the `notebooks/` folder)
+To get started, look at the  `Inferring burster properties` jupyter notebook
 
 ### What is this repository for? ###
 
