@@ -1,4 +1,4 @@
-wilhelmina# Various utilities moved from burstclass.p2
+# Various utilities moved from burstclass.p2
 # Augmented 2019 Aug with routines from Inferring\ composition.ipynb
 #
 # def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None):
