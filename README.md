@@ -21,7 +21,7 @@ To get started, look at the  `Inferring burster properties` jupyter notebook
 python3 -m pip install .
 ```
 * import concord
-* Check the Burst matching tutorial notebook for demonstrations of usage
+* Check the `Inferring burster properties` notebook for demonstrations of usage
 * You'll also need to download some reference bursts from http://burst.sci.monash.edu/reference, and some model bursts from http://burst.sci.monash.edu/kepler. Or, you can define routines to read in your own data
 
 ### Who do I talk to? ###

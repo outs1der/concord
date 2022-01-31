@@ -1,4 +1,4 @@
-# Various utilities moved from burstclass.py
+wilhelmina# Various utilities moved from burstclass.p2
 # Augmented 2019 Aug with routines from Inferring\ composition.ipynb
 #
 # def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None):
@@ -762,7 +762,7 @@ def _i(obj, ind):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
+def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
           opz=OPZ, zcno=0.02, old_relation=False,
           isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP,
           model='he16_a', conf=CONF, fulldist=False, nsamp=None, debug=False):
@@ -889,6 +889,7 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=1.0,
         else:
             # On the other hand if you pass alpha, we just need to make sure the arrays
             # (distributions) have consistent sizes
+            # Don't need to do c_bol here, as it's only used for alpha
 
             tdel, alpha_dist, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
                                                            'alpha': (_alpha, None)}, nsamp)
