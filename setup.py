@@ -12,7 +12,7 @@ setuptools.setup(
     description="Package for multi-epoch comparisons of model thermonuclear bursts to observations",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="http://bitbucket.org/minbar/concord",
+    url="https://github.com/outs1der/concord",
     packages=setuptools.find_packages(),
 #    packages=['concord'],
 #    package_dir={'concord': "concord"},
