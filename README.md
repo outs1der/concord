@@ -18,11 +18,15 @@ To get started, look at the  `Inferring burster properties` jupyter notebook
  
 Use the included `environment.yml` file to set up a [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-with-commands) environment with the required dependencies:
 
-`conda env create -f environment.yml`
+```
+conda env create -f environment.yml
+```
 
 This will create an environment called `concord`, which you can activate with: 
 
-`conda activate concord`
+```
+conda activate concord
+```
 
 Then add concord to the local environment with:
 ```
