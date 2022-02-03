@@ -1,7 +1,11 @@
 name: concord
 dependencies:
   - python=3.8.5
+  - pip
   - astropy=5.0.*
   - matplotlib=3.5.*
   - scipy=1.7.*
   - jupyter=1.0.*
+  - pip:
+    - astroquery
+    - chainconsumer
