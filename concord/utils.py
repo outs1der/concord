@@ -666,7 +666,7 @@ def X_0(Xbar, zcno, tdel, opz=OPZ, debug=False, old_relation=False):
     f_burn = tdel / (opz * t_CNO)
     f_burn_prev = 1. / f_burn  # dummy value first off to ensure the loop gets called
     if debug:
-        print ('X_0: trial: t_CNO = {:.2f}, f_burn = {:.4f}'.format(t_CNO, f_burn))
+        print ('X_0: trial for Z={}: t_CNO = {:.2f}, f_burn = {:.4f}'.format(zcno, t_CNO, f_burn))
 
     # Loop here to make sure we have a consistent choice
     # There are different formulae for the two different cases: where H is
@@ -763,7 +763,7 @@ def _i(obj, ind):
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
-          opz=OPZ, zcno=0.02, old_relation=False,
+          zcno=0.02, opz=OPZ, old_relation=False,
           isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP,
           model='he16_a', conf=CONF, fulldist=False, nsamp=None, debug=False):
     '''
@@ -933,7 +933,8 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
         #    x_0 = min([xmax,xbar+0.35*(tdel/(opz*9.8*u.hr))*(zcno/0.02)])
         #    for i in range(10):
         if xbar > 0.0:
-        # split this off as a separate routine
+            # print ('hfrac: zcno = {}'.format(zcno))
+            # split this off as a separate routine
             x_0 = X_0(xbar, zcno, tdel, opz, debug=debug, old_relation=old_relation)
 
         # Although it's probably a mistake, return a tuple of values for the scalar version
@@ -957,18 +958,25 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
 
             # print ('{}/{}: tdel={}, alpha={}, opz={}, zcon={}\n'.format(
             #     j, len_dist(inclination),_i(tdel,j), _i(alpha_dist,j), _i(opz, j), _i(zcno, j)))
-            xbar[j], x_0[j], dummy = hfrac( _i(tdel,j), _i(alpha_dist,j), _i(opz, j), _i(zcno, j),
-                isotropic=isotropic, old_relation=old_relation, inclination=i,
+            # take care that this call includes all the possible
+            # parameters! Don't need fper,fluen, or c_bol, as we're
+            # passing alpha instead; don't need the imin, imax as we're
+            # passing individual values from the inclination distribution
+            xbar[j], x_0[j], dummy = hfrac( _i(tdel,j), _i(alpha_dist,j),
+                zcno=_i(zcno, j), opz=_i(opz, j), old_relation=old_relation, 
+                isotropic=isotropic, inclination=i, model=model, conf=conf,
                 debug=debug)
 
         if fulldist:
             return {'xbar': unc.Distribution(xbar), 'X_0': unc.Distribution(x_0), 'i': inclination,
-                    'alpha': alpha_dist, 'fluen': _fluen, 'fper': _fper, 'model': model}
+                    'alpha': alpha_dist, 'Z': zcno, 'fluen': _fluen, 'fper': _fper, 'model': model}
 
         cval = [50, 50 - conf / 2, 50 + conf / 2]
+        # this option for the return structure is a bit weird, with a
+        # mixture of confidence intervals and distributions
         return { 'xbar': intvl_to_errors(np.percentile(xbar, cval)),
                  'X_0': intvl_to_errors(np.percentile(x_0[x_0 >= 0.], cval)),
-                 'i': intvl_to_errors(np.percentile(inclination[x_0 >= 0.], cval)),
+                 'i': intvl_to_errors(np.percentile(inclination.distribution[x_0 >= 0.], cval)),
                  'alpha': alpha_dist, 'fluen': _fluen, 'fper': _fper, 'model': model}
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
