@@ -15,11 +15,24 @@ To get started, look at the  `Inferring burster properties` jupyter notebook
 * Performing model-observation comparisons
 
 ### How do I get set up? ###
+ 
+Use the included `environment.yml` file to set up a [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-with-commands) environment with the required dependencies:
 
-Clone the repository and install (locally) using pip:
+```
+conda env create -f environment.yml
+```
+
+This will create an environment called `concord`, which you can activate with: 
+
+```
+conda activate concord
+```
+
+Then add concord to the local environment with:
 ```
 python3 -m pip install .
 ```
+
 You can then import the repository and use the functions. Here's a very simple example, to find the peak luminosity of a
 burst from 4U 0513+40 measured by RXTE, as part of the MINBAR sample. The first part calculates the isotropic luminosity, neglecting the uncertainty in both the peak flux and the distance:
 ```

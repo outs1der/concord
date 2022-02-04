@@ -1,0 +1,14 @@
+.idea
+*.pyc
+.DS_Store
+.vscode/
+*.code-workspace
+.DS_Store
+*.swp
+__pycache__
+kepler_grids/*
+animation/
+temp/
+plots/
+.ipynb_checkpoints/
+analysis.p
