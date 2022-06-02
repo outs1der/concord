@@ -1536,7 +1536,7 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
 
     # print (len(E_b.distribution), len(dist.distribution), len(qnuc))
     # print (type(E_b), type(dist), type(xi_b), type(R), type(qnuc))
-    yign = (E_b * dist**2 * opz * xi_b/ (R**2 * qnuc )).to(yign_unit)
+    yign = (E_b * _dist**2 * opz * xi_b/ (R**2 * qnuc )).to(yign_unit)
 
     if len_dist(yign) == 1:
         return yign
@@ -1547,7 +1547,7 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
 
         # Return a dictionary with all the parameters you'll need
 
-        return {'yign': yign, 'fluen': E_b, 'dist': dist, 'i': _inclination, 'xi_b': xi_b, 'model': model}
+        return {'yign': yign, 'fluen': E_b, 'dist': _dist, 'i': _inclination, 'xi_b': xi_b, 'model': model}
     else:
 
         # Return the median value and the (asymmetric) lower and upper errors
