@@ -1547,7 +1547,7 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
 
         # Return a dictionary with all the parameters you'll need
 
-        return {'yign': yign, 'fluen': E_b, 'dist': dist, 'i': _inclination, 'xi_b': xi_b, 'model': model}
+        return {'yign': yign, 'fluen': E_b, 'dist': _dist, 'i': _inclination, 'xi_b': xi_b, 'model': model}
     else:
 
         # Return the median value and the (asymmetric) lower and upper errors
