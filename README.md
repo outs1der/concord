@@ -4,7 +4,7 @@ This repository contains code intended to simplify the analysis of astronomical 
 
 Full documentation can be found at https://burst.sci.monash.edu/concord/
 
-This code is under development, and a companion paper is expected to be submitted in early 2022
+This code is under active development, but the v1.0.0 release is associated with a companion paper submitted to ApJS in 2022
 
 To get started, look at the  `Inferring burster properties` jupyter notebook
 
