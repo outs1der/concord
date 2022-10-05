@@ -1,4 +1,4 @@
-# Various utilities moved from burstclass.p2
+# Various utilities moved from burstclass.py
 # Augmented 2019 Aug with routines from Inferring\ composition.ipynb
 #
 # def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None):
@@ -80,7 +80,7 @@ logger = create_logger()
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, verbose=False):
+def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, statistics='max', verbose=False):
     """
     This method converts a measurement to a distribution, to allow flexibility
     in how values are implemented in the various routines. Primarily used
@@ -96,6 +96,7 @@ def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, verbose=False):
     see https://docs.astropy.org/en/stable/uncertainty for more details
 
     :param num: scalar/array to convert to distribution
+    :param statistics: convention for input stats for asymmetric distributions
     :return: astropy distribution object
 
     Example usage:
@@ -152,7 +153,11 @@ def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, verbose=False):
         return unc.normal(num[0]*num_unit, std=num[1]*num_unit, n_samples=nsamp)
     elif np.shape(num) == (3,):
         # value with asymmetric error; convention is value, err_lo, err_hi
-        return unc.Distribution(asym_norm(num[0], num[1], num[2], nsamp)*num_unit)
+        if statistics not in ('max', 'cumulative'):
+            logger.error("allowed statistics conventions are 'max' (default) or 'cumulative'")
+            return None
+
+        return unc.Distribution(asym_norm(num[0], num[1], num[2], nsamp, statistics=statistics)*num_unit)
     else:
         # more than two values indicates a distribution, so just return that
         if len(num) < NSAMP_DEF:
@@ -300,7 +305,7 @@ def len_dist(d):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def asym_norm(m, sigm=None, sigp=None, nsamp=NSAMP_DEF, positive=False, model=1):
+def asym_norm(m, sigm=None, sigp=None, nsamp=NSAMP_DEF, statistics='max', positive=False, model=1):
     '''
     Draw samples from an asymmetric error distribution characterised by a
     mean and upper and lower 68% confidence intervals (sigp and sigm,
@@ -318,6 +323,7 @@ def asym_norm(m, sigm=None, sigp=None, nsamp=NSAMP_DEF, positive=False, model=1)
     :param sigm: lower 68th-percentile uncertainty
     :param sigp: upper 68th-percentile uncertainty
     :param nsamp: number of samples required
+    :param statistics: convention for input stats for asymmetric distributions
     :param positive: ensure all the samples are positive (may affect the
         distribution)
     :param model: implementation of the distribution function; only one
@@ -338,7 +344,45 @@ def asym_norm(m, sigm=None, sigp=None, nsamp=NSAMP_DEF, positive=False, model=1)
         logger.error("other types of asymmetric distributions not yet implemented")
         return None
 
+    if statistics not in('max','cumulative'):
+        logger.error("allowed statistics conventions are 'max' (default) or 'cumulative'")
+        return None
+
     x = np.random.uniform(size=nsamp)
+
+    mirror_about = None
+    if statistics == 'cumulative':
+        # for cumulative stats, we need to convert to maximum likelihood equivalents using
+        # the following empirical scheme
+        # Now correct the cumulative values to give the (hopefully) best ML values
+
+        # Can't guarantee that sigm will be <= sigp, so swap them here if need be
+        # (temporarily) so that I only need to deal with cases where sigp>sigm
+        # assert abs(sigm) <= sigp
+        if abs(sigm) > sigp:
+            mirror_about = m
+            sigm, sigp = sigp, abs(sigm)
+
+        # Empirical coefficients for the quadratic fits to the relations between cumulative
+        # and max. likelihood stats
+
+        cfit = [-2.96161428, 5.24633997, -2.33061373]
+        efit_hi = [0.872277, -0.30338433, 0.44625961]
+        efit_lo = [-3.08149141, 6.29964813, -2.26419104]
+
+        scale = 1. / abs(sigm)  # assumes sigm is the smaller error
+        a =  sigp * scale  # degree of asymmetry
+        if a > 1.52:
+            logger.warning("error ratio exceeds 1.52, extrapolating empirical uncertainty corrections")
+
+        coff = cfit[0] * a ** 2 + cfit[1] * a + cfit[2]
+        escl_hi = efit_hi[0] * a ** 2 + efit_hi[1] * a + efit_hi[2]
+        escl_lo = efit_lo[0] * a ** 2 + efit_lo[1] * a + efit_lo[2]
+
+        m = m + coff / scale
+        sigm = escl_lo / scale
+        sigp = escl_hi / scale
+
     bd = abs(sigm) / (sigp + abs(sigm))
 
     _l = x < bd
@@ -348,6 +392,10 @@ def asym_norm(m, sigm=None, sigp=None, nsamp=NSAMP_DEF, positive=False, model=1)
     while positive & (np.any(x <= 0.)):
         _l = x <= 0.
         x[_l] = asym_norm(m, sigm, sigp, len(np.where(_l)[0]), model=model)
+
+    if mirror_about is not None:
+        # This might not be compatible with the positive flag
+        x = 2*mirror_about - x
 
     return x
 
@@ -1214,7 +1262,7 @@ def luminosity(_F_X, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
 
     # set the nominal distance for the plot labels, dist0
     if hasattr(dist, 'distribution'):
-        dist0 = dist.pdf_percentile(50)
+        dist0 = dist.pdf_percentiles(50)
     elif len_dist(dist) == 1:
         dist0 = dist
     else:
