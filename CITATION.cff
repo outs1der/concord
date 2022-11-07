@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+version: 1.0.0
+doi: 10.26180/21287616.v1 
+date-released: 2022-11-07
+url: "https://github.com/outs1der/concord"
+preferred-citation:
+  type: preprint
+  authors:
+  - family-names: "Galloway"
+    given-names: "Duncan K."
+    orcid: "https://orcid.org/0000-0002-6558-5121"
+  - family-names: "Johnston"
+    given-names: "Zac"
+    orcid: "https://orcid.org/0000-0003-4023-4488"
+  - family-names: "Goodwin"
+    given-names: "Adelle J."
+    orcid: "https://orcid.org/0000-0003-3441-8299"
+  - family-names: "He"
+    given-names: "Chong Chong"
+    orcid: "https://orcid.org/0000-0002-2332-8178"
+  journal: "Astrophysical Journal Supplements (accepted)"
+  title: "Robust inference of neutron-star parameters from thermonuclear burst observations"
+  value: arXiv:2210.03598
