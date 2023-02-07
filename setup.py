@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="concord",
-    version="0.9.0",
+    version="1.1.0",
     author="Duncan Galloway",
     author_email="Duncan.Galloway@monash.edu",
     description="Package for multi-epoch comparisons of model thermonuclear bursts to observations",

@@ -954,7 +954,8 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
         # of an array OR a scalar
         xbar = np.zeros(nsamp)
         x_0 = np.zeros(nsamp)
-        for j, i in enumerate(inclination.distribution):
+        # for j, i in enumerate(inclination.distribution):
+        for j in np.arange(nsamp):
 
             # print ('{}/{}: tdel={}, alpha={}, opz={}, zcon={}\n'.format(
             #     j, len_dist(inclination),_i(tdel,j), _i(alpha_dist,j), _i(opz, j), _i(zcno, j)))
@@ -964,7 +965,8 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
             # passing individual values from the inclination distribution
             xbar[j], x_0[j], dummy = hfrac( _i(tdel,j), _i(alpha_dist,j),
                 zcno=_i(zcno, j), opz=_i(opz, j), old_relation=old_relation, 
-                isotropic=isotropic, inclination=i, model=model, conf=conf,
+                isotropic=isotropic, inclination=_i(inclination,j), model=model,
+                conf=conf,
                 debug=debug)
 
         if fulldist:
