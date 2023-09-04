@@ -1,5 +1,5 @@
 import setuptools
-import glob
+import glob, re
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
