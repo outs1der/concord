@@ -116,7 +116,8 @@ def fper(mburst, param, c_bol=1.0):
     # persistent flux (see Keek & Heger 2011, eq. B20, noting that our mdot is averaged
     # over the neutron star surface):
 
-    return lum_to_flux( mdot_infty*Q_grav/_opz, dist, c_bol, inclination=inclination ).to(u.erg/u.cm**2/u.s)
+    return lum_to_flux( mdot_infty*Q_grav/_opz, dist, c_bol, 
+        inclination=inclination, burst=False ).to(u.erg/u.cm**2/u.s)
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
