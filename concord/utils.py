@@ -1,7 +1,7 @@
 # Various utilities moved from burstclass.py
 # Augmented 2019 Aug with routines from Inferring\ composition.ipynb
 #
-# def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None):
+# def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, positive=False):
 # def homogenize_params(theta, nsamp=None):
 # def len_dist(d):
 # def asym_norm(m, sigm=None, sigp=None, nsamp=NSAMP_DEF, positive=False, model=1):
@@ -80,7 +80,7 @@ logger = create_logger()
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, statistics='max', verbose=False):
+def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, statistics='max', positive=False, verbose=False):
     """
     This method converts a measurement to a distribution, to allow flexibility
     in how values are implemented in the various routines. Primarily used
@@ -96,7 +96,11 @@ def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, statistics='max', verbose=Fa
     see https://docs.astropy.org/en/stable/uncertainty for more details
 
     :param num: scalar/array to convert to distribution
+    :param nsamp: number of samples to generate
+    :param unit: units to apply
     :param statistics: convention for input stats for asymmetric distributions
+    :param positive: ensure all the samples are positive (may affect the
+        distribution)
     :return: astropy distribution object
 
     Example usage:
@@ -146,18 +150,26 @@ def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, statistics='max', verbose=Fa
         # distribution out of this scalar
         return num * num_unit
     elif np.shape(num) == (2,):
-        if num[1] is None:
+        # value and error, just return a symmetric distribution
+        if (num[1] is None) or (num[1] == 0.0):
+            # (unless the error is not defined)
             # return unc.Distribution(np.full(nsamp, num[0]) * num_unit)
             return num[0] * num_unit
-        # value and error
-        return unc.normal(num[0]*num_unit, std=num[1]*num_unit, n_samples=nsamp)
+        # this original code doesn't guarantee positive samples
+        # return unc.normal(num[0]*num_unit, std=num[1]*num_unit, n_samples=nsamp)
+        x = np.random.normal(num[0], num[1], nsamp)
+        while positive & (np.any(x <= 0.)):
+            _l = x <= 0.
+            x[_l] = np.random.normal(num[0], num[1], len(np.where(_l)[0]))
+        return unc.Distribution( x*num_unit )
     elif np.shape(num) == (3,):
         # value with asymmetric error; convention is value, err_lo, err_hi
         if statistics not in ('max', 'cumulative'):
             logger.error("allowed statistics conventions are 'max' (default) or 'cumulative'")
             return None
 
-        return unc.Distribution(asym_norm(num[0], num[1], num[2], nsamp, statistics=statistics)*num_unit)
+        return unc.Distribution( asym_norm(num[0], num[1], num[2], nsamp,
+            statistics=statistics, positive=positive)*num_unit)
     else:
         # more than two values indicates a distribution, so just return that
         if len(num) < NSAMP_DEF:
