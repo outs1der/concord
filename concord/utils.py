@@ -1073,7 +1073,7 @@ def iso_dist(nsamp=NSAMP_DEF, imin=0., imax=IMAX_NDIP):
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
 def dist(_F_pk, nsamp=None, dip=False,
-         empirical=False, X=0.0, M=M_NS, opz=OPZ, T_e=0.0,
+         L_Edd=None, empirical=False, X=0.0, M=M_NS, opz=OPZ, T_e=0.0,
          isotropic=False, inclination=None, imin=0., imax=IMAX_NDIP,
          model='he16_a', conf=CONF, fulldist=False, plot=False):
     """
@@ -1106,6 +1106,7 @@ def dist(_F_pk, nsamp=None, dip=False,
     :param _F_pk: peak burst flux
     :param nsamp: number of samples required for the distributions
     :param dip: set to True if the source is a "dipper"
+    :param L_Edd: enter your own value (including an error, if available) for the Eddington luminosity (units of 1e38 erg/s)
     :param empirical: flag to use the empirical Eddington luminosity
     :param X: hydrogen mass fraction in the atmosphere
     :param M: neutron-star mass
@@ -1157,12 +1158,18 @@ def dist(_F_pk, nsamp=None, dip=False,
 
     # Choose the Eddington flux value to compare the distance against
 
-    if empirical:
+    if L_Edd is not None:
+        # include here your own value of the Eddington limit
+        L_Edd = value_to_dist(L_Edd, nsamp=_nsamp, unit=u.erg/u.s)*1e38
+        if empirical:
+            logger.warning('empirical flag ignored with custom L_Edd')
+
+    elif empirical:
 
         # Kuulkers et al. 2003, A&A 399, 663
         # L_Edd = 3.79e38 * u.erg / u.s
         # L_Edd_err = 0.15e38 * u.erg / u.s
-        L_Edd = unc.normal(3.79e38 * u.erg / u.s, std=0.15e38 * u.erg / u.s, n_samples=_nsamp)
+        L_Edd = unc.normal(3.79 * u.erg / u.s, std=0.15 * u.erg / u.s, n_samples=_nsamp) * 1e38
     else:
 
         # Galloway et al. 2008, ApJS 179, 360
