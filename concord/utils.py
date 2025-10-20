@@ -192,6 +192,10 @@ def homogenize_params(theta, nsamp=None):
     output distributions (this may be redundant, since we now also do the
     inclination distributions here)
 
+    For "standard" measurable quantities that are labeled as such (in the
+    input dict) we force the distributions to be positive. This step may
+    result in distorted distributions for the results.
+
     Usage:
 
     (par1, par2, ... nsamp ) = homogenize_params( dictionary_of_input_params_and_units, nsamp )
@@ -285,7 +289,11 @@ def homogenize_params(theta, nsamp=None):
                 # special here for no supplied bolometric correction
                 logger.warning('no bolometric correction applied')
                 theta_hom.append( 1.0 )
+            elif par in params:
+                # "standard" (measurables) are forced to be positive
+                theta_hom.append( value_to_dist(theta[par][0], nsamp=nsamp, unit=theta[par][1], positive=True) )
             else:
+                logger.warning('non-standard param {} may include negative samples'.format(par))
                 theta_hom.append( value_to_dist(theta[par][0], nsamp=nsamp, unit=theta[par][1]) )
 
     if scalar:
@@ -1311,6 +1319,7 @@ def luminosity(_F_X, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
 
     lum = (4 * np.pi * F_X * _c_bol * _dist ** 2 * xi_b).to('erg s-1')
 
+    assert np.all(lum > 0.0*u.erg/u.s)
     if len_dist(lum) == 1:
 
         # Just return the value; we only keep F_X as scalar if there's no
