@@ -1290,6 +1290,7 @@ def luminosity(_F_X, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
     #         nsamp = _nsamp,
 
     # set the nominal distance for the plot labels, dist0
+    # TODO shouldn't this be _dist?
     if hasattr(dist, 'distribution'):
         dist0 = dist.pdf_percentiles(50)
     elif len_dist(dist) == 1:
@@ -1610,7 +1611,9 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
     #             / (Q_nuc(Xbar) / 4.4) * (opz / 1.31) / (R / (10.*u.km)) ** 2) * yign_unit
     # but now with full unit support, we just calculate in a more straightforward way
 
-    qnuc = Q_nuc(Xbar, quadratic=quadratic, old_relation=old_relation) * u.MeV / const.m_p
+    qnuc = Q_nuc(Xbar, quadratic=quadratic,
+            old_relation=old_relation)
+    qnuc = unc.Distribution(qnuc.distribution * u.MeV / const.m_p)
 
     # print (len(E_b.distribution), len(dist.distribution), len(qnuc))
     # print (type(E_b), type(dist), type(xi_b), type(R), type(qnuc))
