@@ -784,6 +784,7 @@ def alpha(_tdel, _fluen, _fper, c_bol=None, nsamp=NSAMP_DEF, conf=CONF, fulldist
     :param fluen: burst fluence
     :param fper: persistent flux
     :param c_bol: bolometric correction on persistent flux
+
     :return: alpha-values, either a scalar (if all the inputs are also
 	scalars); a central value and confidence range; or (if
         ``fulldist=True``) a dictionary with the distributions of the
@@ -797,6 +798,9 @@ def alpha(_tdel, _fluen, _fper, c_bol=None, nsamp=NSAMP_DEF, conf=CONF, fulldist
                                                             'fluen': (_fluen, MINBAR_FLUEN_UNIT),
                                                             'fper': (_fper, MINBAR_FLUX_UNIT),
                                                             'c_bol': (c_bol, None)}, nsamp )
+    if tdel is None:
+        # bail out immediately if homogenize_params fails
+        return None
 
     _alpha = (fper * _c_bol * tdel / fluen).decompose()
 
@@ -833,7 +837,7 @@ def _i(obj, ind):
 def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
           zcno=0.02, opz=OPZ, old_relation=False,
           isotropic=False, inclination=None, imin=0.0, imax=IMAX_NDIP,
-          model='he16_a', conf=CONF, fulldist=False, nsamp=None, debug=False):
+          model='he16_a', conf=CONF, fulldist=False, nsamp=NSAMP_DEF, debug=False):
     '''
     Estimates the H-fraction at burst ignition, based on the burst properties
     In the absence of the alpha-value(s), you need to supply the
@@ -904,14 +908,19 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
             logger.warning('no bolometric correction applied in alpha calculation')
 
     # Flag to check for the "single" mode of operation, used by this routine
+    # also check if the alpha calculation is scalar (if it's needed)
 
-    scalar = (len_dist(_tdel) == 1) & ((len_dist(inclination) == 1) or isotropic) & \
-              ((len_dist(_alpha) == 1) or ((_alpha is None) \
-              & len_dist(fper) == len_dist(fluen) == len_dist(c_bol) == 1))
+    scalar_alpha = ((_alpha is None) \
+        & (len_dist(_tdel) == len_dist(fper) == len_dist(fluen) == 1) \
+        & (len_dist(c_bol) <= 1)) or (len_dist(_alpha) == 1)
+
+    scalar = (len_dist(_tdel) == 1) & ((len_dist(inclination) == 1) or isotropic) \
+              & scalar_alpha
     # mode_single = ( (_alpha is not None) & (inclination is not None) &
     #               (np.shape(_alpha) == () ) & (not hasattr(_alpha,'distribution')) )
     if debug:
         print ('hfrac: mode_single = ',scalar)
+        print ('hfrac: alpha_single = ',scalar_alpha)
 
     # The following parameters define the relation for Q_nuc = q_0 + q_1*hbar, where hbar is the
     # average hydrogen fraction in the fuel column at ignition
@@ -935,12 +944,11 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
 
     # convert the tdel parameter provided, to a distribution (if required)
     # and check that the other parameters have consistent sizes
-    if scalar:
+    _alpha_dist = _alpha
+    if scalar_alpha:
         tdel = _tdel
         if _alpha is None:
-            alpha_dist = alpha(tdel, fluen, fper, c_bol)
-        else:
-            alpha_dist = _alpha
+            _alpha_dist = alpha(tdel, fluen, fper, c_bol)
     else:
         if _alpha is None:
             # If you've not passed alpha, then we need to calculate it here, and copy all
@@ -949,38 +957,30 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
             # excludes the inclination)
 
             _alpha = alpha(_tdel, fluen, fper, c_bol, nsamp=nsamp, fulldist=True)
-            alpha_dist = _alpha['alpha']
+            _alpha_dist = _alpha['alpha']
             tdel = _alpha['tdel']
             _fper = _alpha['fper']
             _fluen = _alpha['fluen']
-            _nsamp = len_dist(alpha_dist)
-        else:
-            # On the other hand if you pass alpha, we just need to make sure the arrays
-            # (distributions) have consistent sizes
-            # Don't need to do c_bol here, as it's only used for alpha
+            _nsamp = len_dist(_alpha_dist)
 
-            tdel, alpha_dist, _nsamp = homogenize_params( {'tdel': (_tdel, u.hr),
-                                                           'alpha': (_alpha, None)}, nsamp)
-            _fper, _fluen = fper, fluen
+    # On the other hand if you pass alpha, we just need to make sure the arrays
+    # (distributions) have consistent sizes
+    # Don't need to do c_bol here, as it's only used for alpha
 
-        # if no sample size has been passed, but we still need to generate samples
-        # to account for the emission anisotropy, determine the array size here
-        if (nsamp is None) | (not isotropic):
-            nsamp = NSAMP_DEF
-            if (_nsamp > 3):
-                nsamp = _nsamp
+    tdel, alpha_dist, _inclination, _nsamp = homogenize_params(
+        {'tdel': (_tdel, u.hr),
+        'alpha': (_alpha_dist, None),
+        'incl': (inclination, u.deg, isotropic, imin, imax)}, nsamp)
+    _fper, _fluen = fper, fluen
 
-    # Set the inclination parameters, by default for isotropy
-    xi_b = 1.
-    xi_p = 1.
+    if tdel is None:
+        # bail out immediately if homogenize_params fails
+        return None, None, None
+
+    xi_b, xi_p = None, None
     if not isotropic:
-        if inclination is None:
-            # With no inclination provided, we set up a uniform distribution of values
-            # up to some maximum, and calculate the composition values for each inclination
-            inclination = iso_dist(nsamp, imin=imin, imax=imax)
-
         # Calculate the anisotropy factors for the inclination
-        xi_b, xi_p = anisotropy(inclination, model=model)
+        xi_b, xi_p = anisotropy(_inclination, model=model)
 
     xmax = 0.77  # no longer used
 
@@ -989,7 +989,8 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
 
         # this will fail for isotropic=True
         # assert len_dist(tdel) == len_dist(alpha_dist) == len_dist(inclination) == 1
-        assert len_dist(tdel) == len_dist(alpha_dist) == len_dist(xi_b) == len_dist(xi_p) == 1
+        assert (len_dist(tdel) == len_dist(alpha_dist) == 1) \
+            & (len_dist(xi_b) <= 1) & (len_dist(xi_p) <= 1)
 
         # And finally calculate the hydrogen fraction(s)
         # Early on I was limiting this by xmax, but we want to do that in the
@@ -1007,7 +1008,7 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
 
         # Although it's probably a mistake, return a tuple of values for the scalar version
         # in contrast to the fulldist one, which returns a dict
-        return xbar, x_0, inclination
+        return xbar, x_0, _inclination
         # return {'xbar': xbar, 'X_0': x_0, 'i': inclination, 'alpha': alpha_dist,
         #         'fluen': fluen, 'fper': fper, 'model': model}
 
@@ -1020,25 +1021,30 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
         # not least because you can't index floats (or single element quantities)
         # Now we work around this using the _i utility function, which returns a slice
         # of an array OR a scalar
-        xbar = np.zeros(nsamp)
-        x_0 = np.zeros(nsamp)
+        xbar = np.zeros(_nsamp)
+        x_0 = np.zeros(_nsamp)
         # for j, i in enumerate(inclination.distribution):
-        for j in np.arange(nsamp):
+        if debug:
+            print ('beginning recursive calls to hfrac...')
+        for j in np.arange(_nsamp):
 
-            # print ('{}/{}: tdel={}, alpha={}, opz={}, zcon={}\n'.format(
-            #     j, len_dist(inclination),_i(tdel,j), _i(alpha_dist,j), _i(opz, j), _i(zcno, j)))
+            if debug:
+                print ('{}/{}: tdel={}, alpha={}, opz={}, zcon={}\n'.format(
+                    j, len_dist(_inclination),_i(tdel,j), _i(alpha_dist,j), _i(opz, j), _i(zcno, j)))
+
             # take care that this call includes all the possible
             # parameters! Don't need fper,fluen, or c_bol, as we're
             # passing alpha instead; don't need the imin, imax as we're
             # passing individual values from the inclination distribution
+
             xbar[j], x_0[j], dummy = hfrac( _i(tdel,j), _i(alpha_dist,j),
                 zcno=_i(zcno, j), opz=_i(opz, j), old_relation=old_relation, 
-                isotropic=isotropic, inclination=_i(inclination,j), model=model,
+                isotropic=isotropic, inclination=_i(_inclination,j), model=model,
                 conf=conf,
                 debug=debug)
 
         if fulldist:
-            return {'xbar': unc.Distribution(xbar), 'X_0': unc.Distribution(x_0), 'i': inclination,
+            return {'xbar': unc.Distribution(xbar), 'X_0': unc.Distribution(x_0), 'i': _inclination,
                     'alpha': alpha_dist, 'Z': zcno, 'fluen': _fluen, 'fper': _fper, 'model': model}
 
         cval = [50, 50 - conf / 2, 50 + conf / 2]
@@ -1046,7 +1052,7 @@ def hfrac(_tdel, _alpha=None, fper=None, fluen=None, c_bol=None,
         # mixture of confidence intervals and distributions
         return { 'xbar': intvl_to_errors(np.percentile(xbar, cval)),
                  'X_0': intvl_to_errors(np.percentile(x_0[x_0 >= 0.], cval)),
-                 'i': intvl_to_errors(np.percentile(inclination.distribution[x_0 >= 0.], cval)),
+                 'i': intvl_to_errors(np.percentile(_inclination.distribution[x_0 >= 0.], cval)),
                  'alpha': alpha_dist, 'fluen': _fluen, 'fper': _fper, 'model': model}
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
@@ -1140,6 +1146,10 @@ def dist(_F_pk, nsamp=None, dip=False,
     # the lengths are consistent
     F_pk, _inclination, _nsamp = homogenize_params( {'fpeak': (_F_pk, MINBAR_FLUX_UNIT),
                                                       'incl': (inclination, u.deg, isotropic, imin, imax)}, nsamp)
+
+    if F_pk is None:
+        # bail out immediately if homogenize_params fails
+        return None
 
     # if no sample size has been passed, but we still need to generate samples
     # to account for the emission anisotropy, determine the array size here
@@ -1281,6 +1291,10 @@ def luminosity(_F_X, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
                                                                    'dist': (dist, u.kpc),
                                                                    'incl': (inclination, u.deg, isotropic, imin, imax),
                                                                    'c_bol': (c_bol, None)}, nsamp)
+
+    if F_X is None:
+        # bail out immediately if homogenize_params fails
+        return None
 
     # if no sample size has been passed, but we still need to generate samples
     # to account for the emission anisotropy, determine the array size here
@@ -1452,6 +1466,11 @@ def mdot(_F_per, _dist, c_bol=None, M=None, R=None, opz=None,
                                                       'c_bol': (c_bol, None),
                                                       'incl': (inclination, u.deg, isotropic, imin, imax)},
                                                       nsamp )
+
+    if F_per is None:
+        # bail out immediately if homogenize_params fails
+        return None
+
 #    dist = _dist
 #    if not hasattr(dist, 'unit'):
 #        print('** WARNING ** assuming units of {} for distance'.format(u.kpc))
@@ -1562,6 +1581,10 @@ def yign(_E_b, dist=None, nsamp=None, R=R_NS, opz=OPZ, Xbar=0.7, quadratic=False
     E_b, _dist, _inclination, _nsamp = homogenize_params( {'fluen': (_E_b, MINBAR_FLUEN_UNIT),
                                              'dist': (dist, u.kpc),
                                              'incl': (inclination, u.deg, isotropic, imin, imax)}, nsamp)
+
+    if E_b is None:
+        # bail out immediately if homogenize_params fails
+        return None
 
     # if no sample size has been passed, but we still need to generate samples
     # to account for the emission anisotropy, determine the array size here
@@ -1676,6 +1699,10 @@ def lum_to_flux(_lum, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
                                                            'dist': (dist, u.kpc),
                                                            'incl': (inclination, u.deg, isotropic, imin, imax),
                                                            'c_bol': (c_bol, None)}, nsamp)
+
+    if lum is None:
+        # bail out immediately if homogenize_params fails
+        return None
 
     if isotropic:
         xi_b, xi_p = 1., 1.

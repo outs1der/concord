@@ -24,7 +24,7 @@ def load_he16(model):
     return a
 
 
-def anisotropy(inclination, model='he16_a', test=False):
+def anisotropy(inclination, model='he16_a', test=False, warn=True):
     '''This function returns the burst and persistent anisotropy factors
 
     Factors are defined as for Fujimoto et al. 1988, i.e. the xi_b,p such that
@@ -34,7 +34,15 @@ def anisotropy(inclination, model='he16_a', test=False):
     exaggerated), and xi_b,p>1 indicating flux beamed preferentially away
 
     Generate a test of the model using
-    xi_b, xi_p = anisotropy(45.,test=True)'''
+    xi_b, xi_p = anisotropy(45.,test=True)
+
+    :param inclination: inclination values (scalar or array) [degree]
+    :param model: one of fuji88, he16_a, he16_b, he16_c, he16_c_short, he16_d
+    :param test: if set to True, will generate a plot showing the anisotropy factors
+    :param warn: flag to control unit warnings
+
+    :returns:
+    '''
 
     global anisotropy_he16
 
@@ -89,9 +97,10 @@ def anisotropy(inclination, model='he16_a', test=False):
     else:
         theta = inclination
         scalar = (np.shape(theta) == ()) or (np.shape(theta) == (1,))
-    if (hasattr(inclination,'unit') == False):
+    if (hasattr(inclination,'unit') == False) & warn:
         print ("** WARNING ** assuming inclination in degrees")
         theta *= u.degree
+        warn = False # turn off subsequent warnings
 
     if model == 'fuji88':
         xi_b = 1./(0.5+abs(np.cos(theta)))
