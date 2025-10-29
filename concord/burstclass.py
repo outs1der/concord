@@ -362,8 +362,10 @@ class Lightcurve(object):
         # This produces somewhat inconsistent results near the tail of the burst, where
         # the steps don't seem to match with the errorbars
         good = np.where((y.value > 0.) & (yerr.value > 0.))[0]
-        imin, imax = min(good), max(good)
-        plt.step(self.time[imin:imax],y[imin:imax],where='post',label=self.filename, **kwargs)
+        plt.step(
+            np.append(self.time[good],self.time[good][-1:]+self.dt[good][-1:]),
+            np.append(y[good],y[good][-1:]),where='post',label=self.filename,
+            **kwargs)
 #        print (type(self.dt), type(yerr))
 #        print (yerror & (self.dt != None) & (yerr != None))
 #        if (yerror & (self.dt != None) & (yerr != None)):
