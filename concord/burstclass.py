@@ -1,14 +1,9 @@
 # Burst class for MINBAR
 #
-# This code is a preliminary attempt to develop a burst class for MINBAR,
+# This code provides an implementation of a burst class for use with MINBAR data,
 # including model-observation comparisons. 
 # 
-# See also the repository on BitBucket:
-#   https://bitbucket.org/minbar/concord
-#
 # Duncan.Galloway@monash.edu, 2018
-#
-# including model-observation comparisons.
 #
 # Here are the classes and functions making up this module:
 #
@@ -24,7 +19,6 @@
 # def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
 # def plot_contours(sampler,parameters,ignore,plot_size):
 
-import os
 from .utils import *
 import astropy.io.ascii as ascii
 import csv
@@ -68,8 +62,15 @@ if os.path.isfile(CONCORD_PATH+'/table2.tex'):
 def fper(mburst, param, c_bol=1.0):
     '''
     Calculates the persistent flux, based on the supplied mdot, redshift
-    etc. Earlier we passed the individual parameters, but easiest to just provide
-    the model burst
+    etc. for a model burst. Earlier we passed the individual parameters, but easiest to just provide
+    the burst object
+
+    :param mburst: the model burst object
+    :param param: parameter array, (for now) a tuple with the appropriate units;
+      ( distance, inclination, redshift, time offset )
+    :param c_bol: the bolometric correction for the persistent flux
+
+    :return: the persistent flux
     '''
 
     dist, inclination, _opz, t_off = param
@@ -121,7 +122,7 @@ def fper(mburst, param, c_bol=1.0):
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def modelFunc(p,obs,model, disc_model):
+def modelFunc(p, obs, model, disc_model='he16_a'):
     '''
     This function performs the stretching and rescaling of the (model
     predicted) burst lightcurve based on the input parameter set
@@ -135,31 +136,39 @@ def modelFunc(p,obs,model, disc_model):
     :param disc_model: choice of disc model for the anisotropy
     '''
 
-    dist, inclination, _opz, t_off = p
+    if p is not None:
+        dist, inclination, _opz, t_off = p
 
-# Use the anisotropy function to calculate the anisotropy factors given
-# the inclination
+        # Use the anisotropy function to calculate the anisotropy factors given
+        # the inclination
 
-    xi_b, xi_p = dm.anisotropy(inclination)
+        xi_b, xi_p = dm.anisotropy(inclination, model=disc_model)
 
-    # The combination of an input redshift an model gravity uniquely define
-    # a mass-radius combination
+        # The combination of an input redshift an model gravity uniquely define
+        # a mass-radius combination
 
-    _M, _R = calc_mr(model.g, _opz)
+        _M, _R = calc_mr(model.g, _opz)
 
-    # Here we calculate the value of xi (ratio of GR to Newtonian radii),
-    # appropriate for the adopted value of (1+z). This is used instead of the
-    # value attached to the model, because that's for a different redshift
+        # Here we calculate the value of xi (ratio of GR to Newtonian radii),
+        # appropriate for the adopted value of (1+z). This is used instead of the
+        # value attached to the model, because that's for a different redshift
 
-    # xi = sqrt(_opz)
-    xi = (_R / model.R_Newt).decompose()
+        # xi = sqrt(_opz)
+        xi = (_R / model.R_Newt).decompose()
+
+        # assume we've got a model lightcurve here
+        y_interp = model.lumin
+    else:
+        # if no parameters are passed, just do the interpolation
+        xi, _opz, t_off = 1., 1., 0.
+        y_interp = model.flux
 
     # First interpolate the model values onto the observed grid
     # This step defines the interpolation function, using a shifted and rescaled
     # model time to account for time dilation in the NS surface frame
 
-    fInterp = interp1d(_opz*(model.time-t_off),model.lumin,bounds_error=False,
-                      fill_value = min(model.lumin))
+    fInterp = interp1d(_opz*(model.time-t_off), y_interp,bounds_error=False,
+                      fill_value = min(y_interp))
 
     # Then we return the predicted model flux, interpolated onto the observed
     # burst time bins. We shift the observed times to the middle of the bin, using
@@ -173,9 +182,12 @@ def modelFunc(p,obs,model, disc_model):
     # since xi = sqrt(_opz) (see above), this first term just becomes 1/_opz
     #    return ( (xi/_opz)**2
 
-    return ( (xi / _opz)**2
-            * fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*model.lumin.unit
-            / (4.*pi*dist.to('cm')**2) / xi_b )
+    result = fInterp(obs.time+(0.5-obs.timepixr)*obs.dt)*y_interp.unit
+
+    if p is not None:
+        return ( (xi / _opz)**2 * result / (4.*pi*dist.to('cm')**2) / xi_b )
+
+    return result
 
 # ======= ========= ========= ========= ========= ========= ========= =========
 
@@ -205,7 +217,21 @@ class Lightcurve(object):
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
     def __init__(self, *args, **kwargs):
-        """initialise the object by assigning named entities from the kwargs"""
+        """
+        Initialise the object by assigning named entities from the kwargs.
+        Each entity is added as a class atribute
+
+        Below is a (hopefully) exhaustive list of the recognized keywords
+
+        filename - source file for the data
+        time, n - time array, unit, and number of elements
+        timepixr - where in the time bin is the flux measured [0..1]
+        dt - width of time bin
+        lumin, lumin_err - luminosity and error
+        flux, flux_err - flux and error (normally only one of these 2 present)
+
+        :returns: length of the time series, or None
+        """
 
 # Initialise the various attributes, where present. We expect to have at
 # least one of flux or lumin (and the related uncertainty)
@@ -214,20 +240,32 @@ class Lightcurve(object):
         self.filename = kwargs.get('filename',None)
 
         self.time = kwargs.get('time',None)
+        if self.time is None:
+            logger.error('burst Lightcurve object must have a time column')
+            return None
+        else:
+            self.n = len(self.time)
+
         self.timepixr = kwargs.get('timepixr',0.0)
 
         # Not good enough to not have a dt column
 #        self.dt = kwargs.get('dt',None)
         if 'dt' in kwargs:
             self.dt = kwargs.get('dt')
+            assert len(self.dt) == len(self.time)
         else:
             dt = self.time[1:]-self.time[:-1]
-            self.dt = np.append(dt.value,dt[-1].value)*dt.unit
+            # I don't think dt.unit will necessarily be defined
+            self.dt = np.append(dt.value,dt[-1].value)#*dt.unit
 
 #        if kwargs.get('flux',None):
 
         self.lumin = kwargs.get('lumin',None)
         self.lumin_err = kwargs.get('lumin_err',None)
+        if (self.lumin is not None):
+            assert (len(self.lumin) == self.n)
+        if (self.lumin_err is not None):
+            assert (len(self.lumin_err) == self.n)
 
 # Here we define the dt_nogap and good attributes, which are used in the
 # fluence calculation (and elsewhere)
@@ -239,13 +277,27 @@ class Lightcurve(object):
             # print ('flux',self.flux)
             # print ('flux_err',self.flux_err)
 
-            self.good = np.where(self.flux_err < self.flux)[0]
+            if self.flux_err is None:
+                # possible there is a flux_min, flux_max or some other
+                # label
+                if ('e_flux' in kwargs):
+                    self.flux_err = kwargs.get('e_flux', None)
+                elif ('flux_min' in kwargs) & ('flux_max' in kwargs):
+                    self.flux_err = 0.5*(kwargs['flux_max']-kwargs['flux_min'])
+
+            assert (len(self.flux) == self.n)
+            if (self.flux_err is not None):
+                assert (len(self.flux_err) == self.n)
+            self.good = np.arange(self.n)
+            if self.flux_err is not None:
+                self.good = np.where((self.flux_err < self.flux) &
+                    (self.flux_err > 0))[0]
             if len(self.good) > 0:
                 for i in range(len(self.good)-1):
                     self.dt_nogap[self.good[i]] = max(
     [self.dt[self.good[i]],self.time[self.good[i+1]]-self.time[self.good[i]]] )
-        else:
-            self.good = np.arange(len(self.lumin))
+
+        return self.n
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -413,11 +465,11 @@ class Lightcurve(object):
         """
 
         if not hasattr(self,'lumin'):
-            print ("concord.observe: ** ERROR ** need luminosity to simulate observation")
+            logger.error ("need luminosity to simulate observation")
             return None
 
         if not hasattr(self,'g'):
-            print ("concord.observe: ** ERROR** need model gravity to simulate observation")
+            logger.error ("need model gravity to simulate observation")
 
         # First unpack the simulation parameters
 
@@ -452,7 +504,7 @@ class Lightcurve(object):
             model += np.random.normal(size=npts)*obs.flux_err
 
         else:
-            print ("concord.observe: ** WARNING ** can't add scatter without flux errors")
+            logger.warning ("can't add scatter without flux errors")
 
         # This is OK (modelFunc will deal with it)
 
@@ -487,12 +539,6 @@ class Lightcurve(object):
                             )
 
         return sim
-
-#         return Lightcurve(time=obs.time,dt=obs.dt,
-#                           flux=model,flux_err=obs.flux_err,
-# #                          tdel = self.tdel*_opz,tdel_err=self.tdel_err*_opz,
-# #                          fper = fper(self.mdot,_opz,dist,xi_p,c_bol=c_bol),
-#                           filename="{} @ {}".format(self.filename,dist))
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -529,7 +575,7 @@ class Lightcurve(object):
 #        self.pfluxe = self.flux_err[self.good[imax]]
 
         if (max(self.dt_nogap/self.dt) > 2.) & warnings:
-            print ('** WARNING ** excessive gap filling not yet implemented')
+            logger.warning ('excessive gap filling not yet implemented')
 
         fluen = sum(y[self.good]*self.dt_nogap[self.good])
         fluene_stat = np.sqrt(sum( (yerr[self.good]*self.dt_nogap[self.good])**2 ))
@@ -584,7 +630,7 @@ class Lightcurve(object):
 
         f_int=0.
         if (result[0] > 0.0) & warnings:
-            print ('** WARNING ** fit is rising, result is not trustworthy')
+            logger.warning ('fit is rising, result is not trustworthy')
         else:
             tmax=max(self.time[sel]+self.dt_nogap[sel]-self.time[sel[0]])
             f_int=-fluen.unit/result[0]*exp(result[1])*exp(tmax.value*result[0])
@@ -604,7 +650,7 @@ class Lightcurve(object):
 
         if f_int > fluene_stat:
             if warnings:
-                print ('** WARNING ** extrapolated fluence > stat_error, replacing')
+                logger.warning ('extrapolated fluence > stat_error, replacing')
             return fluen, f_int
 
         return fluen, fluene_stat
@@ -616,9 +662,9 @@ class Lightcurve(object):
 
 class ObservedBurst(Lightcurve):
     '''
-    Observed burst class. Apart from the lightcurve (which is
-    defined with ``time``, ``flux``, and ``flux_err`` columns), the additional
-    attributes set are:
+    Observed burst class. Apart from the lightcurve (which is defined
+    minimally with ``time``, ``flux``, and ``flux_err`` columns), the
+    additional attributes set are:
 
     :filename: source file name
     :tdel, tdel_err: recurrence time and error (hr)
@@ -642,6 +688,14 @@ class ObservedBurst(Lightcurve):
         Now we define a Lightcurve instance, using the columns from the file
         Units are applied to the input arrays (and assumed to be correct!)
 
+        Relevant additional parameters include
+
+        tdel
+        fper, fper_err
+        kT, kT_min, kT_max etc.
+        rad, rad_min, rad_max etc.
+        chisq
+
         :param time: array of times (start of time bin is assumed)
         :param dt: width of each bin
         :param flux: flux averaged over each time bin
@@ -651,9 +705,14 @@ class ObservedBurst(Lightcurve):
         :returns:
         '''
 
-        Lightcurve.__init__(self, time = time*u.s, dt = dt*u.s,
+        # TODO really need to check here in case the various quantities already have units
+
+        _n = Lightcurve.__init__(self, time = time*u.s, dt = dt*u.s,
                                 flux = flux*u.erg/u.cm**2/u.s,
                                 flux_err= flux_err*u.erg/u.cm**2/u.s)
+        if _n is None:
+            logger.error("can't create Lightcurve object, bailing out")
+            return None
 
         # End block for adding attributes from the file. Below you can use the
         # additional arguments on init to set or override attributes
@@ -668,9 +727,31 @@ class ObservedBurst(Lightcurve):
                     setattr(self,key,float(kwargs[key])*u.hr)
                 elif ((key == 'fper') | (key == 'fper_err')) & (not hasattr(kwargs[key],'unit')):
                     setattr(self,key,float(kwargs[key])*u.erg/u.cm**2/u.s)
+                # Ensure that additional time-resolved spectral parameters have the right units
+                elif (((key[:2] == 'kT') | (key == 'e_kT')) # will trap kT_min, kT_max, kT_err etc.
+                    & (not hasattr(kwargs[key], 'unit'))):
+                    if len(kwargs[key]) != _n:
+                        logger.error("additional time-resolved spectral parameters must have same length as time")
+                        return None
+                    setattr(self, key, kwargs[key]*u.keV)
+                elif (key[:3] == 'rad') | (key == 'e_rad'): # will trap rad_min, rad_max etc.
+                    # radius technically has no units; typically km**2/d(10kpc)**2
+                    if len(kwargs[key]) != _n:
+                        logger.error("additional time-resolved spectral parameters must have same length as time")
+                        return None
+                    setattr(self,key,kwargs[key])
+                elif (key == 'chisq'):
+                    if len(kwargs[key]) != _n:
+                        logger.error("additional time-resolved spectral parameters must have same length as time")
+                        return None
+                    setattr(self,key,kwargs[key])
                 else:
                     setattr(self,key,kwargs[key])
 
+        if (min(self.time) > 0.) & (not hasattr(self, 'bstart')):
+            # possible the start time has not been defined/subtracted
+            self.bstart = min(self.time[self.flux > 0.])
+            self.time -= self.bstart
 
     @classmethod
     def minbar(cls, id, remote=False):
@@ -710,6 +791,7 @@ class ObservedBurst(Lightcurve):
         if remote:
             cls.minbar_bursts.local_data = cls.local_data
 
+        # TODO: should add the other time-resolved spectral parameters here
         return ObservedBurst(d['time'].values, d['dt'].values,
                              d['flux'].values*1e-9, d['fluxerr'].values*1e-9,
                              # additional attributes
@@ -773,7 +855,7 @@ class ObservedBurst(Lightcurve):
         #        print (i, lcfile, cls.key)
 
         if row is None:
-            print ('** ERROR ** no match for key {}'.format(key))
+            logger.error('no match for key {}'.format(key))
             return
 
         # print ('source = {}'.format(source))
@@ -938,9 +1020,16 @@ class ObservedBurst(Lightcurve):
         :param debug: display debugging information
         '''
 
-        # Calculate the simulated burst using the observe method
+        if type(mburst) == ObservedBurst:
+            # We've got an observed burst, but still trying to work out how to implement this
 
-        sim_burst = mburst.observe(param, obs=self, disc_model=disc_model, c_bol=self.c_bol)
+            logger.error('comparing with observed bursts not yet implemented, sorry')
+            return
+        else:
+            # Calculate the simulated burst using the observe method
+            # this method also re-bins (well, interpolates) the data
+
+            sim_burst = mburst.observe(param, obs=self, disc_model=disc_model, c_bol=self.c_bol)
 
         assert sim_burst.flux.unit == self.flux.unit == self.flux_err.unit
 
@@ -964,17 +1053,21 @@ class ObservedBurst(Lightcurve):
 
         # Persistent flux
 
-        # fper_pred = fper(mburst.mdot,_opz,dist,xi_p,c_bol=self.cbol)
-        fper_pred = sim_burst.fper
+        if hasattr(sim_burst, 'fper') & hasattr(self, 'fper'):
+            # fper_pred = fper(mburst.mdot,_opz,dist,xi_p,c_bol=self.cbol)
+            fper_pred = sim_burst.fper
 
-        if hasattr(self,'fper_err'):
-            fper_sig2 = 1.0/(self.fper_err.value**2)
+            if hasattr(self,'fper_err'):
+                fper_sig2 = 1.0/(self.fper_err.value**2)
+            else:
+                logger.warning ('no uncertainty on F_per')
+                fper_sig2 = 1.0
+            lhood_cpt = np.append(lhood_cpt, -weights['fluxwt']*(
+                   (self.fper.value-fper_pred.value)**2*fper_sig2
+                   +np.log(2.*pi/fper_sig2) ) )
         else:
-            print ('concord.compare: ** WARNING ** no uncertainty on F_per')
-            fper_sig2 = 1.0
-        lhood_cpt = np.append(lhood_cpt, -weights['fluxwt']*( 
-               (self.fper.value-fper_pred.value)**2*fper_sig2 
-               +np.log(2.*pi/fper_sig2) ) )
+            logger.warning('no F_per for one or both of base and comparison bursts')
+            fper_sig2, lhood_cpt = 1.0, np.append(lhood_cpt, 0.0)
 
         # recurrence time
 
@@ -982,10 +1075,14 @@ class ObservedBurst(Lightcurve):
         # lhood_cpt = np.append(lhood_cpt, -weights['tdelwt']*(
         #        (self.tdel.value-mburst.tdel.value*_opz)**2*tdel_sig2
         #        +np.log(2.*pi/tdel_sig2) ) )
-        tdel_sig2 = 1.0 / (self.tdel_err.value**2+sim_burst.tdel_err.value**2)
-        lhood_cpt = np.append(lhood_cpt, -weights['tdelwt']*(
-                (self.tdel.value-sim_burst.tdel.value)**2*tdel_sig2
-                +np.log(2.*pi/tdel_sig2) ) )
+        if hasattr(sim_burst, 'tdel') & hasattr(self, 'tdel'):
+            tdel_sig2 = 1.0 / (self.tdel_err.value**2+sim_burst.tdel_err.value**2)
+            lhood_cpt = np.append(lhood_cpt, -weights['tdelwt']*(
+                    (self.tdel.value-sim_burst.tdel.value)**2*tdel_sig2
+                    +np.log(2.*pi/tdel_sig2) ) )
+        else:
+            logger.warning('no tdel for one or both of base and comparison bursts')
+            tdel_sig2, lhood_cpt = 1.0, np.append(lhood_cpt, 0.0)
 
         # lightcurve
 
@@ -1007,7 +1104,7 @@ class ObservedBurst(Lightcurve):
                     self.flux[i].value, self.flux_err[i].value, sim_burst.flux[i].value,_lhood,cl))
 
         if breakdown:
-            print ("Likelihood component breakdown (fper, tdel, lightcurve): ",lhood_cpt)
+            logger.info ("likelihood component breakdown (fper, tdel, lightcurve): ",lhood_cpt)
 
 # Plot the observed burst
 
@@ -1153,7 +1250,7 @@ class KeplerBurst(Lightcurve):
 
         else:
 
-            print ("** ERROR ** no valid model specification")
+            logger.error ("no valid model specification")
             return
 
         # Read in the file, and initialise the lightcurve
@@ -1246,7 +1343,7 @@ class KeplerBurst(Lightcurve):
 # But if that fails, we use the local version, which has a few differences
 # (unfortunately)
 
-                    print ("** WARNING ** can't get Vizier table, using local file")
+                    logger.warning ("can't get Vizier table, using local file")
                     self.table_file='/Users/duncan/Documents/2015/Nat new catalog/summ.csv'
                     self.data = ascii.read(self.table_file)
 
@@ -1330,7 +1427,7 @@ class KeplerBurst(Lightcurve):
             elif (hasattr(self,'M_NS') & hasattr(self,'R_Newt')):
                 self.g = g(self.M_NS,self.R_Newt,Newt=True)
             else:
-                print ("** ERROR ** can't calculate g")
+                logger.error ("can't calculate g")
 
         if (not hasattr(self,'M_NS')):
             if (hasattr(self,'g') & hasattr(self,'R_NS')): 
@@ -1340,7 +1437,7 @@ class KeplerBurst(Lightcurve):
             elif (hasattr(self,'g') & hasattr(self,'R_Newt')):
                 self.M_NS = (self.g*R_Newt**2/const.G).to(u.g)
                 if debug:
-                    print ('Inferred mass = {:.4f} M_sun'.format(M_NS/const.M_sun))
+                    logger.info ('inferred mass = {:.4f} M_sun'.format(M_NS/const.M_sun))
 
 # Here we calculate the redshift, and check for consistency with any
 # already-set value
@@ -1350,7 +1447,7 @@ class KeplerBurst(Lightcurve):
             if hasattr(self,'opz'):
 #                assert abs(_opz-self.opz)/_opz < eta, "Inconsistent value of opz, {} != {}".format(_opz,self.opz)
                 if abs(_opz-self.opz)/_opz >= eta:
-                  print ("Inconsistent value of opz, {:.4f} != {:.4f}".format(_opz,self.opz))
+                  logger.warning ("inconsistent value of opz, {:.4f} != {:.4f}".format(_opz,self.opz))
             else:
                 self.opz = _opz
 
@@ -1360,7 +1457,7 @@ class KeplerBurst(Lightcurve):
         if hasattr(self,'xi'):
 #            assert abs(_xi-self.xi)/_xi < eta, "Inconsistent value of xi, {} != {}".format(_xi,self.xi)
             if abs(_xi-self.xi)/_xi >= eta:
-                print ("Inconsistent value of xi, {:.4f} != {:.4f}".format(_xi,self.xi))
+                logger.warning ("inconsistent value of xi, {:.4f} != {:.4f}".format(_xi,self.xi))
         else:
             self.xi = _xi
 
@@ -1377,7 +1474,7 @@ class KeplerBurst(Lightcurve):
             not (hasattr(self,'g')) & hasattr(self,'R_Newt') and 
             not (hasattr(self,'M_NS')) & hasattr(self,'R_NS') and 
             not (hasattr(self,'M_NS')) & hasattr(self,'R_Newt')):
-            print ("** WARNING ** insufficient parameters defined to convert to observed frame")
+            logger.warning ("insufficient parameters defined to convert to observed frame")
 
         # Some ambiguity with the attribute capitalisation for the accretion rate,
         # so try to fix that here. Also make this work with the more recent versions
@@ -1522,7 +1619,7 @@ def lhoodClass(params, obs, model, **kwargs):
     if type(obs) == tuple:
         n = len(obs)
         if (n != len(model)):
-            print ("** ERROR ** number of observed and model bursts don't match")
+            logger.error ("number of observed and model bursts don't match")
 
         for i in range(n):
 
@@ -1579,7 +1676,7 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
         _param_best = param
 
     param_best = apply_units(_param_best)
-    print ('Got parameter set for plotting: ',param_best)
+    logger.info ('got parameter set for plotting: ',param_best)
 
 # Want to have a check here in case there are other than 3 models & obs
 # to compare
