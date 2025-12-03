@@ -700,8 +700,8 @@ class Lightcurve(object):
         f_pk, e_f_pk = self.peak_flux
         fluen, e_fluen = self.fluence
 
-        _F_pk = value_to_dist((f_pk.value, e_f_pk.value)* u.erg / u.cm ** 2 / u.s, nsamp=nsamp)
-        _fluen = value_to_dist((fluen.value, e_fluen.value)* u.erg / u.cm ** 2, nsamp=nsamp)
+        _F_pk = value_to_dist((f_pk.value, e_f_pk.value)* u.erg / u.cm ** 2 / u.s, nsamp=nsamp, positive=True)
+        _fluen = value_to_dist((fluen.value, e_fluen.value)* u.erg / u.cm ** 2, nsamp=nsamp, positive=True)
 
         tau = _fluen / _F_pk
         # plt.hist(tau.distribution, density=True, bins=20)
@@ -1189,6 +1189,10 @@ class ObservedBurst(Lightcurve):
         # TODO: should add the other time-resolved spectral parameters here
         return ObservedBurst(d['time'].values, d['dt'].values,
                              d['flux'].values*1e-9, d['fluxerr'].values*1e-9,
+                             # additional keyword time-resolved spectroscopy elements
+                             kT=d['kT'].values, kT_min=d['kT_min'].values, kT_max=d['kT_max'].values,
+                             rad=d['rad'].values, rad_min=d['rad_min'].values, rad_max=d['rad_max'].values,
+                             chisq=d['chisq'],
                              # additional attributes
                              minbar_id=id, filename=d.attrs['file'],
                              timepixr=0.0, conf=0.68,
@@ -1208,7 +1212,7 @@ class ObservedBurst(Lightcurve):
     @classmethod
     def ref(cls, source, dt):
         '''
-	Method to read in a reference burst and populate the relevant
+	    Method to read in a reference burst and populate the relevant
         arrays to create an :py:class:`concord.burstclass.ObservedBurst`
 
         Calling approach:
@@ -1381,6 +1385,41 @@ class ObservedBurst(Lightcurve):
         # should also print the simulation lightcurve parameters, where available
 
         self.print()
+
+
+    def test_pre(self):
+        """
+        Here apply the PRE criteria from Galloway et al. 2008:
+        '...radius expansion occurred when (1) the blackbody normalization Kbb reached a ( local) maximum close to the time of peak
+        flux; (2) lower values of Kbb were measured following the maximum, with the decrease significant to 4\sigma or more; and (3) there
+        was evidence of a (local) minimum in the fitted temperature Tbb at the same time as the maximum in Kbb. Bursts where just one or two
+        of these criteria were satisfied we refer to as ‘‘marginal’’ cases, in which the presence of PRE could not be conclusively established.'
+
+        :return: 3-element boolean tuple with the three criteria (all should be true for a proper PRE burst)
+        """
+
+        if not (('kT' in self.columns) & ('rad' in self.columns)):
+            logger.error("can't test for PRE without blackbody temperature and radius")
+
+        imax = np.argmax(self.flux) # bin with maximum flux
+        irmax = np.argmax(self.rad[:imax+1]) # bin with maximum radius, within the subinterval including the peak flux bin
+        irmin = np.argmin(self.rad[irmax:imax+1])+irmax # bin with minimum radius, between the max radius and max flux
+        sig = (self.rad[irmax]-self.rad[irmin])/np.sqrt(self.e_rad[irmax]**2+self.e_rad[irmin]**2) # significance of the drop
+
+        # test for a local maximum in kT coincident with the minimum in radius
+        # could add a significance test here
+        kT_ismax = False
+        if irmax < self.n-1:
+            kT_ismax = self.kT[irmax] > self.kT[irmax+1]
+        if irmax > 0:
+            kT_ismax = (kT_ismax) & (self.kT[irmax] > self.kT[irmax-1])
+        else:
+            kT_ismax = False # can't tell if the max kT is at the first bin
+
+        return (irmax > 0,  # local maximum requires that there are smaller values before and after
+            sig > 4,        # significant drop in radius after
+            kT_ismax)       # local kT max
+
 
     def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.26,-10.*u.s],
         		breakdown = False, plot = False, subplot = True,
