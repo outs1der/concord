@@ -890,11 +890,11 @@ class Lightcurve(object):
 
         # Determine the number of columns for averaging, and build the 2D array
 
-        dx = 0
+        dx = []
         _t, _te = (), ()
-        for col in col_avg:
+        for i, col in enumerate(col_avg):
             if col in self.columns:
-                dx += 1
+                dx.append(i)
                 try:
                     _t = _t + (getattr(self, col).value,)
                 except:
@@ -908,11 +908,14 @@ class Lightcurve(object):
                     _te = _te + (getattr(self, 'e_'+col).value,)
             else:
                 logger.warning('no such column {} in input data'.format(col))
-        if dx == 0:
+        if len(dx) == 0:
             logger.error('no columns found in input data')
             return None, None
         data = np.vstack(_t)
         e_data = np.vstack(_te)
+        # need to keep notchi up to date with skipped columns
+        notchi = notchi[dx]
+        dx = len(dx)
 
         # The MINBAR time-resolved spectroscopic data are defined with the times at
         # the start of the bin. For a model lightcurve though, we might not have dt, so should check here
@@ -1145,7 +1148,7 @@ class ObservedBurst(Lightcurve):
     @classmethod
     def minbar(cls, id, remote=False):
         '''
-	Method to generate an observed burst from MINBAR, and populate the
+	    Method to generate an observed burst from MINBAR, and populate the
         relevant arrays. Requires the minbar repo to be present (obviously)
 
         Calling approach:
@@ -1185,6 +1188,7 @@ class ObservedBurst(Lightcurve):
                              d['flux'].values*1e-9, d['fluxerr'].values*1e-9,
                              # additional attributes
                              minbar_id=id, filename=d.attrs['file'],
+                             timepixr=0.0, conf=0.68,
                              name = cls.minbar_bursts[id]['name'], instr = cls.minbar_bursts[id]['instr'],
                              time_start = cls.minbar_bursts[id]['time'], obsid = cls.minbar_bursts[id]['obsid'],
                              tdel = cls.minbar_bursts[id]['tdel'],
