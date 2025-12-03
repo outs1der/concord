@@ -914,7 +914,7 @@ class Lightcurve(object):
         data = np.vstack(_t)
         e_data = np.vstack(_te)
         # need to keep notchi up to date with skipped columns
-        notchi = notchi[dx]
+        notchi = np.where(_col_avg[dx] != 'chisq')[0]
         dx = len(dx)
 
         # The MINBAR time-resolved spectroscopic data are defined with the times at
@@ -1090,7 +1090,7 @@ class ObservedBurst(Lightcurve):
 
         _n = Lightcurve.__init__(self, time = time*u.s, dt = dt*u.s,
                                 flux = flux*u.erg/u.cm**2/u.s,
-                                e_flux= e_flux*u.erg/u.cm**2/u.s)
+                                e_flux= e_flux*u.erg/u.cm**2/u.s, **kwargs)
         if _n is None:
             logger.error("can't create Lightcurve object, bailing out")
             return None
