@@ -1142,7 +1142,10 @@ class ObservedBurst(Lightcurve):
 
         if (min(self.time) > 0.) & (not hasattr(self, 'bstart')):
             # possible the start time has not been defined/subtracted
-            self.bstart = min(self.time[self.flux > 0.])
+            # self.bstart = min(self.time[self.flux > 0.])
+            # use the MINBAR definition
+
+            self.bstart = min(self.time[self.flux > 0.25*self.peak_flux[0]])
             self.time -= self.bstart
 
     @classmethod
