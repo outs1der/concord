@@ -178,7 +178,7 @@ def value_to_dist(_num, nsamp=NSAMP_DEF, unit=None, statistics='max', positive=F
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
-def homogenize_params(theta, nsamp=None):
+def homogenize_params(theta, nsamp=None, warnings=True):
     """
     This method is used by the MC routines, to ensure consistency of the
     parameter set. We want to make sure that each parameter (if a distribution)
@@ -210,6 +210,8 @@ def homogenize_params(theta, nsamp=None):
     :param theta: dictionary with parameters and units
     :param nsamp: desired size of distribution objects, if not already set by
                   one or more of the parameters
+    :param warnings: if set to False, will suppress warnings
+
     :return: tuple with all the parameters in the same order they're
         passed, plus the actual number of samples per parameter
     """
@@ -237,7 +239,7 @@ def homogenize_params(theta, nsamp=None):
     mismatch = False
     l = [] # array for parameter lengths
     for par in theta.keys():
-        if par not in params:
+        if (par not in params) & warnings:
             logger.warning('parameter {} is not in my list')
         l.append( len_dist(theta[par][0]) )
         if (l[-1] > 3):
@@ -262,7 +264,7 @@ def homogenize_params(theta, nsamp=None):
             if (nsamp is None):
                 nsamp = NSAMP_DEF
         else:
-            if (nsamp is not None) & (_nsamp != nsamp):
+            if (nsamp is not None) & (_nsamp != nsamp) & warnings:
                 logger.warning('passed nsamp overridden by size of one or more parameter distribution')
             nsamp = _nsamp
     # print (scalar, _nsamp, nsamp)
@@ -287,13 +289,15 @@ def homogenize_params(theta, nsamp=None):
                     theta_hom.append( theta[par][0] )
             elif (par == 'c_bol') & (l[i] == 0):
                 # special here for no supplied bolometric correction
-                logger.warning('no bolometric correction applied')
+                if warnings:
+                    logger.warning('no bolometric correction applied')
                 theta_hom.append( 1.0 )
             elif par in params:
                 # "standard" (measurables) are forced to be positive
                 theta_hom.append( value_to_dist(theta[par][0], nsamp=nsamp, unit=theta[par][1], positive=True) )
             else:
-                logger.warning('non-standard param {} may include negative samples'.format(par))
+                if warnings:
+                    logger.warning('non-standard param {} may include negative samples'.format(par))
                 theta_hom.append( value_to_dist(theta[par][0], nsamp=nsamp, unit=theta[par][1]) )
 
     if scalar:
@@ -1287,10 +1291,13 @@ def luminosity(_F_X, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
 
     # generate distributions where required, with correct units, and make sure
     # the lengths are consistent
+    # suppress warnings for bursts (to get rid of the annoying bolometric
+    # correction reminder)
     F_X, _dist, _inclination, _c_bol, _nsamp = homogenize_params( {'flux': (_F_X, MINBAR_FLUX_UNIT),
                                                                    'dist': (dist, u.kpc),
                                                                    'incl': (inclination, u.deg, isotropic, imin, imax),
-                                                                   'c_bol': (c_bol, None)}, nsamp)
+                                                                   'c_bol': (c_bol, None)}, nsamp,
+                                                                   warnings=(not burst))
 
     if F_X is None:
         # bail out immediately if homogenize_params fails
@@ -1698,7 +1705,8 @@ def lum_to_flux(_lum, dist=None, c_bol=None, nsamp=None, burst=True, dip=False,
     lum, _dist, _inclination, _c_bol, _nsamp = homogenize_params( {'lum': (_lum, u.erg/u.s),
                                                            'dist': (dist, u.kpc),
                                                            'incl': (inclination, u.deg, isotropic, imin, imax),
-                                                           'c_bol': (c_bol, None)}, nsamp)
+                                                           'c_bol': (c_bol, None)}, nsamp,
+                                                                   warnings=(not burst))
 
     if lum is None:
         # bail out immediately if homogenize_params fails

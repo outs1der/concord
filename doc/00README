@@ -1,16 +1,14 @@
 File 00README
 Created 20/9/21
-Last modified 12/1/22
+Last modified 4/12/2025
 
 This file describes the contents of concord/doc. This directory contains
-the original contents of the concord paper, which have since been moved to
-Overleaf; see
+the original preprint of the concord paper, and the code documentation.
 
-https://www.overleaf.com/project/61483d26d1fc31597f945eb9
-
-The directory also contains files related to the code documentation, which
-is generated automatically with sphinx; type
+The code documentation source is provided in source/index.rst, and can be
+generated automatically with sphinx; type
 
 make html
 
 and copy the contents of the html directory to an appropriate remote site
+(currently https://burst.sci.monash.edu/concord)

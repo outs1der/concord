@@ -18,11 +18,11 @@ sys.path.insert(0, os.path.abspath('..'))
 # -- Project information -----------------------------------------------------
 
 project = 'concord'
-copyright = '2021, Duncan Galloway'
+copyright = '2025, Duncan Galloway'
 author = 'Duncan Galloway'
 
 # The full version, including alpha/beta/rc tags
-release = '0.9.0'
+release = '1.0.0 and above'
 
 
 # -- General configuration ---------------------------------------------------

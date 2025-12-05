@@ -1387,7 +1387,7 @@ class ObservedBurst(Lightcurve):
         self.print()
 
 
-    def test_pre(self):
+    def test_pre(self, plot=False):
         """
         Here apply the PRE criteria from Galloway et al. 2008:
         '...radius expansion occurred when (1) the blackbody normalization Kbb reached a ( local) maximum close to the time of peak
@@ -1415,6 +1415,12 @@ class ObservedBurst(Lightcurve):
             kT_ismax = (kT_ismax) & (self.kT[irmax] > self.kT[irmax-1])
         else:
             kT_ismax = False # can't tell if the max kT is at the first bin
+
+        if plot:
+            self.plot()
+            plt.xlim((0, self.time[imax]*1.2))
+            plt.axvline(self.time[imax]+self.dt[imax], color='k', linestyle='--')
+            plt.axvline(self.time[irmax] + self.dt[irmax], color='r', linestyle='--')
 
         return (irmax > 0,  # local maximum requires that there are smaller values before and after
             sig > 4,        # significant drop in radius after

@@ -15,10 +15,13 @@ and the tools presented here are intended
 to make comprehensive model-observation comparisons straightforward.
 
 This code is under active development, but the `v1.0.0 release <https://bridges.monash.edu/articles/software/concord_release_1/21287616>`_ is
-associated with a companion paper accepted by Astrophysical Journal
+associated with a companion paper published in Astrophysical Journal
 Supplements (see `Galloway et al. 2022 <https://iopscience.iop.org/article/10.3847/1538-4365/ac98c9>`_, also available at
 `arXiv:2210.03598 <https://arxiv.org/abs/2210.03598>`_). A preprint of the
 paper is available in the `doc` subdirectory of the repository
+
+This documentation is based on the v1.0.0 release but may include
+descriptions of features, functions or methods added since.
 
 .. toctree::
    :maxdepth: 2
@@ -27,13 +30,21 @@ paper is available in the `doc` subdirectory of the repository
 Getting started
 ===============
 
-Clone the repository and install using pip::
+.. already described in README.md
 
-    python3 -m pip install
+Clone the repository, and create & activate the environment::
 
-You can then import the repository and use the functions. Here's a very simple example, to find the peak luminosity of a
-burst from 4U 0513+40 measured by RXTE, as part of the MINBAR sample. The
-first part calculates the isotropic luminosity, neglecting the uncertainty
+    conda env create -f environment.yml
+    conda activate concord
+
+You can also install using pip::
+
+    python3 -m pip install .
+
+You can then import the repository and use the functions. Here's two
+simple examples, to find the peak luminosity of a
+burst from 4U 0513+40 measured by `RXTE`, as part of the MINBAR sample. The
+first example calculates the isotropic luminosity, neglecting the uncertainty
 in both the peak flux and the distance::
 
     import concord as cd
@@ -44,7 +55,7 @@ in both the peak flux and the distance::
     print (l_iso)
     # 2.767771097997098e+38 erg / s
 
-The second part takes into account both the uncertainties in the peak flux
+The second version takes into account both the uncertainties in the peak flux
 and distance (including the asymmetric errors), and also includes the
 model-predicted effect of the high system inclination (>80 degrees)::
 
@@ -58,7 +69,9 @@ model-predicted effect of the high system inclination (>80 degrees)::
 
 With the `fulldist=True` option, the function returns a dictionary with
 the Monte-Carlo generated distribution of the result (key `lum`) and all
-the intermediate quantities. 
+the intermediate quantities. These distributions are implemented via the
+`astropy <https://www.astropy.org>`_ 
+`Distribution <https://docs.astropy.org/en/stable/uncertainty>`_ package.
 
 Check the ``Inferring burster properties`` notebook, which includes the 
 examples used in the paper, for additional demonstrations of usage.
