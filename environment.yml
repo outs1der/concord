@@ -8,4 +8,4 @@ dependencies:
   - jupyter
   - pip:
     - astroquery
-    - chainconsumer=0.33.0
+    - chainconsumer

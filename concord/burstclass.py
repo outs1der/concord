@@ -30,7 +30,7 @@
 #     def info(self):
 #     def compare(self, mburst, param = [6.1*u.kpc,60.*u.degree,1.26,-10.*u.s],
 # class KeplerBurst(Lightcurve):
-#     defined with time, lumin, and lumin_err columns), the additional
+#     defined with time, lumin, and e_lumin columns), the additional
 #     def __init__(self, filename=None, run_id=None, path=None,
 #     def info(self):
 #
@@ -225,13 +225,13 @@ class Lightcurve(object):
     :timepixr: set to 0.0 (default) if time is the start of the bin, 0.5 for
                midpoint
     :flux, e_flux: flux and error (no units assumed)
-    :lumin, lumin_err: luminosity and error
+    :lumin, e_lumin: luminosity and error
 
     Normally only one of flux or luminosity would be supplied
 
     Example: simulated burst (giving time and luminosity)
 
-    >>> Lightcurve(self, time=d['time']*u.s, lumin=d['luminosity']*u.erg/u.s, lumin_err=d['u_luminosity']*u.erg/u.s)
+    >>> Lightcurve(self, time=d['time']*u.s, lumin=d['luminosity']*u.erg/u.s, e_lumin=d['u_luminosity']*u.erg/u.s)
 
     Example: observed burst giving flux
 
@@ -252,7 +252,7 @@ class Lightcurve(object):
         time, n - time array, unit, and number of elements
         timepixr - where in the time bin is the flux measured [0..1]
         dt - width of time bin
-        lumin, lumin_err - luminosity and error
+        lumin, e_lumin - luminosity and error
         flux, e_flux - flux and error (normally only one of these 2 present)
 
         :returns: length of the time series, or None
@@ -285,7 +285,7 @@ class Lightcurve(object):
             assert ('dt' not in kwargs)
             self.has_err.append( self.set_error('lumin', kwargs) )
             if (self.has_err[-1]):
-                assert (len(self.lumin_err) == self.n)
+                assert (len(self.e_lumin) == self.n)
             else:
                 logger.warning('luminosity is defined but no uncertainty was provided')
 
@@ -494,7 +494,7 @@ class Lightcurve(object):
         elif hasattr(self,'lumin'):
             luminosity = True
             y = self.lumin
-            yerr = self.lumin_err
+            yerr = self.e_lumin
             ylabel = "Luminosity ({0.unit:latex_inline})".format(self.lumin)
 
         # screen here for observed bursts from MINBAR
@@ -754,7 +754,7 @@ class Lightcurve(object):
             yerr = self.e_flux
         elif hasattr(self,'lumin'):
             y = self.lumin
-            yerr = self.lumin_err
+            yerr = self.e_lumin
 
         imax = np.argmax(y[self.good])
         pflux = y[self.good[imax]]
@@ -1391,7 +1391,7 @@ class ObservedBurst(Lightcurve):
         """
         Here apply the PRE criteria from Galloway et al. 2008:
         '...radius expansion occurred when (1) the blackbody normalization Kbb reached a ( local) maximum close to the time of peak
-        flux; (2) lower values of Kbb were measured following the maximum, with the decrease significant to 4\sigma or more; and (3) there
+        flux; (2) lower values of Kbb were measured following the maximum, with the decrease significant to 4 sigma or more; and (3) there
         was evidence of a (local) minimum in the fitted temperature Tbb at the same time as the maximum in Kbb. Bursts where just one or two
         of these criteria were satisfied we refer to as ‘‘marginal’’ cases, in which the presence of PRE could not be conclusively established.'
 
@@ -1622,7 +1622,7 @@ class ObservedBurst(Lightcurve):
 class KeplerBurst(Lightcurve):
     '''
     Example simulated burst class. Apart from the lightcurve (which is
-    defined with time, lumin, and lumin_err columns), the additional
+    defined with time, lumin, and e_lumin columns), the additional
     (minimal) attributes requred are:
 
     :filename: source file name
@@ -1699,11 +1699,11 @@ class KeplerBurst(Lightcurve):
         if ('time' in d.columns):
             Lightcurve.__init__(self, filename=self.filename, 
                             time=d['time']*u.s,
-                            lumin=d['luminosity']*u.erg/u.s, lumin_err=d['u_luminosity']*u.erg/u.s)
+                            lumin=d['luminosity']*u.erg/u.s, e_lumin=d['u_luminosity']*u.erg/u.s)
         else:
             Lightcurve.__init__(self, filename=self.filename, 
                             time=d['col1']*u.s,
-                            lumin=d['col2']*u.erg/u.s, lumin_err=d['col3']*u.erg/u.s)
+                            lumin=d['col2']*u.erg/u.s, e_lumin=d['col3']*u.erg/u.s)
 
         if ('comments' in d.meta):
             self.comments = d.meta['comments']
