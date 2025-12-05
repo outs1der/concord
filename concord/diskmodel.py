@@ -7,10 +7,9 @@ import astropy.units as u
 import astropy.uncertainty as unc
 import os
 
-import pkg_resources
+import importlib 
 
-# CONCORD_PATH = os.environ['CONCORD_PATH']
-CONCORD_PATH = pkg_resources.resource_filename('concord','data')
+CONCORD_CONTEXT = importlib.resources.path('concord','data')
 he16_models = ['he16_a', 'he16_b', 'he16_c', 'he16_c_short', 'he16_d']
 
 
@@ -18,8 +17,9 @@ def load_he16(model):
     """Reads in and returns the He & Keek (2016) model specified."""
     model_str = model.split('he16_')[1]
     he16_filename = 'anisotropy_{}.txt'.format(model_str)
-    he16_filepath = os.path.join(CONCORD_PATH, he16_filename)
-    a=ascii.read(he16_filepath)
+    with CONCORD_CONTEXT as path:
+        he16_filepath = os.path.join(path, he16_filename)
+        a=ascii.read(he16_filepath)
 
     return a
 
