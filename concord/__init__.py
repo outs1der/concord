@@ -1,10 +1,6 @@
-import pkg_resources
-
-CONCORD_PATH = pkg_resources.resource_filename('concord','data')
-
 __author__ = 'Duncan K. Galloway'
 __email__ = 'Duncan.Galloway@monash.edu'
-__version__ = '1.5.0'
+__version__ = '1.6.0'
 
 # Ensure objects are available at the package level
 

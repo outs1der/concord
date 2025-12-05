@@ -34,10 +34,9 @@ from concord import diskmodel as dm
 
 # Get the path for the concord files from the environment variable
 
-import pkg_resources
+import importlib 
+CONCORD_CONTEXT = importlib.resources.path('concord','data')
 
-CONCORD_PATH = pkg_resources.resource_filename('concord','data')
-# CONCORD_PATH = os.environ['CONCORD_PATH']
 ETA = 1.e-6
 # default colours for plotting
 OBS_COLOUR = 'b'
@@ -54,8 +53,9 @@ except:
 # Set a flag here to determine if the reference bursts are present
 
 REF_PRESENT = False
-if os.path.isfile(CONCORD_PATH+'/table2.tex'):
-    REF_PRESENT = True
+with CONCORD_CONTEXT as path:
+    CONCORD_PATH = str(path)
+    REF_PRESENT = os.path.isfile(path / 'table2.tex')
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -861,7 +861,7 @@ class ObservedBurst(Lightcurve):
         # print ('source = {}'.format(source))
         # print ('dt = {}'.format(dt))
 
-        tdel, tdel_err = decode_LaTeX(cls.table['$\Delta t$ (hr)'][row])
+        tdel, tdel_err = decode_LaTeX(cls.table[r'$\Delta t$ (hr)'][row])
 
         if tdel_err is None:
 
@@ -894,7 +894,7 @@ class ObservedBurst(Lightcurve):
                 # Here we convert the table entry to a value. We have a couple of options
                 # here: raw value, range (separated by "--"), or LaTeX expression
 
-                range_match = re.search('([0-9]+\.[0-9]+)--([0-9]+\.[0-9]+)',
+                range_match = re.search(r'([0-9]+\.[0-9]+)--([0-9]+\.[0-9]+)',
                     cls.table[column][row])
 
                 if range_match:
@@ -1147,7 +1147,7 @@ class ObservedBurst(Lightcurve):
                        yerr=self.tdel_err.value, fmt='o', color='b')
                 a.errorbar([1.05], sim_burst.tdel.value,
                        yerr=sim_burst.tdel_err.value, fmt='o', color='g')
-                plt.ylabel('$\Delta t$ (hr)')
+                plt.ylabel(r'$\Delta t$ (hr)')
 
 #            plt.plot(self.time,model,'.')
                 plt.xlim(0.8,1.2)
@@ -1726,8 +1726,8 @@ def plot_comparison(obs,models,param=None,sampler=None,ibest=None):
     fig = plt.figure()
     plt.errorbar(x,y,xerr=xerr,yerr=yerr,fmt='o')
     plt.plot([3,6],[3,6],'--')
-    plt.xlabel('Observed $\Delta t$ (hr)')
-    plt.ylabel('Predicted $(1+z)\Delta t$ (hr)')
+    plt.xlabel(r'Observed $\Delta t$ (hr)')
+    plt.ylabel(r'Predicted $(1+z)\Delta t$ (hr)')
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
