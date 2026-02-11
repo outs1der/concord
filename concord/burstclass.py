@@ -330,7 +330,6 @@ class Lightcurve(object):
                     self.dt_nogap[self.good[i]] = max(
     [self.dt[self.good[i]],self.time[self.good[i+1]]-self.time[self.good[i]]] )
 
-        return self.n
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -1091,7 +1090,8 @@ class ObservedBurst(Lightcurve):
         _n = Lightcurve.__init__(self, time = time*u.s, dt = dt*u.s,
                                 flux = flux*u.erg/u.cm**2/u.s,
                                 e_flux= e_flux*u.erg/u.cm**2/u.s, **kwargs)
-        if _n is None:
+        _n = len(self.time)
+        if _n == 0:
             logger.error("can't create Lightcurve object, bailing out")
             return None
 
