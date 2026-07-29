@@ -58,7 +58,8 @@ from concord import diskmodel as dm
 # Get the path for the concord files from the environment variable
 
 import importlib 
-CONCORD_CONTEXT = importlib.resources.path('concord','data')
+
+CONCORD_DATA_PATH = importlib.resources.files('concord.data')
 
 ETA = 1.e-6
 CONF_DEFAULT = 0.68
@@ -76,10 +77,7 @@ except:
 
 # Set a flag here to determine if the reference bursts are present
 
-REF_PRESENT = False
-with CONCORD_CONTEXT as path:
-    CONCORD_PATH = str(path)
-    REF_PRESENT = os.path.isfile(path / 'table2.tex')
+REF_PRESENT = os.path.isfile(CONCORD_DATA_PATH.joinpath('table2.tex'))
 
 # ------- --------- --------- --------- --------- --------- --------- ---------
 
@@ -1221,14 +1219,14 @@ class ObservedBurst(Lightcurve):
         '''
 
         if not REF_PRESENT:
-            logger.error('reference data not found in {}'.format(CONCORD_PATH))
+            logger.error('reference data not found in {}'.format(CONCORD_DATA_PATH))
             return None
 
         # First read in the table
         # Because we apply this at the class level, it's available to all instances
         # Other attributes have to be applied at the instance level
 
-        cls.table_file = os.path.join(CONCORD_PATH, 'table2.tex')
+        cls.table_file = CONCORD_DATA_PATH.joinpath('table2.tex')
         cls.table = Table.read(cls.table_file)
 
         # Below we associate each epoch with a file
@@ -1320,7 +1318,7 @@ class ObservedBurst(Lightcurve):
                 # setattr(self, label[i], self.table[column][self.row] * unit[i])
                 rowparam[label[i]] = cls.table[column][row] * unit[i]
 
-        return cls.from_file(cls.table['file'][row], CONCORD_PATH, **rowparam)
+        return cls.from_file(cls.table['file'][row], CONCORD_DATA_PATH, **rowparam)
 
     @classmethod
     def from_file(cls, filename, path='.', **kwargs):
@@ -1344,7 +1342,12 @@ class ObservedBurst(Lightcurve):
         >>> obs = ObservedBurst.from_file('gs1826-24_3.530h.dat','example_data')
         '''
 
-        d = ascii.read(path+'/'+filename)
+        try:
+            # will work for string paths and filenames
+            d = ascii.read(path+'/'+filename)
+        except:
+            # for MultiplexedPath paths, like CONCORD_DATA_PATH
+            d = ascii.read(path / filename)
 
         return cls(d['col1'], d['col2'], d['col3']*1e-9, d['col4']*1e-9,
                    path=path, filename=filename, comments=d.meta['comments'],
