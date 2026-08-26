@@ -769,68 +769,72 @@ class Lightcurve(object):
         rchisq=0.0
         ng = len(self.good)
         ntail=ng-imax-1	# Number of points in the tail
+
+        f_int=0.
         if ntail >= minpts:
             tail=np.where(self.time[self.good] > self.time[self.good[imax]])[0]
 
-# Determine the minimum flux reached in the tail. This might be bigger than
-# fitfrac*pflux, so we need to count from there as a zero point
+	    # Determine the minimum flux reached in the tail. This might
+	    # be bigger than fitfrac*pflux, so we need to count from there
+	    # as a zero point
 
-        minflux=0.
-        if len(tail) > 0:
-            minflux=min(y[self.good[tail]])
+            minflux=0.
+            if len(tail) > 0:
+                minflux=min(y[self.good[tail]])
 
-# Now determine the points in the tail which are *excluded* from the fit;
-# for the fit selection, we then calculate from the end of this interval
+	    # Now determine the points in the tail which are *excluded*
+	    # from the fit; for the fit selection, we then calculate from
+	    # the end of this interval
 
-        tailexcl=np.where((self.time[self.good] > self.time[self.good[imax]])
+            tailexcl=np.where((self.time[self.good] > self.time[self.good[imax]])
                        & (y[self.good] > minflux+fitfrac*pflux))[0]
 
-        if len(tailexcl) > 0:
-            sel=self.good[min([ng-4,max(tailexcl)]):ng]
+            if len(tailexcl) > 0:
+                sel=self.good[min([ng-4,max(tailexcl)]):ng]
 				# Last three points, at least
-        else:
-            sel=self.good[min([imax+1,ng-4]):ng]
+            else:
+                sel=self.good[min([imax+1,ng-4]):ng]
 				# ...or, if all the tail points are excluded,
 				#   just take the last three
 
-        # Now actually do the fitting (to the log of the flux)
-        # Originally we used linfit, but this is a bit obscure; subsequently
-        # replaced with np.polyfit (see
-        # https://numpy.org/doc/stable/reference/generated/numpy.polyfit.html)
+            # Now actually do the fitting (to the log of the flux)
+            # Originally we used linfit, but this is a bit obscure; subsequently
+            # replaced with np.polyfit (see
+            # https://numpy.org/doc/stable/reference/generated/numpy.polyfit.html)
 
-        # result, cvm, fit_info = linfit(
-        #     self.time[sel]-self.time[sel[0]]+self.dt_nogap[sel]/2.,
-        #     np.log(y[sel].value),
-        #     sigmay=0.5*(np.log((y[sel]+yerr[sel]).value)
-        #                 -np.log((y[sel]-yerr[sel]).value)),
-        #     return_all=True)
-        result = np.polyfit(
-          self.time[sel]-self.time[sel[0]]+self.dt_nogap[sel]/2.,
-          np.log(y[sel].value), 1,
-          w=1./(0.5*(np.log((y[sel]+yerr[sel]).value)
+            # result, cvm, fit_info = linfit(
+            #     self.time[sel]-self.time[sel[0]]+self.dt_nogap[sel]/2.,
+            #     np.log(y[sel].value),
+            #     sigmay=0.5*(np.log((y[sel]+yerr[sel]).value)
+            #                 -np.log((y[sel]-yerr[sel]).value)),
+            #     return_all=True)
+            result = np.polyfit(
+              self.time[sel]-self.time[sel[0]]+self.dt_nogap[sel]/2.,
+              np.log(y[sel].value), 1,
+              w=1./(0.5*(np.log((y[sel]+yerr[sel]).value)
                      -np.log((y[sel]-yerr[sel]).value))))
 
-# Result is a 2-element array, slope and intercept (opposite order to IDL)
+            # Result is a 2-element array, slope and intercept (opposite order to IDL)
 
-        f_int=0.
-        if (result[0] > 0.0) & warnings:
-            logger.warning ('fit is rising, result is not trustworthy')
-        else:
-            tmax=max(self.time[sel]+self.dt_nogap[sel]-self.time[sel[0]])
-            f_int=-fluen.unit/result[0]*exp(result[1])*exp(tmax.value*result[0])
+            if (result[0] > 0.0) & warnings:
+                logger.warning ('fit is rising, result is not trustworthy')
+            else:
+                tmax=max(self.time[sel]+self.dt_nogap[sel]-self.time[sel[0]])
+                f_int=-fluen.unit/result[0]*exp(result[1])*exp(tmax.value*result[0])
 
         fluen+=f_int
 
-# Show the integrated part against the lightcurve, if required
-# This could be improved
+        # Show the integrated part against the lightcurve, if required
+        # This could be improved
 
         if plot:
             self.plot()
-            xx=np.arange(20)/19.*(max(self.time[sel]+self.dt_nogap[sel])-self.time[sel[0]])*4
-#            print ("xx: ",xx)#+self.time[sel[0]])
-#            print ("yy:",np.exp(xx.value*result[0]))
-            plt.plot(xx+self.time[sel[0]],
-                np.exp(result[1])*np.exp(xx.value*result[0]))
+            if f_int > 0.0:
+                xx=np.arange(20)/19.*(max(self.time[sel]+self.dt_nogap[sel])-self.time[sel[0]])*4
+    #            print ("xx: ",xx)#+self.time[sel[0]])
+    #            print ("yy:",np.exp(xx.value*result[0]))
+                plt.plot(xx+self.time[sel[0]],
+                    np.exp(result[1])*np.exp(xx.value*result[0]))
 
         if f_int > fluene_stat:
             if warnings:
